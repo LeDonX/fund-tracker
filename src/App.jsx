@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { 
   Plus, 
   RefreshCw, 
@@ -13,28 +13,15 @@ import {
   ChevronRight,
   FolderPlus,
   X,
-  FileText,
   AlertCircle,
-  Trash2
+  Trash2,
+  Clock
 } from 'lucide-react';
 
-// --- 模拟初始数据 ---
+// --- 初始分组数据 ---
 const INITIAL_SECTORS = ['大消费', '科技半导体', '医疗医药', '均衡宽基'];
 
-const MOCK_DATA = [
-  { id: 1, name: '招商中证白酒指数', code: '161725', sector: '大消费', amount: 50000, dailyRate: 2.34, dailyProfit: 1170, totalProfit: 12500, totalRate: 25.00, weeklyProfit: -300, monthlyProfit: 2100 },
-  { id: 2, name: '易方达消费行业', code: '110022', sector: '大消费', amount: 30000, dailyRate: 1.20, dailyProfit: 360, totalProfit: -1500, totalRate: -5.00, weeklyProfit: 150, monthlyProfit: 400 },
-  { id: 3, name: '诺安成长混合', code: '320007', sector: '科技半导体', amount: 45000, dailyRate: -3.50, dailyProfit: -1575, totalProfit: -8000, totalRate: -17.78, weeklyProfit: -2500, monthlyProfit: -4000 },
-  { id: 4, name: '银河创新成长', code: '519674', sector: '科技半导体', amount: 20000, dailyRate: -2.10, dailyProfit: -420, totalProfit: 4000, totalRate: 20.00, weeklyProfit: -800, monthlyProfit: 1200 },
-  { id: 5, name: '中欧医疗健康', code: '003095', sector: '医疗医药', amount: 60000, dailyRate: 0.50, dailyProfit: 300, totalProfit: -12000, totalRate: -20.00, weeklyProfit: 600, monthlyProfit: -1000 },
-  { id: 6, name: '工银前沿医疗', code: '001717', sector: '医疗医药', amount: 25000, dailyRate: 0.80, dailyProfit: 200, totalProfit: 1500, totalRate: 6.00, weeklyProfit: 400, monthlyProfit: 800 },
-  { id: 7, name: '易方达蓝筹精选', code: '005827', sector: '均衡宽基', amount: 100000, dailyRate: 1.05, dailyProfit: 1050, totalProfit: -5000, totalRate: -5.00, weeklyProfit: 1200, monthlyProfit: 3500 },
-  { id: 8, name: '富国天惠成长', code: '161005', sector: '均衡宽基', amount: 80000, dailyRate: 0.90, dailyProfit: 720, totalProfit: 18000, totalRate: 22.50, weeklyProfit: 900, monthlyProfit: 2500 },
-  { id: 9, name: '景顺长城鼎益', code: '162605', sector: '均衡宽基', amount: 40000, dailyRate: 1.15, dailyProfit: 460, totalProfit: 3000, totalRate: 7.50, weeklyProfit: 500, monthlyProfit: 1100 },
-  { id: 10, name: '万家行业优选', code: '161903', sector: '科技半导体', amount: 35000, dailyRate: -1.80, dailyProfit: -630, totalProfit: -2000, totalRate: -5.71, weeklyProfit: -1200, monthlyProfit: -800 },
-];
-
-// --- 模拟交易记录数据生成器 ---
+// --- 模拟交易记录数据生成器 (历史记录弹窗用) ---
 const generateMockHistory = () => {
   return [
     { id: 101, date: '2026-03-15', type: '买入', amount: 10000, status: '确认成功' },
@@ -71,7 +58,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-md" }) => {
       <div className={`bg-white rounded-2xl shadow-xl w-full ${maxWidth} flex flex-col max-h-[90vh]`}>
         <div className="flex justify-between items-center p-5 border-b border-slate-100 flex-shrink-0">
           <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -83,37 +70,506 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-md" }) => {
   );
 };
 
+// ============================================================================
+// 天天基金 / 东财估值服务：JSONP Script 注入法
+// ============================================================================
+const SCRIPT_TIMEOUT_MS = 8000;
+
+const toNumber = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const readStoredJson = (storageKey, fallbackValue) => {
+  try {
+    const rawValue = localStorage.getItem(storageKey);
+    if (!rawValue) return fallbackValue;
+
+    const parsedValue = JSON.parse(rawValue);
+    return parsedValue ?? fallbackValue;
+  } catch (error) {
+    console.warn(`本地缓存解析失败: ${storageKey}`, error);
+    return fallbackValue;
+  }
+};
+
+const normalizeStoredFund = (fund, index) => {
+  if (!fund || typeof fund !== 'object') {
+    return null;
+  }
+
+  const hasTrackedShares = fund.shares !== undefined || fund.costAmount !== undefined;
+
+  return {
+    id: fund.id ?? Date.now() + index,
+    name: typeof fund.name === 'string' && fund.name.trim() ? fund.name.trim() : '未命名基金',
+    code: String(fund.code || '').trim(),
+    sector: typeof fund.sector === 'string' ? fund.sector : '',
+    amount: Math.max(0, toNumber(fund.amount)),
+    dailyRate: toNumber(fund.dailyRate),
+    dailyProfit: toNumber(fund.dailyProfit),
+    totalProfit: toNumber(fund.totalProfit),
+    totalRate: toNumber(fund.totalRate),
+    weeklyProfit: toNumber(fund.weeklyProfit),
+    monthlyProfit: toNumber(fund.monthlyProfit),
+    shares: hasTrackedShares ? Math.max(0, toNumber(fund.shares)) : undefined,
+    costAmount: fund.costAmount !== undefined ? Math.max(0, toNumber(fund.costAmount)) : undefined,
+    currentNetValue: fund.currentNetValue !== undefined ? Math.max(0, toNumber(fund.currentNetValue)) : undefined,
+    lastNetValue: fund.lastNetValue !== undefined ? Math.max(0, toNumber(fund.lastNetValue)) : undefined,
+    lastValuationTime: typeof fund.lastValuationTime === 'string' ? fund.lastValuationTime : '',
+    netValueDate: typeof fund.netValueDate === 'string' ? fund.netValueDate : '',
+    bootstrapSharesFromAmount: Boolean(fund.bootstrapSharesFromAmount),
+  };
+};
+
+const normalizeStoredFunds = (storedFunds) => {
+  if (!Array.isArray(storedFunds)) return [];
+
+  return storedFunds
+    .map((fund, index) => normalizeStoredFund(fund, index))
+    .filter((fund) => fund && fund.code);
+};
+
+const normalizeStoredSectors = (storedSectors) => {
+  if (!Array.isArray(storedSectors)) {
+    return INITIAL_SECTORS;
+  }
+
+  const normalized = storedSectors
+    .map((sector) => (typeof sector === 'string' ? sector.trim() : ''))
+    .filter(Boolean);
+
+  return normalized.length > 0 ? normalized : INITIAL_SECTORS;
+};
+
+const createEmptyFundForm = () => ({ code: '', amount: '', holdingProfit: '' });
+
+const createEmptyFundLookup = () => ({
+  status: 'idle',
+  message: '输入 6 位基金代码后将自动查询基金名称与最新估值。',
+  quote: null,
+});
+
+const getQuoteReferenceNetValue = (quote) => {
+  const estimatedNetValue = toNumber(quote?.estimatedNetValue);
+  if (estimatedNetValue > 0) return estimatedNetValue;
+  return toNumber(quote?.lastNetValue);
+};
+
+const getStoredReferenceNetValue = (fund) => {
+  const currentNetValue = toNumber(fund?.currentNetValue);
+  if (currentNetValue > 0) return currentNetValue;
+
+  const lastNetValue = toNumber(fund?.lastNetValue);
+  if (lastNetValue > 0) return lastNetValue;
+
+  const shares = toNumber(fund?.shares);
+  const marketValue = toNumber(fund?.amount);
+  if (shares > 0 && marketValue > 0) {
+    return marketValue / shares;
+  }
+
+  return 0;
+};
+
+const buildFundSnapshot = (fund, overrides = {}) => {
+  const hasTrackedShares = overrides.shares !== undefined || fund.shares !== undefined;
+  const shares = hasTrackedShares ? Math.max(0, toNumber(overrides.shares ?? fund.shares)) : 0;
+  const currentNetValue = toNumber(overrides.currentNetValue ?? getStoredReferenceNetValue(fund));
+  const lastNetValue = toNumber(overrides.lastNetValue ?? fund.lastNetValue);
+  const derivedDailyRate = currentNetValue > 0 && lastNetValue > 0
+    ? ((currentNetValue - lastNetValue) / lastNetValue) * 100
+    : 0;
+  const dailyRate = toNumber(overrides.dailyRate ?? derivedDailyRate);
+  const fallbackMarketValue = Math.max(0, toNumber(overrides.amount ?? fund.amount));
+  const marketValue = hasTrackedShares
+    ? (shares > 0 && currentNetValue > 0 ? shares * currentNetValue : 0)
+    : fallbackMarketValue;
+  const fallbackCostAmount = fund.costAmount !== undefined
+    ? Math.max(0, toNumber(fund.costAmount))
+    : Math.max(0, toNumber(fund.amount));
+  const costAmount = hasTrackedShares
+    ? (shares > 0 ? Math.max(0, toNumber(overrides.costAmount ?? fallbackCostAmount)) : 0)
+    : undefined;
+  const legacyDailyProfit = dailyRate !== 0
+    ? (fallbackMarketValue * dailyRate) / 100
+    : toNumber(overrides.dailyProfit ?? fund.dailyProfit);
+  const legacyTotalProfit = toNumber(overrides.totalProfit ?? fund.totalProfit);
+  const legacyTotalRate = toNumber(overrides.totalRate ?? fund.totalRate);
+  const dailyProfit = hasTrackedShares
+    ? (shares > 0 && currentNetValue > 0 && lastNetValue > 0 ? shares * (currentNetValue - lastNetValue) : 0)
+    : legacyDailyProfit;
+  const totalProfit = hasTrackedShares
+    ? marketValue - costAmount
+    : legacyTotalProfit;
+  const totalRate = hasTrackedShares
+    ? (costAmount > 0 ? (totalProfit / costAmount) * 100 : 0)
+    : legacyTotalRate;
+
+  return {
+    ...fund,
+    ...overrides,
+    amount: marketValue,
+    shares: hasTrackedShares ? shares : undefined,
+    costAmount,
+    currentNetValue,
+    lastNetValue,
+    dailyRate,
+    dailyProfit,
+    totalProfit,
+    totalRate,
+    weeklyProfit: toNumber(overrides.weeklyProfit ?? fund.weeklyProfit),
+    monthlyProfit: toNumber(overrides.monthlyProfit ?? fund.monthlyProfit),
+  };
+};
+
+const reconcileFundWithQuote = (fund, quote) => {
+  const referenceNetValue = getQuoteReferenceNetValue(quote);
+  const fallbackMarketValue = Math.max(0, toNumber(fund.amount));
+  const existingShares = toNumber(fund.shares);
+  const shouldBootstrapShares = Boolean(fund.bootstrapSharesFromAmount);
+  const shares = existingShares > 0
+    ? existingShares
+    : (shouldBootstrapShares && referenceNetValue > 0 && fallbackMarketValue > 0 ? fallbackMarketValue / referenceNetValue : undefined);
+  const hasStoredCostAmount = fund.costAmount !== undefined;
+  const existingCostAmount = Math.max(0, toNumber(fund.costAmount));
+  const costAmount = hasStoredCostAmount
+    ? existingCostAmount
+    : (shouldBootstrapShares ? fallbackMarketValue : undefined);
+
+  return buildFundSnapshot(fund, {
+    name: quote.name || fund.name,
+    code: quote.code || fund.code,
+    ...(shares !== undefined ? { shares } : {}),
+    ...(costAmount !== undefined ? { costAmount } : {}),
+    currentNetValue: referenceNetValue,
+    lastNetValue: quote.lastNetValue,
+    dailyRate: quote.dailyRate,
+    lastValuationTime: quote.updateTime || fund.lastValuationTime || '',
+    netValueDate: quote.netValueDate || fund.netValueDate || '',
+    bootstrapSharesFromAmount: false,
+  });
+};
+
+const fetchQuoteMapForFunds = async (fundsToUpdate) => {
+  if (!fundsToUpdate || fundsToUpdate.length === 0) {
+    return new Map();
+  }
+
+  const uniqueCodes = [...new Set(
+    fundsToUpdate
+      .map((fund) => String(fund.code || '').trim())
+      .filter(Boolean)
+  )];
+
+  const quoteMap = new Map();
+
+  for (const code of uniqueCodes) {
+    try {
+      const quote = await enqueueTiantianFundQuote(code);
+      quoteMap.set(code, quote);
+    } catch (error) {
+      console.warn(`天天基金估值刷新失败: ${code}`, error);
+    }
+  }
+
+  return quoteMap;
+};
+
+const mergeFundsWithQuotes = (fundsToMerge, quoteMap) => {
+  if (!fundsToMerge || fundsToMerge.length === 0) {
+    return fundsToMerge;
+  }
+
+  return fundsToMerge.map((fund) => {
+    const quote = quoteMap.get(String(fund.code || '').trim());
+    if (quote) {
+      return reconcileFundWithQuote(fund, quote);
+    }
+
+    if (fund.shares === undefined) {
+      return {
+        ...fund,
+        dailyRate: 0,
+        dailyProfit: 0,
+      };
+    }
+
+    return fund;
+  });
+};
+
+let tiantianQuoteQueue = Promise.resolve();
+
+const loadTiantianFundQuote = (fundCode) => {
+  return new Promise((resolve, reject) => {
+    const normalizedCode = String(fundCode || '').trim();
+    if (!normalizedCode) {
+      reject(new Error('基金代码不能为空'));
+      return;
+    }
+
+    const callbackName = 'jsonpgz';
+    const previousCallback = window[callbackName];
+    const scriptId = `tiantian_quote_${normalizedCode}_${Date.now()}`;
+    let settled = false;
+
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      document.getElementById(scriptId)?.remove();
+
+      if (previousCallback === undefined) {
+        delete window[callbackName];
+      } else {
+        window[callbackName] = previousCallback;
+      }
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(`基金 ${normalizedCode} 估值请求超时`));
+    }, SCRIPT_TIMEOUT_MS);
+
+    window[callbackName] = (payload) => {
+      const payloadCode = String(payload?.fundcode || '').trim();
+      if (payloadCode && payloadCode !== normalizedCode) {
+        return;
+      }
+
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve({
+        code: payloadCode || normalizedCode,
+        name: payload?.name || '',
+        lastNetValue: toNumber(payload?.dwjz),
+        estimatedNetValue: toNumber(payload?.gsz),
+        dailyRate: toNumber(payload?.gszzl),
+        updateTime: payload?.gztime || '',
+        netValueDate: payload?.jzrq || '',
+      });
+    };
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = `https://fundgz.1234567.com.cn/js/${normalizedCode}.js?rt=${Date.now()}`;
+    script.async = true;
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(`基金 ${normalizedCode} 估值加载失败`));
+    };
+
+    document.body.appendChild(script);
+  });
+};
+
+const enqueueTiantianFundQuote = (fundCode) => {
+  const task = tiantianQuoteQueue.then(() => loadTiantianFundQuote(fundCode));
+  tiantianQuoteQueue = task.then(() => undefined, () => undefined);
+  return task;
+};
+
+const alignFundMarketValue = async (fund, nextMarketValue, fallbackName = fund.name) => {
+  const sanitizedMarketValue = Math.max(0, toNumber(nextMarketValue));
+
+  try {
+    const quote = await enqueueTiantianFundQuote(fund.code);
+    const referenceNetValue = getQuoteReferenceNetValue(quote);
+
+    if (referenceNetValue > 0) {
+      return buildFundSnapshot({ ...fund, name: fallbackName }, {
+        name: quote.name || fallbackName,
+        shares: sanitizedMarketValue > 0 ? sanitizedMarketValue / referenceNetValue : 0,
+        costAmount: toNumber(fund.costAmount) > 0 ? toNumber(fund.costAmount) : sanitizedMarketValue,
+        currentNetValue: referenceNetValue,
+        lastNetValue: quote.lastNetValue,
+        dailyRate: quote.dailyRate,
+        lastValuationTime: quote.updateTime || fund.lastValuationTime || '',
+        netValueDate: quote.netValueDate || fund.netValueDate || '',
+      });
+    }
+  } catch (error) {
+    console.warn(`持仓市值校准失败: ${fund.code}`, error);
+  }
+
+  const fallbackReferenceNetValue = getStoredReferenceNetValue(fund);
+  if (fallbackReferenceNetValue > 0) {
+    return buildFundSnapshot({ ...fund, name: fallbackName }, {
+      name: fallbackName,
+      shares: sanitizedMarketValue > 0 ? sanitizedMarketValue / fallbackReferenceNetValue : 0,
+      costAmount: toNumber(fund.costAmount) > 0 ? toNumber(fund.costAmount) : sanitizedMarketValue,
+      currentNetValue: fallbackReferenceNetValue,
+    });
+  }
+
+  return {
+    ...fund,
+    name: fallbackName,
+    amount: sanitizedMarketValue,
+    costAmount: toNumber(fund.costAmount) > 0 ? toNumber(fund.costAmount) : sanitizedMarketValue,
+  };
+};
+
+const applyTradeToFund = (fund, trade, quote) => {
+  const normalizedFund = quote ? reconcileFundWithQuote(fund, quote) : fund;
+  const referenceNetValue = getQuoteReferenceNetValue(quote) || getStoredReferenceNetValue(normalizedFund);
+  const tradeAmount = Math.max(0, toNumber(trade.amount));
+
+  if (referenceNetValue <= 0 || tradeAmount <= 0) {
+    return normalizedFund;
+  }
+
+  const currentShares = Math.max(0, toNumber(normalizedFund.shares));
+  const currentCostAmount = Math.max(0, toNumber(normalizedFund.costAmount));
+  let nextShares = currentShares;
+  let nextCostAmount = currentCostAmount;
+
+  if (trade.type === '买入') {
+    nextShares += tradeAmount / referenceNetValue;
+    nextCostAmount += tradeAmount;
+  } else if (trade.type === '卖出') {
+    if (currentShares <= 0) {
+      return normalizedFund;
+    }
+
+    const soldShares = Math.min(currentShares, tradeAmount / referenceNetValue);
+    const soldRatio = currentShares > 0 ? soldShares / currentShares : 0;
+    nextShares = Math.max(0, currentShares - soldShares);
+    nextCostAmount = Math.max(0, currentCostAmount - currentCostAmount * soldRatio);
+  } else if (trade.type === '分红') {
+    nextCostAmount = Math.max(0, currentCostAmount - tradeAmount);
+  }
+
+  return buildFundSnapshot(normalizedFund, {
+    name: quote?.name || normalizedFund.name,
+    shares: nextShares,
+    costAmount: nextCostAmount,
+    currentNetValue: referenceNetValue,
+    lastNetValue: quote?.lastNetValue ?? normalizedFund.lastNetValue,
+    dailyRate: quote?.dailyRate ?? normalizedFund.dailyRate,
+    lastValuationTime: quote?.updateTime || normalizedFund.lastValuationTime || '',
+    netValueDate: quote?.netValueDate || normalizedFund.netValueDate || '',
+  });
+};
+// ============================================================================
+
 export default function FundTrackerApp() {
-  const [funds, setFunds] = useState(MOCK_DATA);
-  const [sectors, setSectors] = useState(INITIAL_SECTORS);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // 折叠状态控制
+  // 1. 初始化持仓：从 localStorage 读取，若无则默认为空数组 []
+  const [funds, setFunds] = useState(() => {
+    return normalizeStoredFunds(readStoredJson('fundTrackerData', []));
+  });
+
+  // 2. 初始化分组
+  const [sectors, setSectors] = useState(() => {
+    return normalizeStoredSectors(readStoredJson('fundTrackerSectors', INITIAL_SECTORS));
+  });
+
+  // 3. 监听变化：只要持仓变了，立刻存入本地缓存
+  useEffect(() => {
+    localStorage.setItem('fundTrackerData', JSON.stringify(funds));
+  }, [funds]);
+
+  // 4. 监听变化：只要分组变了，立刻存入本地缓存
+  useEffect(() => {
+    localStorage.setItem('fundTrackerSectors', JSON.stringify(sectors));
+  }, [sectors]);
+
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
-
-  // 记录当前操作的基金（用于查看历史和设置）
   const [selectedFund, setSelectedFund] = useState(null);
+  const hasAutoRefreshedRef = useRef(false);
+  const fundLookupRequestRef = useRef(0);
 
-  // 各类弹窗状态
   const [modals, setModals] = useState({
-    group: false,
-    fund: false,
-    sync: false,
-    import: false,
-    export: false,
-    history: false,
-    settings: false
+    group: false, fund: false, sync: false, import: false, export: false, history: false, settings: false
   });
 
   const openModal = (type) => setModals(prev => ({ ...prev, [type]: true }));
   const closeModal = (type) => setModals(prev => ({ ...prev, [type]: false }));
 
-  // 表单状态
   const [newGroupName, setNewGroupName] = useState('');
-  const [fundForm, setFundForm] = useState({ name: '', code: '', sector: INITIAL_SECTORS[0], amount: '' });
-  const [syncForm, setSyncForm] = useState({ code: '', type: '买入', amount: '', date: new Date().toISOString().split('T')[0] });
-  // 编辑表单状态
+  const [fundForm, setFundForm] = useState(createEmptyFundForm);
+  const [fundLookup, setFundLookup] = useState(createEmptyFundLookup);
+  const [syncForm, setSyncForm] = useState({ code: '', type: '买入', amount: '' });
   const [editForm, setEditForm] = useState({ id: null, name: '', code: '', sector: '', amount: '' });
+
+  const normalizedFundCode = String(fundForm.code || '').trim();
+  const hasHoldingAmountInput = String(fundForm.amount || '').trim() !== '';
+  const hasHoldingProfitInput = String(fundForm.holdingProfit || '').trim() !== '';
+  const holdingAmountValue = hasHoldingAmountInput ? Number.parseFloat(fundForm.amount) : Number.NaN;
+  const holdingProfitValue = hasHoldingProfitInput ? Number.parseFloat(fundForm.holdingProfit) : Number.NaN;
+  const derivedCostAmountRaw = Number.isFinite(holdingAmountValue) && Number.isFinite(holdingProfitValue)
+    ? holdingAmountValue - holdingProfitValue
+    : Number.NaN;
+  const derivedCostAmount = Number.isFinite(derivedCostAmountRaw)
+    ? Math.max(0, derivedCostAmountRaw)
+    : Number.NaN;
+  const isHoldingAmountValid = Number.isFinite(holdingAmountValue) && holdingAmountValue > 0;
+  const isHoldingProfitValid = Number.isFinite(holdingProfitValue);
+  const isDerivedCostAmountValid = Number.isFinite(derivedCostAmountRaw) && derivedCostAmountRaw >= 0;
+  const canSubmitFund = fundLookup.status === 'success' && isHoldingAmountValid && isHoldingProfitValid && isDerivedCostAmountValid;
+
+  const resetFundModalState = useCallback(() => {
+    fundLookupRequestRef.current += 1;
+    setFundForm(createEmptyFundForm());
+    setFundLookup(createEmptyFundLookup());
+  }, []);
+
+  const handleOpenFundModal = () => {
+    resetFundModalState();
+    openModal('fund');
+  };
+
+  const handleCloseFundModal = () => {
+    resetFundModalState();
+    closeModal('fund');
+  };
+
+  const handleFundCodeChange = (value) => {
+    const nextCode = String(value || '').trim();
+    fundLookupRequestRef.current += 1;
+
+    setFundForm((current) => ({
+      ...current,
+      code: nextCode,
+    }));
+
+    if (!nextCode) {
+      setFundLookup(createEmptyFundLookup());
+      return;
+    }
+
+    if (/^\d{1,5}$/.test(nextCode)) {
+      setFundLookup({
+        status: 'idle',
+        message: '输入满 6 位基金代码后将自动查询基金名称与最新估值。',
+        quote: null,
+      });
+      return;
+    }
+
+    if (!/^\d{6}$/.test(nextCode)) {
+      setFundLookup({
+        status: 'error',
+        message: '请输入正确的 6 位基金代码后再查询。',
+        quote: null,
+      });
+      return;
+    }
+
+    setFundLookup({
+      status: 'loading',
+      message: `正在查询 ${nextCode} 的基金信息...`,
+      quote: null,
+    });
+  };
 
   // --- 数据计算与分组 ---
   const { groupedFunds, totalDailyProfit, totalAmount, totalProfit } = useMemo(() => {
@@ -134,22 +590,42 @@ export default function FundTrackerApp() {
       }
 
       groups[targetSector].funds.push(fund);
-      groups[targetSector].sectorDailyProfit += fund.dailyProfit;
-      groups[targetSector].sectorAmount += fund.amount;
+      groups[targetSector].sectorDailyProfit += (fund.dailyProfit || 0);
+      groups[targetSector].sectorAmount += (fund.amount || 0);
       
-      tDaily += fund.dailyProfit;
-      tAmount += fund.amount;
-      tProfit += fund.totalProfit;
+      tDaily += (fund.dailyProfit || 0);
+      tAmount += (fund.amount || 0);
+      tProfit += (fund.totalProfit || 0);
     });
 
     return { groupedFunds: groups, totalDailyProfit: tDaily, totalAmount: tAmount, totalProfit: tProfit };
   }, [funds, sectors]);
 
   // --- 交互处理 ---
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 1000);
-  };
+
+    try {
+      const quoteMap = await fetchQuoteMapForFunds(funds);
+      if (quoteMap.size > 0) {
+        setFunds((currentFunds) => mergeFundsWithQuotes(currentFunds, quoteMap));
+
+        const now = new Date();
+        setLastUpdateTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`);
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [funds]);
+
+  useEffect(() => {
+    if (hasAutoRefreshedRef.current || funds.length === 0) {
+      return;
+    }
+
+    hasAutoRefreshedRef.current = true;
+    handleRefresh();
+  }, [funds.length, handleRefresh]);
 
   const toggleGroup = (sector) => {
     setCollapsedGroups(prev => {
@@ -165,48 +641,155 @@ export default function FundTrackerApp() {
     if (!newGroupName.trim()) return;
     if (!sectors.includes(newGroupName.trim())) {
       setSectors([...sectors, newGroupName.trim()]);
-      if (!fundForm.sector) setFundForm({...fundForm, sector: newGroupName.trim()});
     }
     setNewGroupName('');
     closeModal('group');
   };
 
+  useEffect(() => {
+    if (!modals.fund || !/^\d{6}$/.test(normalizedFundCode)) {
+      return;
+    }
+
+    const requestId = fundLookupRequestRef.current;
+
+    const timerId = window.setTimeout(async () => {
+      try {
+        const quote = await enqueueTiantianFundQuote(normalizedFundCode);
+        const resolvedCode = String(quote?.code || '').trim();
+        const resolvedName = String(quote?.name || '').trim();
+        const referenceNetValue = getQuoteReferenceNetValue(quote);
+
+        if (fundLookupRequestRef.current !== requestId) {
+          return;
+        }
+
+        if (resolvedCode && resolvedCode !== normalizedFundCode) {
+          setFundLookup({
+            status: 'error',
+            message: '查询结果与当前基金代码不匹配，请重新输入后再试。',
+            quote: null,
+          });
+          return;
+        }
+
+        if (!resolvedName || referenceNetValue <= 0) {
+          setFundLookup({
+            status: 'error',
+            message: '已查到代码，但缺少可用基金名称或净值/估值，暂时无法新增。',
+            quote: null,
+          });
+          return;
+        }
+
+        setFundLookup({
+          status: 'success',
+          message: `基金名称已自动匹配：${resolvedName}`,
+          quote,
+        });
+      } catch (error) {
+        if (fundLookupRequestRef.current !== requestId) {
+          return;
+        }
+
+        setFundLookup({
+          status: 'error',
+          message: error?.message || '基金查询失败，请稍后重试。',
+          quote: null,
+        });
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [modals.fund, normalizedFundCode]);
+
   const handleAddFund = (e) => {
     e.preventDefault();
-    if (!fundForm.name || !fundForm.code || !fundForm.sector) return;
 
-    const newFund = {
+    if (!canSubmitFund || !fundLookup.quote) {
+      alert('请先确认基金代码查询成功，并检查持仓金额与持有收益填写是否有效。');
+      return;
+    }
+
+    const hasDuplicateFund = funds.some((fund) => String(fund.code || '').trim() === normalizedFundCode);
+    if (hasDuplicateFund) {
+      alert('这只基金已经在持仓列表里了。请用“同步交易”调整仓位，或到“设置”里修改现有持仓。');
+      return;
+    }
+
+    const defaultSector = sectors[0] || '';
+    const newFund = reconcileFundWithQuote({
       id: Date.now(),
-      name: fundForm.name,
-      code: fundForm.code,
-      sector: fundForm.sector,
-      amount: Number(fundForm.amount) || 0,
-      dailyRate: 0, dailyProfit: 0, totalProfit: 0, totalRate: 0, weeklyProfit: 0, monthlyProfit: 0
-    };
+      name: String(fundLookup.quote.name || '').trim() || '未命名基金',
+      code: normalizedFundCode,
+      sector: defaultSector,
+      amount: holdingAmountValue,
+      shares: undefined,
+      costAmount: derivedCostAmount,
+      currentNetValue: 0,
+      lastNetValue: 0,
+      lastValuationTime: '',
+      netValueDate: '',
+      bootstrapSharesFromAmount: true,
+      dailyRate: 0,
+      dailyProfit: 0,
+      totalProfit: 0,
+      totalRate: 0,
+      weeklyProfit: 0,
+      monthlyProfit: 0,
+    }, fundLookup.quote);
 
-    setFunds([...funds, newFund]);
-    closeModal('fund');
-    setFundForm({ name: '', code: '', sector: sectors[0] || '', amount: '' });
+    setFunds(prev => [...prev, newFund]);
+
+    handleCloseFundModal();
     
     if (collapsedGroups.has(newFund.sector)) {
       toggleGroup(newFund.sector);
     }
   };
 
-  const handleSyncTrade = (e) => {
+  const handleSyncTrade = async (e) => {
     e.preventDefault();
-    const existingFundIndex = funds.findIndex(f => f.code === syncForm.code);
-    if (existingFundIndex !== -1) {
-       const updatedFunds = [...funds];
-       const amountChange = syncForm.type === '买入' ? Number(syncForm.amount) : -Number(syncForm.amount);
-       updatedFunds[existingFundIndex].amount = Math.max(0, updatedFunds[existingFundIndex].amount + amountChange);
-       setFunds(updatedFunds);
+
+    const normalizedCode = String(syncForm.code || '').trim();
+    const existingFundIndex = funds.findIndex(f => String(f.code || '').trim() === normalizedCode);
+
+    if (existingFundIndex === -1) {
+      alert('未找到对应的基金代码，请先新增持仓再同步交易。');
+      return;
     }
+
+    const targetFund = funds[existingFundIndex];
+    let quote = null;
+
+    try {
+      quote = await enqueueTiantianFundQuote(targetFund.code);
+    } catch (error) {
+      console.warn(`同步交易时获取估值失败: ${targetFund.code}`, error);
+    }
+
+    if (getQuoteReferenceNetValue(quote) <= 0 && getStoredReferenceNetValue(targetFund) <= 0) {
+      alert('暂时无法获取这只基金的净值/估值，无法按份额口径同步交易，请先刷新估值后再试。');
+      return;
+    }
+
+    setFunds((currentFunds) => currentFunds.map((fund) => {
+      if (fund.id !== targetFund.id) {
+        return fund;
+      }
+
+      return applyTradeToFund(fund, {
+        type: syncForm.type,
+        amount: syncForm.amount,
+      }, quote);
+    }));
+
     closeModal('sync');
-    setSyncForm({ code: '', type: '买入', amount: '', date: new Date().toISOString().split('T')[0] });
+    setSyncForm({ code: '', type: '买入', amount: '' });
   };
 
-  // --- 操作列交互处理 ---
   const handleOpenHistory = (fund) => {
     setSelectedFund(fund);
     openModal('history');
@@ -217,22 +800,40 @@ export default function FundTrackerApp() {
     openModal('settings');
   };
 
-  const handleUpdateFund = (e) => {
+  const handleUpdateFund = async (e) => {
     e.preventDefault();
-    setFunds(funds.map(f => 
-      f.id === editForm.id 
-        ? { ...f, name: editForm.name, code: editForm.code, sector: editForm.sector, amount: Number(editForm.amount) } 
-        : f
-    ));
+
+    const nextFunds = await Promise.all(funds.map(async (fund) => {
+      if (fund.id !== editForm.id) {
+        return fund;
+      }
+
+      const updatedFund = await alignFundMarketValue({
+        ...fund,
+        name: editForm.name,
+        code: editForm.code,
+        sector: editForm.sector,
+      }, editForm.amount, editForm.name);
+
+      return {
+        ...updatedFund,
+        sector: editForm.sector,
+      };
+    }));
+
+    const updatedTarget = nextFunds.find((fund) => fund.id === editForm.id);
+    if (updatedTarget) {
+      setFunds((currentFunds) => currentFunds.map((fund) => (
+        fund.id === editForm.id ? updatedTarget : fund
+      )));
+    }
     closeModal('settings');
   };
 
   const handleDeleteFund = () => {
-    // iframe环境不使用window.confirm，直接执行删除逻辑
-    setFunds(funds.filter(f => f.id !== editForm.id));
+    setFunds((currentFunds) => currentFunds.filter((fund) => fund.id !== editForm.id));
     closeModal('settings');
   };
-
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col font-sans text-slate-800 overflow-hidden">
@@ -245,12 +846,19 @@ export default function FundTrackerApp() {
               <TrendingUp className="text-red-500 w-7 h-7" />
               养基宝 <span className="text-sm font-normal text-slate-500 ml-2 bg-slate-100 px-2 py-1 rounded-md">V1.3.0</span>
             </h1>
-            <p className="text-slate-500 text-sm mt-1">全天候追踪您的基金投资组合表现</p>
+            <div className="flex items-center gap-2 mt-2">
+              <p className="text-slate-500 text-sm">全天候追踪您的基金投资组合表现</p>
+              {lastUpdateTime && (
+                <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                  <Clock className="w-3 h-3" /> 最新估值: {lastUpdateTime}
+                </span>
+              )}
+            </div>
           </div>
           
           <div className="flex flex-wrap gap-6 lg:gap-8 mt-4 lg:mt-0">
             <div className="flex flex-col items-end">
-              <span className="text-slate-500 text-sm mb-1">总持仓金额 (元)</span>
+              <span className="text-slate-500 text-sm mb-1">总持仓市值 (元)</span>
               <span className="text-xl lg:text-2xl font-bold text-slate-900">
                 ¥ {totalAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
               </span>
@@ -275,39 +883,39 @@ export default function FundTrackerApp() {
         {/* --- 工具栏 --- */}
         <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => openModal('fund')} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm shadow-sm">
+            <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm shadow-sm">
               <Plus className="w-4 h-4" /> 新增持仓
             </button>
-            <button onClick={() => openModal('group')} className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm border border-indigo-200">
+            <button type="button" onClick={() => openModal('group')} className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm border border-indigo-200">
               <FolderPlus className="w-4 h-4" /> 创建分组
             </button>
-            <button onClick={() => openModal('sync')} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
+            <button type="button" onClick={() => openModal('sync')} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
               <ArrowRightLeft className="w-4 h-4" /> 同步交易
             </button>
           </div>
           
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => openModal('import')} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
+            <button type="button" onClick={() => openModal('import')} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
               <Upload className="w-4 h-4" /> 导入
             </button>
-            <button onClick={() => openModal('export')} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
+            <button type="button" onClick={() => openModal('export')} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
               <Download className="w-4 h-4" /> 导出
             </button>
-            <button onClick={handleRefresh} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200 ml-0 lg:ml-2">
+            <button type="button" onClick={handleRefresh} disabled={funds.length === 0} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200 ml-0 lg:ml-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
               刷新估值
             </button>
           </div>
         </div>
 
-        {/* --- 主体表格区 (带内部滚动，表头固定) --- */}
+        {/* --- 主体表格区 --- */}
         <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-[300px] overflow-hidden">
           <div className="flex-1 overflow-auto relative custom-scrollbar">
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider shadow-[0_1px_0_0_#e2e8f0]">
                   <th className="p-4 font-medium bg-slate-50">基金名称 (代码)</th>
-                  <th className="p-4 font-medium text-right bg-slate-50">持仓金额</th>
+                  <th className="p-4 font-medium text-right bg-slate-50">持仓市值</th>
                   <th className="p-4 font-medium text-right bg-slate-50">当日估算涨幅</th>
                   <th className="p-4 font-medium text-right bg-blue-50/80">当日估算收益</th>
                   <th className="p-4 font-medium text-right bg-slate-50">持有收益率</th>
@@ -324,8 +932,9 @@ export default function FundTrackerApp() {
                     <React.Fragment key={sector}>
                       <tr className="bg-slate-100/70 border-b border-slate-200 group hover:bg-slate-100 transition-colors">
                         <td colSpan={9} className="p-0">
-                          <div 
-                            className="flex items-center justify-between px-4 py-2.5 border-l-4 border-blue-500 cursor-pointer select-none"
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between px-4 py-2.5 border-l-4 border-blue-500 cursor-pointer select-none text-left"
                             onClick={() => toggleGroup(sector)}
                           >
                             <span className="font-semibold text-slate-700 text-sm flex items-center gap-2">
@@ -337,13 +946,13 @@ export default function FundTrackerApp() {
                               </span>
                             </span>
                             <div className="flex items-center gap-6 text-sm pr-4">
-                              <span className="text-slate-500">板块持仓: <span className="font-medium text-slate-800">¥{data.sectorAmount.toLocaleString()}</span></span>
+                              <span className="text-slate-500">板块市值: <span className="font-medium text-slate-800">¥{data.sectorAmount.toLocaleString()}</span></span>
                               <span className="text-slate-500">当日盈亏: </span>
                               <span className="text-base">
                                 <FormatNumber value={data.sectorDailyProfit} isCurrency={true} />
                               </span>
                             </div>
-                          </div>
+                          </button>
                         </td>
                       </tr>
                       
@@ -359,7 +968,10 @@ export default function FundTrackerApp() {
                         <tr key={fund.id} className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors bg-white">
                           <td className="p-4">
                             <div className="font-medium text-slate-800">{fund.name}</div>
-                            <div className="text-xs text-slate-400 mt-0.5">{fund.code}</div>
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              {fund.code}
+                              {toNumber(fund.shares) > 0 && ` · ${toNumber(fund.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份`}
+                            </div>
                           </td>
                           <td className="p-4 text-right font-medium text-slate-700">
                             ¥{fund.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
@@ -385,6 +997,7 @@ export default function FundTrackerApp() {
                           <td className="p-4 text-center">
                             <div className="flex items-center justify-center gap-1">
                               <button 
+                                type="button"
                                 onClick={() => handleOpenHistory(fund)}
                                 className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors" 
                                 title="交易记录"
@@ -392,6 +1005,7 @@ export default function FundTrackerApp() {
                                 <History className="w-4 h-4" />
                               </button>
                               <button 
+                                type="button"
                                 onClick={() => handleOpenSettings(fund)}
                                 className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors" 
                                 title="设置"
@@ -409,31 +1023,28 @@ export default function FundTrackerApp() {
             </table>
           </div>
           {funds.length === 0 && (
-             <div className="p-12 text-center text-slate-500 absolute inset-0 flex items-center justify-center pointer-events-none">
+             <div className="p-12 text-center text-slate-500 absolute inset-0 flex items-center justify-center pointer-events-none mt-10">
                暂无基金持仓数据，请点击上方“新增持仓”添加
              </div>
           )}
         </div>
       </div>
 
-      {/* --- 样式注入：用于美化滚动条 --- */}
-      <style dangerouslySetInnerHTML={{__html: `
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-      `}} />
+      `}</style>
 
       {/* ======================= 所有弹窗组件 ======================= */}
 
-      {/* 1. 创建分组 Modal */}
       <Modal isOpen={modals.group} onClose={() => closeModal('group')} title="创建新分组">
-        {/* ... (原有逻辑保持不变) */}
         <form onSubmit={handleCreateGroup} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">分组名称</label>
+            <label htmlFor="group-name" className="block text-sm font-medium text-slate-700 mb-1">分组名称</label>
             <input 
-              type="text" required autoFocus value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)}
+              id="group-name" type="text" required value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)}
               placeholder="如：海外QDII、固收+" 
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             />
@@ -445,92 +1056,94 @@ export default function FundTrackerApp() {
         </form>
       </Modal>
 
-      {/* 2. 新增持仓 Modal */}
-      <Modal isOpen={modals.fund} onClose={() => closeModal('fund')} title="新增基金持仓" maxWidth="max-w-lg">
-        {/* ... (原有逻辑保持不变) */}
+      <Modal isOpen={modals.fund} onClose={handleCloseFundModal} title="新增基金持仓" maxWidth="max-w-lg">
         <form onSubmit={handleAddFund} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">基金名称</label>
+            <label htmlFor="fund-code" className="block text-sm font-medium text-slate-700 mb-1">基金代码</label>
             <input 
-              type="text" required value={fundForm.name} onChange={(e) => setFundForm({...fundForm, name: e.target.value})}
-              placeholder="如：易方达蓝筹精选" 
+              id="fund-code" type="text" required value={fundForm.code} onChange={(e) => handleFundCodeChange(e.target.value)}
+              placeholder="如：005827"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
+          </div>
+          <div className={`rounded-xl border px-4 py-3 text-sm ${fundLookup.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : fundLookup.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : fundLookup.status === 'loading' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+            <div className="font-medium">查询状态</div>
+            <p className="mt-1">{fundLookup.message}</p>
+            <p className="mt-2 text-slate-800">
+              基金名称：<span className="font-medium">{fundLookup.quote?.name || '待自动解析'}</span>
+            </p>
+            <p className="mt-1 text-xs text-slate-500">新增后默认归入首个分组：{sectors[0] || '未设置分组'}</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">基金代码</label>
+              <label htmlFor="fund-amount" className="block text-sm font-medium text-slate-700 mb-1">持仓金额 (元)</label>
               <input 
-                type="text" required value={fundForm.code} onChange={(e) => setFundForm({...fundForm, code: e.target.value})}
-                placeholder="如：005827" 
+                id="fund-amount" type="number" min="0" step="0.01" required value={fundForm.amount} onChange={(e) => setFundForm({...fundForm, amount: e.target.value})}
+                placeholder="当前持仓总金额"
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               />
+              <p className="text-xs text-slate-400 mt-1">这里填当前总持仓金额，已包含累计收益。</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">所属分组</label>
-              <select 
-                value={fundForm.sector} onChange={(e) => setFundForm({...fundForm, sector: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-              >
-                {sectors.map(sector => <option key={sector} value={sector}>{sector}</option>)}
-              </select>
+              <label htmlFor="fund-profit" className="block text-sm font-medium text-slate-700 mb-1">持有收益 (元)</label>
+              <input 
+                id="fund-profit" type="number" step="0.01" required value={fundForm.holdingProfit} onChange={(e) => setFundForm({...fundForm, holdingProfit: e.target.value})}
+                placeholder="累计持有收益"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <p className="text-xs text-slate-400 mt-1">支持填写负数，系统会据此反推出持仓成本。</p>
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">初始持仓金额 (元)</label>
-            <input 
-              type="number" min="0" step="0.01" required value={fundForm.amount} onChange={(e) => setFundForm({...fundForm, amount: e.target.value})}
-              placeholder="请输入金额" 
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+          <div className={`rounded-xl border px-4 py-3 text-sm ${isDerivedCostAmountValid ? 'border-slate-200 bg-slate-50 text-slate-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+            <div className="font-medium">自动换算结果</div>
+            <p className="mt-1">成本金额 = 持仓金额 - 持有收益 = {Number.isFinite(derivedCostAmount) ? `¥${derivedCostAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--'}</p>
+            {!isDerivedCostAmountValid && hasHoldingAmountInput && hasHoldingProfitInput && (
+              <p className="mt-1">当前填写会导致成本金额为负数，暂时不能保存。</p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">保存后会按当前估值自动换算份额，并继续沿用现有按份额刷新的逻辑。</p>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
-            <button type="button" onClick={() => closeModal('fund')} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">取消</button>
-            <button type="submit" className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors">保存持仓</button>
+            <button type="button" onClick={handleCloseFundModal} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">取消</button>
+            <button type="submit" disabled={!canSubmitFund} className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:cursor-not-allowed">保存持仓</button>
           </div>
         </form>
       </Modal>
 
-      {/* 3. 同步交易 Modal */}
       <Modal isOpen={modals.sync} onClose={() => closeModal('sync')} title="同步交易记录" maxWidth="max-w-md">
-        {/* ... (原有逻辑保持不变) */}
         <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-start gap-2 mb-4 text-sm">
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <p>录入交易记录将自动更新您的持仓金额与成本计算。</p>
+          <p>录入后会按当前估值同步份额、持仓市值与成本估算，不回算历史日期净值。</p>
         </div>
         <form onSubmit={handleSyncTrade} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">基金代码/拼音简写</label>
+            <label htmlFor="sync-code" className="block text-sm font-medium text-slate-700 mb-1">基金代码/拼音简写</label>
             <input 
-              type="text" required value={syncForm.code} onChange={(e) => setSyncForm({...syncForm, code: e.target.value})}
+              id="sync-code" type="text" required value={syncForm.code} onChange={(e) => setSyncForm({...syncForm, code: e.target.value})}
               placeholder="输入代码选择现有基金" 
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">交易类型</label>
+              <label htmlFor="sync-type" className="block text-sm font-medium text-slate-700 mb-1">交易类型</label>
               <select 
+                id="sync-type"
                 value={syncForm.type} onChange={(e) => setSyncForm({...syncForm, type: e.target.value})}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               >
                 <option value="买入">买入 / 申购</option>
-                <option value="卖出">卖出 / 赎回</option>
-                <option value="分红">分红</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">交易日期</label>
-              <input 
-                type="date" required value={syncForm.date} onChange={(e) => setSyncForm({...syncForm, date: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
+                  <option value="卖出">卖出 / 赎回</option>
+                  <option value="分红">分红</option>
+                </select>
+              </div>
+            <div className="flex items-end rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              当前按最新估值换算份额
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">确认金额 (元)</label>
+            <label htmlFor="sync-amount" className="block text-sm font-medium text-slate-700 mb-1">确认金额 (元)</label>
             <input 
-              type="number" min="0" step="0.01" required value={syncForm.amount} onChange={(e) => setSyncForm({...syncForm, amount: e.target.value})}
+              id="sync-amount" type="number" min="0" step="0.01" required value={syncForm.amount} onChange={(e) => setSyncForm({...syncForm, amount: e.target.value})}
               placeholder="请输入发生金额" 
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
@@ -542,7 +1155,6 @@ export default function FundTrackerApp() {
         </form>
       </Modal>
 
-      {/* 4. 导入/导出 Modals (折叠省略展示，保持原有功能) */}
       <Modal isOpen={modals.import} onClose={() => closeModal('import')} title="导入基金数据">
         <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer">
           <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
@@ -571,13 +1183,17 @@ export default function FundTrackerApp() {
         </div>
       </Modal>
 
-      {/* 6. 查看交易记录 Modal (新增) */}
       <Modal isOpen={modals.history} onClose={() => closeModal('history')} title={`${selectedFund?.name || '基金'} - 交易记录`} maxWidth="max-w-lg">
         <div className="space-y-4">
           <div className="flex justify-between items-center text-sm mb-2">
             <span className="text-slate-500">基金代码: {selectedFund?.code}</span>
-            <span className="text-slate-500">当前持仓: <span className="font-medium text-slate-800">¥{selectedFund?.amount.toLocaleString()}</span></span>
+            <span className="text-slate-500">当前市值: <span className="font-medium text-slate-800">¥{selectedFund?.amount?.toLocaleString()}</span></span>
           </div>
+          {toNumber(selectedFund?.shares) > 0 && (
+            <div className="text-xs text-slate-400 -mt-2">
+              当前持有份额：{toNumber(selectedFund?.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份
+            </div>
+          )}
           
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left text-sm">
@@ -617,28 +1233,28 @@ export default function FundTrackerApp() {
         </div>
       </Modal>
 
-      {/* 7. 编辑/设置持仓 Modal (新增) */}
       <Modal isOpen={modals.settings} onClose={() => closeModal('settings')} title="编辑持仓信息" maxWidth="max-w-lg">
         <form onSubmit={handleUpdateFund} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">基金名称</label>
+            <label htmlFor="edit-name" className="block text-sm font-medium text-slate-700 mb-1">基金名称</label>
             <input 
-              type="text" required value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+              id="edit-name" type="text" required value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">基金代码</label>
+              <label htmlFor="edit-code" className="block text-sm font-medium text-slate-700 mb-1">基金代码</label>
               <input 
-                type="text" required value={editForm.code} onChange={(e) => setEditForm({...editForm, code: e.target.value})}
+                id="edit-code" type="text" required value={editForm.code} onChange={(e) => setEditForm({...editForm, code: e.target.value})}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
-                readOnly // 基金代码一般不可改，这里做成只读
+                readOnly 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">所属分组</label>
+              <label htmlFor="edit-sector" className="block text-sm font-medium text-slate-700 mb-1">所属分组</label>
               <select 
+                id="edit-sector"
                 value={editForm.sector} onChange={(e) => setEditForm({...editForm, sector: e.target.value})}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               >
@@ -647,12 +1263,15 @@ export default function FundTrackerApp() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">持仓金额校准 (元)</label>
+            <label htmlFor="edit-market-value" className="block text-sm font-medium text-slate-700 mb-1">持仓市值校准 (元)</label>
             <input 
-              type="number" min="0" step="0.01" required value={editForm.amount} onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
+              id="edit-market-value" type="number" min="0" step="0.01" required value={editForm.amount} onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
-            <p className="text-xs text-slate-400 mt-1">如数据不准，可在此处直接覆盖修改持仓金额。</p>
+            <p className="text-xs text-slate-400 mt-1">如当前市值不准，可在此处覆盖，系统会按最新估值反推份额。</p>
+            {toNumber(editForm.shares) > 0 && (
+              <p className="text-xs text-slate-400 mt-1">当前记录份额：{toNumber(editForm.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份</p>
+            )}
           </div>
 
           <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-6">

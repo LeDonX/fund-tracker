@@ -1,0 +1,118 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - heading "养基宝 V1.3.0" [level=1] [ref=e7]:
+        - img [ref=e8]
+        - text: 养基宝
+        - generic [ref=e11]: V1.3.0
+      - paragraph [ref=e13]: 全天候追踪您的基金投资组合表现
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]: 总持仓市值 (元)
+        - generic [ref=e17]: ¥ 0.00
+      - generic [ref=e19]:
+        - generic [ref=e20]: 累计总收益
+        - generic [ref=e21]: "0.00"
+      - generic [ref=e23]:
+        - generic [ref=e24]: 当日估算盈亏 (元)
+        - generic [ref=e25]: "0.00"
+  - generic [ref=e26]:
+    - generic [ref=e27]:
+      - button "新增持仓" [ref=e28]:
+        - img [ref=e29]
+        - text: 新增持仓
+      - button "创建分组" [ref=e30]:
+        - img [ref=e31]
+        - text: 创建分组
+      - button "同步交易" [ref=e33]:
+        - img [ref=e34]
+        - text: 同步交易
+    - generic [ref=e37]:
+      - button "导入" [ref=e38]:
+        - img [ref=e39]
+        - text: 导入
+      - button "导出" [ref=e42]:
+        - img [ref=e43]
+        - text: 导出
+      - button "刷新估值" [disabled] [ref=e46]:
+        - img [ref=e47]
+        - text: 刷新估值
+  - generic [ref=e52]:
+    - table [ref=e54]:
+      - rowgroup [ref=e55]:
+        - row "基金名称 (代码) 持仓市值 当日估算涨幅 当日估算收益 持有收益率 持有总收益 本周收益 本月收益 操作" [ref=e56]:
+          - columnheader "基金名称 (代码)" [ref=e57]
+          - columnheader "持仓市值" [ref=e58]
+          - columnheader "当日估算涨幅" [ref=e59]
+          - columnheader "当日估算收益" [ref=e60]
+          - columnheader "持有收益率" [ref=e61]
+          - columnheader "持有总收益" [ref=e62]
+          - columnheader "本周收益" [ref=e63]
+          - columnheader "本月收益" [ref=e64]
+          - columnheader "操作" [ref=e65]
+      - rowgroup [ref=e66]:
+        - 'row "大消费 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e67]':
+          - 'cell "大消费 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e68]':
+            - 'button "大消费 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e69] [cursor=pointer]':
+              - generic [ref=e70]:
+                - img [ref=e71]
+                - img [ref=e73]
+                - text: 大消费
+                - generic [ref=e76]: 0 支
+              - generic [ref=e77]:
+                - generic [ref=e78]:
+                  - text: "板块市值:"
+                  - generic [ref=e79]: ¥0
+                - generic [ref=e80]: "当日盈亏:"
+                - generic [ref=e81]: "0.00"
+        - row "该分组下暂无持仓" [ref=e82]:
+          - cell "该分组下暂无持仓" [ref=e83]
+        - 'row "科技半导体 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e84]':
+          - 'cell "科技半导体 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e85]':
+            - 'button "科技半导体 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e86] [cursor=pointer]':
+              - generic [ref=e87]:
+                - img [ref=e88]
+                - img [ref=e90]
+                - text: 科技半导体
+                - generic [ref=e93]: 0 支
+              - generic [ref=e94]:
+                - generic [ref=e95]:
+                  - text: "板块市值:"
+                  - generic [ref=e96]: ¥0
+                - generic [ref=e97]: "当日盈亏:"
+                - generic [ref=e98]: "0.00"
+        - row "该分组下暂无持仓" [ref=e99]:
+          - cell "该分组下暂无持仓" [ref=e100]
+        - 'row "医疗医药 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e101]':
+          - 'cell "医疗医药 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e102]':
+            - 'button "医疗医药 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e103] [cursor=pointer]':
+              - generic [ref=e104]:
+                - img [ref=e105]
+                - img [ref=e107]
+                - text: 医疗医药
+                - generic [ref=e110]: 0 支
+              - generic [ref=e111]:
+                - generic [ref=e112]:
+                  - text: "板块市值:"
+                  - generic [ref=e113]: ¥0
+                - generic [ref=e114]: "当日盈亏:"
+                - generic [ref=e115]: "0.00"
+        - row "该分组下暂无持仓" [ref=e116]:
+          - cell "该分组下暂无持仓" [ref=e117]
+        - 'row "均衡宽基 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e118]':
+          - 'cell "均衡宽基 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e119]':
+            - 'button "均衡宽基 0 支 板块市值: ¥0 当日盈亏: 0.00" [ref=e120] [cursor=pointer]':
+              - generic [ref=e121]:
+                - img [ref=e122]
+                - img [ref=e124]
+                - text: 均衡宽基
+                - generic [ref=e127]: 0 支
+              - generic [ref=e128]:
+                - generic [ref=e129]:
+                  - text: "板块市值:"
+                  - generic [ref=e130]: ¥0
+                - generic [ref=e131]: "当日盈亏:"
+                - generic [ref=e132]: "0.00"
+        - row "该分组下暂无持仓" [ref=e133]:
+          - cell "该分组下暂无持仓" [ref=e134]
+    - generic: 暂无基金持仓数据，请点击上方“新增持仓”添加

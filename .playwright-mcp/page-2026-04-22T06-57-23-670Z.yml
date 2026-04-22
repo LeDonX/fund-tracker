@@ -1,0 +1,452 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]: 上海证券交易所服务热线：400-8888-400
+    - link "APP下载" [ref=e6] [cursor=pointer]:
+      - /url: /home/app/update/
+    - link "微博微信" [ref=e7] [cursor=pointer]:
+      - /url: /home/weixin/
+    - link "English" [ref=e8] [cursor=pointer]:
+      - /url: http://english.sse.com.cn/
+    - link "繁" [ref=e9] [cursor=pointer]:
+      - /url: http://big5.sse.com.cn/site/cht/www.sse.com.cn/
+  - generic [ref=e12]:
+    - link [ref=e14] [cursor=pointer]:
+      - /url: /
+    - generic [ref=e16]:
+      - list [ref=e19]:
+        - listitem [ref=e20]:
+          - link "首页" [ref=e21] [cursor=pointer]:
+            - /url: /
+        - listitem [ref=e22]:
+          - link "党建" [ref=e23] [cursor=pointer]:
+            - /url: /cpc/overview/
+        - listitem [ref=e24]:
+          - link "发行上市" [ref=e25]:
+            - /url: javascript:;
+        - listitem [ref=e26]:
+          - link "披露" [ref=e27]:
+            - /url: javascript:;
+        - listitem [ref=e28]:
+          - link "监管" [ref=e29]:
+            - /url: javascript:;
+        - listitem [ref=e30]:
+          - link "数据" [ref=e31]:
+            - /url: javascript:;
+        - listitem [ref=e32]:
+          - link "产品" [ref=e33]:
+            - /url: javascript:;
+        - listitem [ref=e34]:
+          - link "服务" [ref=e35]:
+            - /url: javascript:;
+        - listitem [ref=e36]:
+          - link "规则" [ref=e37]:
+            - /url: javascript:;
+        - listitem [ref=e38]:
+          - link "关于" [ref=e39]:
+            - /url: javascript:;
+      - generic [ref=e40]:
+        - link "一网通办" [ref=e41] [cursor=pointer]:
+          - /url: https://one.sse.com.cn/
+        - link "“三开门”专栏" [ref=e42] [cursor=pointer]:
+          - /url: /transparency/home/
+  - generic [ref=e43]:
+    - generic:
+      - generic:     
+  - text:                                                                                                                                                                                                                                                                        
+  - generic [ref=e46]:
+    - generic [ref=e48]:
+      - term [ref=e49]: 用户入口
+      - definition [ref=e50]:
+        - link "投资者" [ref=e51] [cursor=pointer]:
+          - /url: //one.sse.com.cn/investor/
+          - img [ref=e52]
+          - text: 投资者
+      - definition [ref=e53]:
+        - link "会员机构" [ref=e54] [cursor=pointer]:
+          - /url: //one.sse.com.cn/member/
+          - img [ref=e55]
+          - text: 会员机构
+      - definition [ref=e56]:
+        - link "拟上市公司" [ref=e57] [cursor=pointer]:
+          - /url: //one.sse.com.cn/to-be-listed/
+          - img [ref=e58]
+          - text: 拟上市公司
+      - definition [ref=e59]:
+        - link "债券机构" [ref=e60] [cursor=pointer]:
+          - /url: //one.sse.com.cn/bond/
+          - img [ref=e61]
+          - text: 债券机构
+      - definition [ref=e62]:
+        - link "上市公司" [ref=e63] [cursor=pointer]:
+          - /url: //one.sse.com.cn/list/
+          - img [ref=e64]
+          - text: 上市公司
+      - definition [ref=e65]:
+        - link "基金公司" [ref=e66] [cursor=pointer]:
+          - /url: //one.sse.com.cn/fund/
+          - img [ref=e67]
+          - text: 基金公司
+    - generic [ref=e69]:
+      - term [ref=e70]: 高效办成一件事
+      - definition [ref=e71]:
+        - link "股票投资一件事" [ref=e72] [cursor=pointer]:
+          - /url: //one.sse.com.cn/onething/gptz/
+          - img [ref=e73]
+          - text: 股票投资一件事
+      - definition [ref=e74]:
+        - link "债券发行上市一件事" [ref=e75] [cursor=pointer]:
+          - /url: //one.sse.com.cn/onething/zqfx/
+          - img [ref=e76]
+          - text: 债券发行上市一件事
+      - definition [ref=e77]:
+        - link "期权投资一件事" [ref=e78] [cursor=pointer]:
+          - /url: //one.sse.com.cn/onething/qqtz/
+          - img [ref=e79]
+          - text: 期权投资一件事
+      - definition [ref=e80]:
+        - link "REITs发行上市一件事" [ref=e81] [cursor=pointer]:
+          - /url: //one.sse.com.cn/onething/reits/
+          - img [ref=e82]
+          - text: REITs发行上市一件事
+      - definition [ref=e83]:
+        - link "企业上市一件事" [ref=e84] [cursor=pointer]:
+          - /url: //one.sse.com.cn/onething/qyss/
+          - img [ref=e85]
+          - text: 企业上市一件事
+      - definition [ref=e86]:
+        - link "服务预约一件事" [ref=e87] [cursor=pointer]:
+          - /url: //one.sse.com.cn/onething/fwyy/
+          - img [ref=e88]
+          - text: 服务预约一件事
+      - definition [ref=e89]:
+        - link "信息披露一件事" [ref=e90] [cursor=pointer]:
+          - /url: //one.sse.com.cn/onething/xxpl/
+          - img [ref=e91]
+          - text: 信息披露一件事
+    - generic [ref=e93]:
+      - term [ref=e94]:
+        - text: 一网通办移动端
+        - heading "上交所APP\"通办\"栏目" [level=2] [ref=e95]
+      - generic [ref=e96]:
+        - img [ref=e97]
+        - emphasis [ref=e98]: "- 欢迎扫码安装 -"
+  - generic [ref=e100]:
+    - list [ref=e101]:
+      - listitem
+      - listitem [ref=e102]:
+        - link "产品" [ref=e103] [cursor=pointer]:
+          - /url: /assortment/stock/home/
+        - generic [ref=e104]: 
+      - listitem [ref=e105]:
+        - link "基金" [ref=e106] [cursor=pointer]:
+          - /url: /assortment/fund/home/
+        - generic [ref=e107]: 
+      - listitem [ref=e108]:
+        - link "上市开放式基金（LOF）" [ref=e109] [cursor=pointer]:
+          - /url: /assortment/fund/lof/home/
+        - generic [ref=e110]: 
+    - heading [level=1]
+  - generic [ref=e115]:
+    - searchbox "代码 / 简称 / 关键词" [ref=e116]
+    - button [ref=e117] [cursor=pointer]
+  - generic [ref=e119]:
+    - generic [ref=e121]:
+      - generic [ref=e122]:
+        - list [ref=e123]:
+          - listitem [ref=e124]: 上市开放式基金（LOF）
+        - generic [ref=e125] [cursor=pointer]:
+          - generic [ref=e126]: 展开导航菜单
+          - generic [ref=e127]: 
+      - generic [ref=e129]: 类型
+      - generic [ref=e131]:
+        - generic [ref=e132]: 日期
+        - generic [ref=e133]:
+          - textbox "开始时间 至 结束时间" [ref=e134]:
+            - /placeholder: 开始时间  至  结束时间
+          - generic [ref=e135]: 
+      - generic [ref=e136]:
+        - generic [ref=e138]: 上交所发布
+        - generic [ref=e140]: 上交所移动App
+    - generic [ref=e141]:
+      - generic:
+        - generic:
+          - generic:
+            - table
+          - list
+  - contentinfo [ref=e142]:
+    - generic [ref=e144]:
+      - generic [ref=e145]:
+        - link "联系我们" [ref=e146] [cursor=pointer]:
+          - /url: /aboutus/contactus/
+        - link "网站地图" [ref=e147] [cursor=pointer]:
+          - /url: /home/map/
+        - link "相关链接" [ref=e148] [cursor=pointer]:
+          - /url: /home/links/
+        - link "法律声明" [ref=e149] [cursor=pointer]:
+          - /url: /home/legal/
+        - link "注册商标" [ref=e150] [cursor=pointer]:
+          - /url: /aboutus/sseintroduction/trademark/
+        - link "个人信息保护告知书" [ref=e151] [cursor=pointer]:
+          - /url: /home/grxxbhs/
+      - generic [ref=e152]:
+        - paragraph [ref=e153]:
+          - img [ref=e154]
+          - generic [ref=e155]: 官方微博
+        - paragraph [ref=e156]:
+          - img [ref=e157]
+          - generic [ref=e158]: 官方微信
+        - paragraph [ref=e159]:
+          - img [ref=e160]
+          - generic [ref=e161]: APP下载
+    - generic [ref=e162]:
+      - generic [ref=e163]:
+        - generic [ref=e164]:
+          - paragraph [ref=e165]: 党建
+          - list [ref=e166]:
+            - listitem [ref=e167]:
+              - link "党建动态" [ref=e168] [cursor=pointer]:
+                - /url: /cpc/news/
+            - listitem [ref=e169]:
+              - link "学习园地" [ref=e170] [cursor=pointer]:
+                - /url: /cpc/study/
+            - listitem [ref=e171]:
+              - link "图文播报" [ref=e172] [cursor=pointer]:
+                - /url: /cpc/pic/
+        - generic [ref=e173]:
+          - paragraph [ref=e174]: 发行上市
+          - list [ref=e175]:
+            - listitem [ref=e176]:
+              - link "审核公告通知" [ref=e177] [cursor=pointer]:
+                - /url: /listing/announcement/notification/
+            - listitem [ref=e178]:
+              - link "审核信息披露" [ref=e179] [cursor=pointer]:
+                - /url: /listing/disclosure/ipo/
+            - listitem [ref=e180]:
+              - link "审核项目动态" [ref=e181] [cursor=pointer]:
+                - /url: /listing/renewal/ipo/
+            - listitem [ref=e182]:
+              - link "关于上市审核中心" [ref=e183] [cursor=pointer]:
+                - /url: /listing/aboutus/home/
+            - listitem [ref=e184]:
+              - link "科创战略" [ref=e185] [cursor=pointer]:
+                - /url: /listing/strategy/
+        - generic [ref=e186]:
+          - paragraph [ref=e187]: 披露
+          - list [ref=e188]:
+            - listitem [ref=e189]:
+              - link "交易提示" [ref=e190] [cursor=pointer]:
+                - /url: /disclosure/dealinstruc/suspension/stock/
+            - listitem [ref=e191]:
+              - link "上交所公告" [ref=e192] [cursor=pointer]:
+                - /url: /disclosure/announcement/general/
+            - listitem [ref=e193]:
+              - link "上市公司信息" [ref=e194] [cursor=pointer]:
+                - /url: /disclosure/listedinfo/announcement/
+            - listitem [ref=e195]:
+              - link "融资融券信息" [ref=e196] [cursor=pointer]:
+                - /url: /disclosure/magin/announcement/
+            - listitem [ref=e197]:
+              - link "基金信息" [ref=e198] [cursor=pointer]:
+                - /url: /disclosure/fund/announcement/
+            - listitem [ref=e199]:
+              - link "交易信息披露" [ref=e200] [cursor=pointer]:
+                - /url: /disclosure/diclosure/public/dailydata/
+            - listitem [ref=e201]:
+              - link "债券信息" [ref=e202] [cursor=pointer]:
+                - /url: /disclosure/bond/announcement/bookentry/
+            - listitem [ref=e203]:
+              - link "股票期权信息" [ref=e204] [cursor=pointer]:
+                - /url: /disclosure/optioninfo/update/
+        - generic [ref=e205]:
+          - paragraph [ref=e206]: 监管
+          - list [ref=e207]:
+            - listitem [ref=e208]:
+              - link "上市公司监管" [ref=e209] [cursor=pointer]:
+                - /url: /regulation/supervision/dynamic/
+            - listitem [ref=e210]:
+              - link "发行上市审核监管" [ref=e211] [cursor=pointer]:
+                - /url: /regulation/listing/measures/
+            - listitem [ref=e212]:
+              - link "债券监管" [ref=e213] [cursor=pointer]:
+                - /url: /regulation/bonds/jgdt/
+            - listitem [ref=e214]:
+              - link "交易监管" [ref=e215] [cursor=pointer]:
+                - /url: /regulation/trading/dynamic/
+            - listitem [ref=e216]:
+              - link "会员及其他交易参与人监管" [ref=e217] [cursor=pointer]:
+                - /url: /regulation/members/measures/
+            - listitem [ref=e218]:
+              - link "自律管理复核" [ref=e219] [cursor=pointer]:
+                - /url: /regulation/review/
+            - listitem [ref=e220]:
+              - link "自律监管与市场服务事项" [ref=e221] [cursor=pointer]:
+                - /url: /regulation/ma/
+            - listitem [ref=e222]:
+              - link "诉求受理中心" [ref=e223] [cursor=pointer]:
+                - /url: /home/sqslzxnew/sqslzxnewsy/
+        - generic [ref=e224]:
+          - paragraph [ref=e225]: 数据
+          - list [ref=e226]:
+            - listitem [ref=e227]:
+              - link "股票数据" [ref=e228] [cursor=pointer]:
+                - /url: /market/stockdata/statistic/
+            - listitem [ref=e229]:
+              - link "债券数据" [ref=e230] [cursor=pointer]:
+                - /url: /market/bonddata/overview/day/
+            - listitem [ref=e231]:
+              - link "基金数据" [ref=e232] [cursor=pointer]:
+                - /url: /market/funddata/overview/day/
+            - listitem [ref=e233]:
+              - link "其他数据" [ref=e234] [cursor=pointer]:
+                - /url: /market/othersdata/margin/sum/
+            - listitem [ref=e235]:
+              - link "行情信息" [ref=e236] [cursor=pointer]:
+                - /url: /market/price/trends/
+            - listitem [ref=e237]:
+              - link "上证系列指数" [ref=e238] [cursor=pointer]:
+                - /url: /market/sseindex/overview/
+            - listitem [ref=e239]:
+              - link "中证系列指数" [ref=e240] [cursor=pointer]:
+                - /url: http://www.csindex.com.cn/zh-CN/indices/index
+            - listitem [ref=e241]:
+              - link "中华系列指数" [ref=e242] [cursor=pointer]:
+                - /url: https://www.cesc.com/sc/index.html
+        - generic [ref=e243]:
+          - paragraph [ref=e244]: 产品
+          - list [ref=e245]:
+            - listitem [ref=e246]:
+              - link "股票与存托凭证" [ref=e247] [cursor=pointer]:
+                - /url: /assortment/stock/home/
+            - listitem [ref=e248]:
+              - link "基金" [ref=e249] [cursor=pointer]:
+                - /url: /assortment/fund/home/
+            - listitem [ref=e250]:
+              - link "债券" [ref=e251] [cursor=pointer]:
+                - /url: /assortment/bonds/home/
+            - listitem [ref=e252]:
+              - link "股票期权" [ref=e253] [cursor=pointer]:
+                - /url: /assortment/options/home/
+            - listitem [ref=e254]:
+              - link "公募REITs" [ref=e255] [cursor=pointer]:
+                - /url: /reits/home/
+        - generic [ref=e256]:
+          - paragraph [ref=e257]: 服务
+          - list [ref=e258]:
+            - listitem [ref=e259]:
+              - link "企业上市服务" [ref=e260] [cursor=pointer]:
+                - /url: /services/listingwithsse/home/
+            - listitem [ref=e261]:
+              - link "IPO业务专栏" [ref=e262] [cursor=pointer]:
+                - /url: /ipo/home/
+            - listitem [ref=e263]:
+              - link "沪港通" [ref=e264] [cursor=pointer]:
+                - /url: /services/hkexsc/home/
+            - listitem [ref=e265]:
+              - link "绿色证券专栏" [ref=e266] [cursor=pointer]:
+                - /url: /services/greensecurities/home/
+            - listitem [ref=e267]:
+              - link "交易服务" [ref=e268] [cursor=pointer]:
+                - /url: /services/tradingservice/process/
+            - listitem [ref=e269]:
+              - link "交易技术支持专区" [ref=e270] [cursor=pointer]:
+                - /url: /services/tradingtech/notice/
+            - listitem [ref=e271]:
+              - link "收费及代收税费" [ref=e272] [cursor=pointer]:
+                - /url: /services/tradingservice/charge/ssecharge/
+            - listitem [ref=e273]:
+              - link "投资者服务" [ref=e274] [cursor=pointer]:
+                - /url: /services/investors/designatedtxn/
+            - listitem [ref=e275]:
+              - link "上市公司服务" [ref=e276] [cursor=pointer]:
+                - /url: /services/listing/xyzr/
+            - listitem [ref=e277]:
+              - link "路演服务" [ref=e278] [cursor=pointer]:
+                - /url: //roadshow.sseinfo.com/
+            - listitem [ref=e279]:
+              - link "技术服务" [ref=e280] [cursor=pointer]:
+                - /url: /home/biz/cnsca/
+            - listitem [ref=e281]:
+              - link "信息服务" [ref=e282] [cursor=pointer]:
+                - /url: /services/information/delisting/
+            - listitem [ref=e283]:
+              - link "培训服务" [ref=e284] [cursor=pointer]:
+                - /url: //pujiang.sse.com.cn/
+            - listitem [ref=e285]:
+              - link "司法服务" [ref=e286] [cursor=pointer]:
+                - /url: /services/judicia/
+        - generic [ref=e287]:
+          - paragraph [ref=e288]: 规则
+          - list [ref=e289]:
+            - listitem [ref=e290]:
+              - link "法律法规" [ref=e291] [cursor=pointer]:
+                - /url: /lawandrules/rules/law/securities/
+            - listitem [ref=e292]:
+              - link "部门规章" [ref=e293] [cursor=pointer]:
+                - /url: /lawandrules/regulations/csrcorder/
+            - listitem [ref=e294]:
+              - link "本所业务规则" [ref=e295] [cursor=pointer]:
+                - /url: /lawandrules/sselawsrules2025/overview/
+            - listitem [ref=e296]:
+              - link "本所业务指南与流程" [ref=e297] [cursor=pointer]:
+                - /url: /lawandrules/guide/latest/
+            - listitem [ref=e298]:
+              - link "公开征求意见" [ref=e299] [cursor=pointer]:
+                - /url: /lawandrules/publicadvice/
+            - listitem [ref=e300]:
+              - link "制度规则汇编" [ref=e301] [cursor=pointer]:
+                - /url: /lawandrules/assemble/
+        - generic [ref=e302]:
+          - paragraph [ref=e303]: 关于
+          - list [ref=e304]:
+            - listitem [ref=e305]:
+              - link "本所介绍" [ref=e306] [cursor=pointer]:
+                - /url: /aboutus/sseintroduction/introduction/
+            - listitem [ref=e307]:
+              - link "媒体中心" [ref=e308] [cursor=pointer]:
+                - /url: /aboutus/mediacenter/hotandd/
+            - listitem [ref=e309]:
+              - link "国际交流与合作" [ref=e310] [cursor=pointer]:
+                - /url: /aboutus/cooperation/siccce/info/
+            - listitem [ref=e311]:
+              - link "招聘信息" [ref=e312] [cursor=pointer]:
+                - /url: /aboutus/recruitment/sse/
+            - listitem [ref=e313]:
+              - link "联系我们" [ref=e314] [cursor=pointer]:
+                - /url: /aboutus/contactus/
+            - listitem [ref=e315]:
+              - link "研究" [ref=e316] [cursor=pointer]:
+                - /url: /aboutus/research/latest/
+            - listitem [ref=e317]:
+              - link "社会责任" [ref=e318] [cursor=pointer]:
+                - /url: /aboutus/socialresponsibility/
+            - listitem [ref=e319]:
+              - link "公益慈善" [ref=e320] [cursor=pointer]:
+                - /url: //foundation.sse.com.cn/
+            - listitem [ref=e321]:
+              - link "中国证券博物馆" [ref=e322] [cursor=pointer]:
+                - /url: //csm.sse.com.cn/
+            - listitem [ref=e323]:
+              - link "刊物" [ref=e324] [cursor=pointer]:
+                - /url: /aboutus/publication/monthly/overview/
+      - generic [ref=e326]:
+        - paragraph [ref=e327]: 400投资者服务热线： 400-8888-400
+        - generic [ref=e328]:
+          - paragraph
+          - paragraph [ref=e329]:
+            - generic [ref=e330]:
+              - text: 上海证券交易所官网现已支持
+              - generic [ref=e331]:
+                - text: IPV
+                - emphasis [ref=e332]: "6"
+            - generic [ref=e333]:
+              - text: ©上海证券交易所版权所有 2020
+              - link "沪ICP备05004045号-2" [ref=e334] [cursor=pointer]:
+                - /url: https://beian.miit.gov.cn/
+              - link "沪公网安备 31011502016333号" [ref=e335] [cursor=pointer]:
+                - /url: http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31011502016333
+                - generic [ref=e336]:
+                  - img [ref=e337]
+                  - text: 沪公网安备 31011502016333号
+              - link [ref=e338] [cursor=pointer]:
+                - /url: https://bszs.conac.cn/sitename?method=show&id=273B49C66A3F20DDE06310291AACA667
+                - img [ref=e339]
