@@ -33,7 +33,17 @@ const generateMockHistory = () => {
 
 // --- 辅助组件：涨跌颜色格式化 ---
 const FormatNumber = ({ value, isPercent = false, isCurrency = false, showSign = true }) => {
-  if (value === 0 || value === undefined) return <span className="text-slate-500">0.00</span>;
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return <span className="text-slate-400">--</span>;
+  }
+
+  if (value === 0) {
+    const zeroValue = isCurrency
+      ? Number(0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : '0.00';
+
+    return <span className="text-slate-500">{zeroValue}{isPercent ? '%' : ''}</span>;
+  }
   
   const colorClass = value > 0 ? 'text-red-500' : 'text-green-500';
   const sign = value > 0 && showSign ? '+' : '';
@@ -48,6 +58,11 @@ const FormatNumber = ({ value, isPercent = false, isCurrency = false, showSign =
       {sign}{value < 0 ? '-' : ''}{formattedValue}{isPercent ? '%' : ''}
     </span>
   );
+};
+
+const formatCurrencyAmount = (value) => {
+  if (!Number.isFinite(value)) return '--';
+  return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 // --- 辅助组件：弹窗 Modal ---
@@ -93,6 +108,23 @@ const readStoredJson = (storageKey, fallbackValue) => {
   }
 };
 
+const readStoredDisplayMode = () => {
+  try {
+    const rawValue = localStorage.getItem('fundTrackerDisplayMode');
+    return rawValue === 'official' ? 'official' : 'estimate';
+  } catch (error) {
+    console.warn('本地显示口径读取失败', error);
+    return 'estimate';
+  }
+};
+
+const parsePercentageText = (value) => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.replace('%', '').trim();
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 const normalizeStoredFund = (fund, index) => {
   if (!fund || typeof fund !== 'object') {
     return null;
@@ -116,8 +148,13 @@ const normalizeStoredFund = (fund, index) => {
     costAmount: fund.costAmount !== undefined ? Math.max(0, toNumber(fund.costAmount)) : undefined,
     currentNetValue: fund.currentNetValue !== undefined ? Math.max(0, toNumber(fund.currentNetValue)) : undefined,
     lastNetValue: fund.lastNetValue !== undefined ? Math.max(0, toNumber(fund.lastNetValue)) : undefined,
+    officialCurrentNetValue: fund.officialCurrentNetValue !== undefined ? Math.max(0, toNumber(fund.officialCurrentNetValue)) : undefined,
+    officialLastNetValue: fund.officialLastNetValue !== undefined ? Math.max(0, toNumber(fund.officialLastNetValue)) : undefined,
+    officialDailyRate: fund.officialDailyRate !== undefined ? toNumber(fund.officialDailyRate) : undefined,
     lastValuationTime: typeof fund.lastValuationTime === 'string' ? fund.lastValuationTime : '',
     netValueDate: typeof fund.netValueDate === 'string' ? fund.netValueDate : '',
+    officialNetValueDate: typeof fund.officialNetValueDate === 'string' ? fund.officialNetValueDate : '',
+    officialPreviousNetValueDate: typeof fund.officialPreviousNetValueDate === 'string' ? fund.officialPreviousNetValueDate : '',
     bootstrapSharesFromAmount: Boolean(fund.bootstrapSharesFromAmount),
   };
 };
@@ -142,7 +179,7 @@ const normalizeStoredSectors = (storedSectors) => {
   return normalized.length > 0 ? normalized : INITIAL_SECTORS;
 };
 
-const createEmptyFundForm = () => ({ code: '', amount: '', holdingProfit: '' });
+const createEmptyFundForm = (defaultSector = '') => ({ code: '', sector: defaultSector, amount: '', holdingProfit: '', shares: '' });
 
 const createEmptyFundLookup = () => ({
   status: 'idle',
@@ -183,7 +220,7 @@ const buildFundSnapshot = (fund, overrides = {}) => {
   const dailyRate = toNumber(overrides.dailyRate ?? derivedDailyRate);
   const fallbackMarketValue = Math.max(0, toNumber(overrides.amount ?? fund.amount));
   const marketValue = hasTrackedShares
-    ? (shares > 0 && currentNetValue > 0 ? shares * currentNetValue : 0)
+    ? (shares > 0 ? (currentNetValue > 0 ? shares * currentNetValue : fallbackMarketValue) : 0)
     : fallbackMarketValue;
   const fallbackCostAmount = fund.costAmount !== undefined
     ? Math.max(0, toNumber(fund.costAmount))
@@ -191,13 +228,16 @@ const buildFundSnapshot = (fund, overrides = {}) => {
   const costAmount = hasTrackedShares
     ? (shares > 0 ? Math.max(0, toNumber(overrides.costAmount ?? fallbackCostAmount)) : 0)
     : undefined;
-  const legacyDailyProfit = dailyRate !== 0
-    ? (fallbackMarketValue * dailyRate) / 100
-    : toNumber(overrides.dailyProfit ?? fund.dailyProfit);
+  const canUseRateBasedDailyProfit = marketValue > 0 && dailyRate !== 0 && dailyRate !== -100 && (!hasTrackedShares || shares > 0);
+  const hasExplicitDailyProfitOverride = overrides.dailyProfit !== undefined;
+  const fallbackDailyProfit = canUseRateBasedDailyProfit
+    ? (marketValue * dailyRate) / (100 + dailyRate)
+    : (hasExplicitDailyProfitOverride ? toNumber(overrides.dailyProfit) : (dailyRate === 0 ? 0 : toNumber(fund.dailyProfit)));
+  const legacyDailyProfit = fallbackDailyProfit;
   const legacyTotalProfit = toNumber(overrides.totalProfit ?? fund.totalProfit);
   const legacyTotalRate = toNumber(overrides.totalRate ?? fund.totalRate);
   const dailyProfit = hasTrackedShares
-    ? (shares > 0 && currentNetValue > 0 && lastNetValue > 0 ? shares * (currentNetValue - lastNetValue) : 0)
+    ? (shares > 0 && currentNetValue > 0 && lastNetValue > 0 ? shares * (currentNetValue - lastNetValue) : fallbackDailyProfit)
     : legacyDailyProfit;
   const totalProfit = hasTrackedShares
     ? marketValue - costAmount
@@ -220,6 +260,94 @@ const buildFundSnapshot = (fund, overrides = {}) => {
     totalRate,
     weeklyProfit: toNumber(overrides.weeklyProfit ?? fund.weeklyProfit),
     monthlyProfit: toNumber(overrides.monthlyProfit ?? fund.monthlyProfit),
+  };
+};
+
+const parseOfficialNetValueRows = (content) => {
+  if (!content || typeof content !== 'string') return null;
+
+  const parser = new DOMParser();
+  const documentFragment = parser.parseFromString(content, 'text/html');
+  const rows = [...documentFragment.querySelectorAll('tbody tr')]
+    .slice(0, 2)
+    .map((row) => {
+      const cells = row.querySelectorAll('td');
+      const date = String(cells[0]?.textContent || '').trim();
+      const netValue = toNumber(cells[1]?.textContent);
+      const dailyRate = parsePercentageText(cells[3]?.textContent);
+
+      if (!date || netValue <= 0) {
+        return null;
+      }
+
+      return {
+        date,
+        netValue,
+        dailyRate,
+      };
+    })
+    .filter(Boolean);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return {
+    currentNetValue: rows[0].netValue,
+    lastNetValue: rows[1]?.netValue,
+    dailyRate: rows[0].dailyRate,
+    netValueDate: rows[0].date,
+    previousNetValueDate: rows[1]?.date || '',
+  };
+};
+
+const applyOfficialNetValueToFund = (fund, officialSnapshot) => {
+  if (!officialSnapshot || officialSnapshot.currentNetValue <= 0 || !officialSnapshot.netValueDate) {
+    return fund;
+  }
+
+  return {
+    ...fund,
+    officialCurrentNetValue: officialSnapshot.currentNetValue,
+    officialLastNetValue: officialSnapshot.lastNetValue,
+    officialDailyRate: officialSnapshot.dailyRate,
+    officialNetValueDate: officialSnapshot.netValueDate,
+    officialPreviousNetValueDate: officialSnapshot.previousNetValueDate || '',
+  };
+};
+
+const buildOfficialDisplayFund = (fund) => {
+  const shares = Math.max(0, toNumber(fund.shares));
+  const costAmount = fund.costAmount !== undefined ? Math.max(0, toNumber(fund.costAmount)) : undefined;
+  const currentNetValue = fund.officialCurrentNetValue !== undefined ? Math.max(0, toNumber(fund.officialCurrentNetValue)) : undefined;
+  const lastNetValue = fund.officialLastNetValue !== undefined ? Math.max(0, toNumber(fund.officialLastNetValue)) : undefined;
+  const storedOfficialDailyRate = fund.officialDailyRate !== undefined ? toNumber(fund.officialDailyRate) : undefined;
+  const hasTrackedShares = shares > 0;
+  const amount = hasTrackedShares && currentNetValue > 0 ? shares * currentNetValue : null;
+  const derivedDailyRate = currentNetValue > 0 && lastNetValue > 0
+    ? ((currentNetValue - lastNetValue) / lastNetValue) * 100
+    : Number.NaN;
+  const dailyRate = Number.isFinite(storedOfficialDailyRate)
+    ? storedOfficialDailyRate
+    : (Number.isFinite(derivedDailyRate) ? derivedDailyRate : null);
+  const canUseRateBasedDailyProfit = Number.isFinite(amount) && Number.isFinite(dailyRate) && dailyRate !== -100;
+  const dailyProfit = hasTrackedShares && currentNetValue > 0 && lastNetValue > 0
+    ? shares * (currentNetValue - lastNetValue)
+    : (canUseRateBasedDailyProfit ? (amount * dailyRate) / (100 + dailyRate) : null);
+  const totalProfit = Number.isFinite(amount) && costAmount !== undefined ? amount - costAmount : null;
+  const totalRate = Number.isFinite(amount) && costAmount > 0 ? (totalProfit / costAmount) * 100 : (costAmount === 0 && Number.isFinite(amount) ? 0 : null);
+
+  return {
+    ...fund,
+    amount,
+    dailyRate,
+    dailyProfit,
+    totalProfit,
+    totalRate,
+    currentNetValue: currentNetValue ?? fund.currentNetValue,
+    lastNetValue: lastNetValue ?? fund.lastNetValue,
+    netValueDate: fund.officialNetValueDate || fund.netValueDate,
+    lastValuationTime: fund.officialNetValueDate || '',
   };
 };
 
@@ -276,30 +404,33 @@ const fetchQuoteMapForFunds = async (fundsToUpdate) => {
   return quoteMap;
 };
 
-const mergeFundsWithQuotes = (fundsToMerge, quoteMap) => {
+const mergeFundsWithSources = (fundsToMerge, quoteMap, officialMap) => {
   if (!fundsToMerge || fundsToMerge.length === 0) {
     return fundsToMerge;
   }
 
   return fundsToMerge.map((fund) => {
-    const quote = quoteMap.get(String(fund.code || '').trim());
-    if (quote) {
-      return reconcileFundWithQuote(fund, quote);
-    }
+    const code = String(fund.code || '').trim();
+    const quote = quoteMap.get(code);
+    const officialSnapshot = officialMap.get(code);
+    let nextFund = fund;
 
-    if (fund.shares === undefined) {
-      return {
-        ...fund,
+    if (quote) {
+      nextFund = reconcileFundWithQuote(nextFund, quote);
+    } else if (fund.shares === undefined) {
+      nextFund = {
+        ...nextFund,
         dailyRate: 0,
         dailyProfit: 0,
       };
     }
 
-    return fund;
+    return officialSnapshot ? applyOfficialNetValueToFund(nextFund, officialSnapshot) : nextFund;
   });
 };
 
 let tiantianQuoteQueue = Promise.resolve();
+let eastmoneyOfficialQueue = Promise.resolve();
 
 const loadTiantianFundQuote = (fundCode) => {
   return new Promise((resolve, reject) => {
@@ -371,6 +502,95 @@ const enqueueTiantianFundQuote = (fundCode) => {
   const task = tiantianQuoteQueue.then(() => loadTiantianFundQuote(fundCode));
   tiantianQuoteQueue = task.then(() => undefined, () => undefined);
   return task;
+};
+
+const loadEastmoneyOfficialHistory = (fundCode) => {
+  return new Promise((resolve, reject) => {
+    const normalizedCode = String(fundCode || '').trim();
+    if (!normalizedCode) {
+      reject(new Error('基金代码不能为空'));
+      return;
+    }
+
+    const scriptId = `eastmoney_official_${normalizedCode}_${Date.now()}`;
+    const previousApiData = window.apidata;
+    let settled = false;
+
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      document.getElementById(scriptId)?.remove();
+
+      window.apidata = previousApiData;
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(`基金 ${normalizedCode} 官方净值请求超时`));
+    }, SCRIPT_TIMEOUT_MS);
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${normalizedCode}&page=1&per=2&rt=${Date.now()}`;
+    script.async = true;
+    script.onload = () => {
+      if (settled) return;
+      settled = true;
+
+      const parsed = parseOfficialNetValueRows(window.apidata?.content);
+      cleanup();
+
+      if (!parsed) {
+        reject(new Error(`基金 ${normalizedCode} 官方净值解析失败`));
+        return;
+      }
+
+      resolve({
+        code: normalizedCode,
+        ...parsed,
+      });
+    };
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(`基金 ${normalizedCode} 官方净值加载失败`));
+    };
+
+    document.body.appendChild(script);
+  });
+};
+
+const enqueueEastmoneyOfficialHistory = (fundCode) => {
+  const task = eastmoneyOfficialQueue.then(() => loadEastmoneyOfficialHistory(fundCode));
+  eastmoneyOfficialQueue = task.then(() => undefined, () => undefined);
+  return task;
+};
+
+const fetchOfficialMapForFunds = async (fundsToUpdate) => {
+  if (!fundsToUpdate || fundsToUpdate.length === 0) {
+    return new Map();
+  }
+
+  const uniqueCodes = [...new Set(
+    fundsToUpdate
+      .map((fund) => String(fund.code || '').trim())
+      .filter(Boolean)
+  )];
+
+  const officialMap = new Map();
+
+  for (const code of uniqueCodes) {
+    try {
+      const officialSnapshot = await enqueueEastmoneyOfficialHistory(code);
+      officialMap.set(code, officialSnapshot);
+    } catch (error) {
+      console.warn(`天天基金官方净值刷新失败: ${code}`, error);
+    }
+  }
+
+  return officialMap;
 };
 
 const alignFundMarketValue = async (fund, nextMarketValue, fallbackName = fund.name) => {
@@ -469,15 +689,26 @@ export default function FundTrackerApp() {
     return normalizeStoredSectors(readStoredJson('fundTrackerSectors', INITIAL_SECTORS));
   });
 
-  // 3. 监听变化：只要持仓变了，立刻存入本地缓存
+  // 3. 初始化展示口径
+  const [displayMode, setDisplayMode] = useState(readStoredDisplayMode);
+
+  // 4. 监听变化：只要持仓变了，立刻存入本地缓存
   useEffect(() => {
     localStorage.setItem('fundTrackerData', JSON.stringify(funds));
   }, [funds]);
 
-  // 4. 监听变化：只要分组变了，立刻存入本地缓存
+  // 5. 监听变化：只要分组变了，立刻存入本地缓存
   useEffect(() => {
     localStorage.setItem('fundTrackerSectors', JSON.stringify(sectors));
   }, [sectors]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('fundTrackerDisplayMode', displayMode);
+    } catch (error) {
+      console.warn('本地显示口径写入失败', error);
+    }
+  }, [displayMode]);
 
 
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -495,16 +726,19 @@ export default function FundTrackerApp() {
   const closeModal = (type) => setModals(prev => ({ ...prev, [type]: false }));
 
   const [newGroupName, setNewGroupName] = useState('');
-  const [fundForm, setFundForm] = useState(createEmptyFundForm);
+  const [fundForm, setFundForm] = useState(() => createEmptyFundForm(sectors[0] || ''));
   const [fundLookup, setFundLookup] = useState(createEmptyFundLookup);
   const [syncForm, setSyncForm] = useState({ code: '', type: '买入', amount: '' });
   const [editForm, setEditForm] = useState({ id: null, name: '', code: '', sector: '', amount: '' });
 
   const normalizedFundCode = String(fundForm.code || '').trim();
+  const normalizedFundSector = String(fundForm.sector || '').trim();
   const hasHoldingAmountInput = String(fundForm.amount || '').trim() !== '';
   const hasHoldingProfitInput = String(fundForm.holdingProfit || '').trim() !== '';
+  const hasHoldingSharesInput = String(fundForm.shares || '').trim() !== '';
   const holdingAmountValue = hasHoldingAmountInput ? Number.parseFloat(fundForm.amount) : Number.NaN;
   const holdingProfitValue = hasHoldingProfitInput ? Number.parseFloat(fundForm.holdingProfit) : Number.NaN;
+  const holdingSharesValue = hasHoldingSharesInput ? Number.parseFloat(fundForm.shares) : Number.NaN;
   const derivedCostAmountRaw = Number.isFinite(holdingAmountValue) && Number.isFinite(holdingProfitValue)
     ? holdingAmountValue - holdingProfitValue
     : Number.NaN;
@@ -513,14 +747,17 @@ export default function FundTrackerApp() {
     : Number.NaN;
   const isHoldingAmountValid = Number.isFinite(holdingAmountValue) && holdingAmountValue > 0;
   const isHoldingProfitValid = Number.isFinite(holdingProfitValue);
+  const isHoldingSharesValid = !hasHoldingSharesInput || (Number.isFinite(holdingSharesValue) && holdingSharesValue > 0);
   const isDerivedCostAmountValid = Number.isFinite(derivedCostAmountRaw) && derivedCostAmountRaw >= 0;
-  const canSubmitFund = fundLookup.status === 'success' && isHoldingAmountValid && isHoldingProfitValid && isDerivedCostAmountValid;
+  const isFundSectorValid = Boolean(normalizedFundSector) && sectors.includes(normalizedFundSector);
+  const canSubmitFund = fundLookup.status === 'success' && isHoldingAmountValid && isHoldingProfitValid && isHoldingSharesValid && isDerivedCostAmountValid && isFundSectorValid;
 
   const resetFundModalState = useCallback(() => {
+    const defaultSector = sectors[0] || '';
     fundLookupRequestRef.current += 1;
-    setFundForm(createEmptyFundForm());
+    setFundForm(createEmptyFundForm(defaultSector));
     setFundLookup(createEmptyFundLookup());
-  }, []);
+  }, [sectors]);
 
   const handleOpenFundModal = () => {
     resetFundModalState();
@@ -571,44 +808,99 @@ export default function FundTrackerApp() {
     });
   };
 
+  const displayedFunds = useMemo(() => {
+    return funds.map((fund) => ({
+      ...(displayMode === 'official' ? buildOfficialDisplayFund(fund) : fund),
+      sourceFund: fund,
+    }));
+  }, [displayMode, funds]);
+
+  const latestOfficialDate = useMemo(() => {
+    return funds.reduce((latestDate, fund) => {
+      if (fund.officialNetValueDate && fund.officialNetValueDate > latestDate) {
+        return fund.officialNetValueDate;
+      }
+
+      return latestDate;
+    }, '');
+  }, [funds]);
+
+  const isOfficialMode = displayMode === 'official';
+  const dailySummaryLabel = isOfficialMode ? '当日官方盈亏 (元)' : '当日估算盈亏 (元)';
+  const dailyRateColumnLabel = isOfficialMode ? '当日官方涨幅' : '当日估算涨幅';
+  const dailyProfitColumnLabel = isOfficialMode ? '当日官方收益' : '当日估算收益';
+  const groupDailyLabel = isOfficialMode ? '官方盈亏' : '当日盈亏';
+  const refreshButtonLabel = isOfficialMode ? '刷新数据' : '刷新估值';
+  const updateBadgeLabel = isOfficialMode ? '官方净值截止' : '最新估值';
+
   // --- 数据计算与分组 ---
   const { groupedFunds, totalDailyProfit, totalAmount, totalProfit } = useMemo(() => {
     let tDaily = 0;
     let tAmount = 0;
     let tProfit = 0;
+    let hasIncompleteDaily = false;
+    let hasIncompleteAmount = false;
+    let hasIncompleteProfit = false;
     
     const groups = sectors.reduce((acc, sector) => {
-      acc[sector] = { funds: [], sectorDailyProfit: 0, sectorAmount: 0 };
+      acc[sector] = { funds: [], sectorDailyProfit: 0, sectorAmount: 0, sectorTotalProfit: 0, hasIncompleteDaily: false, hasIncompleteAmount: false, hasIncompleteProfit: false };
       return acc;
     }, {});
 
-    funds.forEach((fund) => {
+    displayedFunds.forEach((fund) => {
       const targetSector = groups[fund.sector] ? fund.sector : (groups['其他'] ? '其他' : sectors[0]);
       
       if (!groups[targetSector]) {
-         groups[targetSector] = { funds: [], sectorDailyProfit: 0, sectorAmount: 0 };
+         groups[targetSector] = { funds: [], sectorDailyProfit: 0, sectorAmount: 0, sectorTotalProfit: 0, hasIncompleteDaily: false, hasIncompleteAmount: false, hasIncompleteProfit: false };
       }
 
       groups[targetSector].funds.push(fund);
-      groups[targetSector].sectorDailyProfit += (fund.dailyProfit || 0);
-      groups[targetSector].sectorAmount += (fund.amount || 0);
-      
-      tDaily += (fund.dailyProfit || 0);
-      tAmount += (fund.amount || 0);
-      tProfit += (fund.totalProfit || 0);
+
+      if (Number.isFinite(fund.dailyProfit)) {
+        groups[targetSector].sectorDailyProfit += fund.dailyProfit;
+        tDaily += fund.dailyProfit;
+      } else {
+        groups[targetSector].hasIncompleteDaily = true;
+        hasIncompleteDaily = true;
+      }
+
+      if (Number.isFinite(fund.amount)) {
+        groups[targetSector].sectorAmount += fund.amount;
+        tAmount += fund.amount;
+      } else {
+        groups[targetSector].hasIncompleteAmount = true;
+        hasIncompleteAmount = true;
+      }
+
+      if (Number.isFinite(fund.totalProfit)) {
+        groups[targetSector].sectorTotalProfit += fund.totalProfit;
+        tProfit += fund.totalProfit;
+      } else {
+        groups[targetSector].hasIncompleteProfit = true;
+        hasIncompleteProfit = true;
+      }
     });
 
-    return { groupedFunds: groups, totalDailyProfit: tDaily, totalAmount: tAmount, totalProfit: tProfit };
-  }, [funds, sectors]);
+    return {
+      groupedFunds: groups,
+      totalDailyProfit: hasIncompleteDaily ? null : tDaily,
+      totalAmount: hasIncompleteAmount ? null : tAmount,
+      totalProfit: hasIncompleteProfit ? null : tProfit,
+    };
+  }, [displayedFunds, sectors]);
 
   // --- 交互处理 ---
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
 
     try {
-      const quoteMap = await fetchQuoteMapForFunds(funds);
-      if (quoteMap.size > 0) {
-        setFunds((currentFunds) => mergeFundsWithQuotes(currentFunds, quoteMap));
+      const [quoteMap, officialMap] = await Promise.all([
+        fetchQuoteMapForFunds(funds),
+        fetchOfficialMapForFunds(funds),
+      ]);
+
+      if (quoteMap.size > 0 || officialMap.size > 0) {
+        setFunds((currentFunds) => mergeFundsWithSources(currentFunds, quoteMap, officialMap));
 
         const now = new Date();
         setLastUpdateTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`);
@@ -705,11 +997,11 @@ export default function FundTrackerApp() {
     };
   }, [modals.fund, normalizedFundCode]);
 
-  const handleAddFund = (e) => {
+  const handleAddFund = async (e) => {
     e.preventDefault();
 
     if (!canSubmitFund || !fundLookup.quote) {
-      alert('请先确认基金代码查询成功，并检查持仓金额与持有收益填写是否有效。');
+      alert('请先确认基金代码查询成功，并检查分组、持仓金额、持有收益与可选份额填写是否有效。');
       return;
     }
 
@@ -719,20 +1011,20 @@ export default function FundTrackerApp() {
       return;
     }
 
-    const defaultSector = sectors[0] || '';
-    const newFund = reconcileFundWithQuote({
+    const manualShares = hasHoldingSharesInput ? holdingSharesValue : undefined;
+    const nextFund = reconcileFundWithQuote({
       id: Date.now(),
       name: String(fundLookup.quote.name || '').trim() || '未命名基金',
       code: normalizedFundCode,
-      sector: defaultSector,
+      sector: normalizedFundSector,
       amount: holdingAmountValue,
-      shares: undefined,
+      shares: manualShares,
       costAmount: derivedCostAmount,
       currentNetValue: 0,
       lastNetValue: 0,
       lastValuationTime: '',
       netValueDate: '',
-      bootstrapSharesFromAmount: true,
+      bootstrapSharesFromAmount: manualShares === undefined,
       dailyRate: 0,
       dailyProfit: 0,
       totalProfit: 0,
@@ -740,6 +1032,14 @@ export default function FundTrackerApp() {
       weeklyProfit: 0,
       monthlyProfit: 0,
     }, fundLookup.quote);
+
+    let newFund = nextFund;
+    try {
+      const officialSnapshot = await enqueueEastmoneyOfficialHistory(normalizedFundCode);
+      newFund = applyOfficialNetValueToFund(nextFund, officialSnapshot);
+    } catch (error) {
+      console.warn(`新增持仓时获取官方净值失败: ${normalizedFundCode}`, error);
+    }
 
     setFunds(prev => [...prev, newFund]);
 
@@ -848,9 +1148,9 @@ export default function FundTrackerApp() {
             </h1>
             <div className="flex items-center gap-2 mt-2">
               <p className="text-slate-500 text-sm">全天候追踪您的基金投资组合表现</p>
-              {lastUpdateTime && (
+              {((!isOfficialMode && lastUpdateTime) || (isOfficialMode && latestOfficialDate)) && (
                 <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                  <Clock className="w-3 h-3" /> 最新估值: {lastUpdateTime}
+                  <Clock className="w-3 h-3" /> {updateBadgeLabel}: {isOfficialMode ? latestOfficialDate : lastUpdateTime}
                 </span>
               )}
             </div>
@@ -860,7 +1160,7 @@ export default function FundTrackerApp() {
             <div className="flex flex-col items-end">
               <span className="text-slate-500 text-sm mb-1">总持仓市值 (元)</span>
               <span className="text-xl lg:text-2xl font-bold text-slate-900">
-                ¥ {totalAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
+                {formatCurrencyAmount(totalAmount)}
               </span>
             </div>
             <div className="hidden lg:block w-px bg-slate-200 h-12 self-center"></div>
@@ -872,7 +1172,7 @@ export default function FundTrackerApp() {
             </div>
             <div className="hidden lg:block w-px bg-slate-200 h-12 self-center"></div>
             <div className="flex flex-col items-end">
-              <span className="text-slate-500 text-sm mb-1">当日估算盈亏 (元)</span>
+              <span className="text-slate-500 text-sm mb-1">{dailySummaryLabel}</span>
               <span className="text-2xl lg:text-3xl font-black">
                 <FormatNumber value={totalDailyProfit} isCurrency={true} />
               </span>
@@ -895,6 +1195,22 @@ export default function FundTrackerApp() {
           </div>
           
           <div className="flex flex-wrap gap-2">
+            <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setDisplayMode('estimate')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${displayMode === 'estimate' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                盘中估算
+              </button>
+              <button
+                type="button"
+                onClick={() => setDisplayMode('official')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${displayMode === 'official' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                官方结果
+              </button>
+            </div>
             <button type="button" onClick={() => openModal('import')} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
               <Upload className="w-4 h-4" /> 导入
             </button>
@@ -903,7 +1219,7 @@ export default function FundTrackerApp() {
             </button>
             <button type="button" onClick={handleRefresh} disabled={funds.length === 0} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200 ml-0 lg:ml-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
-              刷新估值
+              {refreshButtonLabel}
             </button>
           </div>
         </div>
@@ -916,8 +1232,8 @@ export default function FundTrackerApp() {
                 <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider shadow-[0_1px_0_0_#e2e8f0]">
                   <th className="p-4 font-medium bg-slate-50">基金名称 (代码)</th>
                   <th className="p-4 font-medium text-right bg-slate-50">持仓市值</th>
-                  <th className="p-4 font-medium text-right bg-slate-50">当日估算涨幅</th>
-                  <th className="p-4 font-medium text-right bg-blue-50/80">当日估算收益</th>
+                  <th className="p-4 font-medium text-right bg-slate-50">{dailyRateColumnLabel}</th>
+                  <th className="p-4 font-medium text-right bg-blue-50/80">{dailyProfitColumnLabel}</th>
                   <th className="p-4 font-medium text-right bg-slate-50">持有收益率</th>
                   <th className="p-4 font-medium text-right bg-slate-50">持有总收益</th>
                   <th className="p-4 font-medium text-right bg-slate-50">本周收益</th>
@@ -946,10 +1262,10 @@ export default function FundTrackerApp() {
                               </span>
                             </span>
                             <div className="flex items-center gap-6 text-sm pr-4">
-                              <span className="text-slate-500">板块市值: <span className="font-medium text-slate-800">¥{data.sectorAmount.toLocaleString()}</span></span>
-                              <span className="text-slate-500">当日盈亏: </span>
+                              <span className="text-slate-500">板块市值: <span className="font-medium text-slate-800">{data.hasIncompleteAmount ? '--' : formatCurrencyAmount(data.sectorAmount)}</span></span>
+                              <span className="text-slate-500">{groupDailyLabel}: </span>
                               <span className="text-base">
-                                <FormatNumber value={data.sectorDailyProfit} isCurrency={true} />
+                                <FormatNumber value={data.hasIncompleteDaily ? null : data.sectorDailyProfit} isCurrency={true} />
                               </span>
                             </div>
                           </button>
@@ -974,7 +1290,7 @@ export default function FundTrackerApp() {
                             </div>
                           </td>
                           <td className="p-4 text-right font-medium text-slate-700">
-                            ¥{fund.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
+                            {formatCurrencyAmount(fund.amount)}
                           </td>
                           <td className="p-4 text-right">
                             <FormatNumber value={fund.dailyRate} isPercent={true} />
@@ -1006,7 +1322,7 @@ export default function FundTrackerApp() {
                               </button>
                               <button 
                                 type="button"
-                                onClick={() => handleOpenSettings(fund)}
+                                onClick={() => handleOpenSettings(fund.sourceFund ?? fund)}
                                 className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors" 
                                 title="设置"
                               >
@@ -1035,9 +1351,10 @@ export default function FundTrackerApp() {
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .add-fund-number-input::-webkit-outer-spin-button,
+        .add-fund-number-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .add-fund-number-input { appearance: textfield; -moz-appearance: textfield; }
       `}</style>
-
-      {/* ======================= 所有弹窗组件 ======================= */}
 
       <Modal isOpen={modals.group} onClose={() => closeModal('group')} title="创建新分组">
         <form onSubmit={handleCreateGroup} className="space-y-4">
@@ -1065,14 +1382,35 @@ export default function FundTrackerApp() {
               placeholder="如：005827"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
+            <div className="mt-2 space-y-1">
+              <p className={`flex items-center gap-2 text-sm ${fundLookup.status === 'success' ? 'text-emerald-700' : fundLookup.status === 'error' ? 'text-rose-700' : fundLookup.status === 'loading' ? 'text-blue-700' : 'text-slate-500'}`}>
+                <span className={`h-2 w-2 rounded-full ${fundLookup.status === 'success' ? 'bg-emerald-500' : fundLookup.status === 'error' ? 'bg-rose-500' : fundLookup.status === 'loading' ? 'bg-blue-500' : 'bg-slate-300'}`}></span>
+                <span>{fundLookup.message}</span>
+              </p>
+              <p className="text-xs text-slate-500">基金名称：<span className="font-medium text-slate-700">{fundLookup.quote?.name || '待自动解析'}</span></p>
+            </div>
           </div>
-          <div className={`rounded-xl border px-4 py-3 text-sm ${fundLookup.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : fundLookup.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : fundLookup.status === 'loading' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
-            <div className="font-medium">查询状态</div>
-            <p className="mt-1">{fundLookup.message}</p>
-            <p className="mt-2 text-slate-800">
-              基金名称：<span className="font-medium">{fundLookup.quote?.name || '待自动解析'}</span>
-            </p>
-            <p className="mt-1 text-xs text-slate-500">新增后默认归入首个分组：{sectors[0] || '未设置分组'}</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="fund-sector" className="block text-sm font-medium text-slate-700 mb-1">所属分组</label>
+              <select 
+                id="fund-sector"
+                required
+                value={fundForm.sector} onChange={(e) => setFundForm({...fundForm, sector: e.target.value})}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              >
+                {sectors.map(sector => <option key={sector} value={sector}>{sector}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="fund-shares" className="block text-sm font-medium text-slate-700 mb-1">持有份额 (选填)</label>
+              <input 
+                id="fund-shares" type="number" min="0" step="0.01" value={fundForm.shares} onChange={(e) => setFundForm({...fundForm, shares: e.target.value})}
+                placeholder="如已知可直接填写"
+                className="add-fund-number-input w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <p className={`text-xs mt-1 ${hasHoldingSharesInput && !isHoldingSharesValid ? 'text-rose-600' : 'text-slate-400'}`}>留空则继续按当前估值自动换算份额；如填写则以份额为准。</p>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1080,7 +1418,7 @@ export default function FundTrackerApp() {
               <input 
                 id="fund-amount" type="number" min="0" step="0.01" required value={fundForm.amount} onChange={(e) => setFundForm({...fundForm, amount: e.target.value})}
                 placeholder="当前持仓总金额"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="add-fund-number-input w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               />
               <p className="text-xs text-slate-400 mt-1">这里填当前总持仓金额，已包含累计收益。</p>
             </div>
@@ -1089,7 +1427,7 @@ export default function FundTrackerApp() {
               <input 
                 id="fund-profit" type="number" step="0.01" required value={fundForm.holdingProfit} onChange={(e) => setFundForm({...fundForm, holdingProfit: e.target.value})}
                 placeholder="累计持有收益"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="add-fund-number-input w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               />
               <p className="text-xs text-slate-400 mt-1">支持填写负数，系统会据此反推出持仓成本。</p>
             </div>
@@ -1100,7 +1438,7 @@ export default function FundTrackerApp() {
             {!isDerivedCostAmountValid && hasHoldingAmountInput && hasHoldingProfitInput && (
               <p className="mt-1">当前填写会导致成本金额为负数，暂时不能保存。</p>
             )}
-            <p className="mt-1 text-xs text-slate-500">保存后会按当前估值自动换算份额，并继续沿用现有按份额刷新的逻辑。</p>
+            <p className="mt-1 text-xs text-slate-500">保存后会沿用现有估值同步逻辑；若未填写份额，系统会继续按当前估值自动换算。</p>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
             <button type="button" onClick={handleCloseFundModal} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">取消</button>
@@ -1187,7 +1525,7 @@ export default function FundTrackerApp() {
         <div className="space-y-4">
           <div className="flex justify-between items-center text-sm mb-2">
             <span className="text-slate-500">基金代码: {selectedFund?.code}</span>
-            <span className="text-slate-500">当前市值: <span className="font-medium text-slate-800">¥{selectedFund?.amount?.toLocaleString()}</span></span>
+            <span className="text-slate-500">当前市值: <span className="font-medium text-slate-800">{formatCurrencyAmount(selectedFund?.amount)}</span></span>
           </div>
           {toNumber(selectedFund?.shares) > 0 && (
             <div className="text-xs text-slate-400 -mt-2">
