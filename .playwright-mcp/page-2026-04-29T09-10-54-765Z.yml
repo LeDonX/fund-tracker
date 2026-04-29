@@ -1,0 +1,173 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - heading "养基宝 V1.3.0" [level=1] [ref=e7]:
+        - img [ref=e8]
+        - text: 养基宝
+        - generic [ref=e11]: V1.3.0
+      - generic [ref=e12]:
+        - paragraph [ref=e13]: 全天候追踪您的基金投资组合表现
+        - generic [ref=e14]:
+          - img [ref=e15]
+          - text: 官方净值截止 2026-04-22
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]: 总持有金额 (元)
+        - generic [ref=e21]: ¥29,581.57
+      - generic [ref=e23]:
+        - generic [ref=e24]: 累计总收益
+        - generic [ref=e26]: "-418.43"
+      - generic [ref=e28]:
+        - generic [ref=e29]: 当日盈亏 (元)
+        - generic [ref=e31]: "-922.62"
+  - generic [ref=e32]:
+    - generic [ref=e33]:
+      - button "新增持仓" [ref=e34]:
+        - img [ref=e35]
+        - text: 新增持仓
+      - button "创建分组" [ref=e36]:
+        - img [ref=e37]
+        - text: 创建分组
+      - button "同步交易" [ref=e39]:
+        - img [ref=e40]
+        - text: 同步交易
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]: 自动口径
+        - generic [ref=e46]: ·
+        - generic [ref=e47]: 2 支盘中估值
+      - button "导入" [ref=e48]:
+        - img [ref=e49]
+        - text: 导入
+      - button "导出" [ref=e52]:
+        - img [ref=e53]
+        - text: 导出
+      - button "刷新数据" [ref=e56]:
+        - img [ref=e57]
+        - text: 刷新数据
+  - table [ref=e64]:
+    - rowgroup [ref=e65]:
+      - row "基金名称 (代码) 持有金额 当日涨幅 当日收益 持有收益率 持有总收益 本周收益 本月收益 操作" [ref=e66]:
+        - columnheader "基金名称 (代码)" [ref=e67]
+        - columnheader "持有金额" [ref=e68]
+        - columnheader "当日涨幅" [ref=e69]
+        - columnheader "当日收益" [ref=e70]
+        - columnheader "持有收益率" [ref=e71]
+        - columnheader "持有总收益" [ref=e72]
+        - columnheader "本周收益" [ref=e73]
+        - columnheader "本月收益" [ref=e74]
+        - columnheader "操作" [ref=e75]
+    - rowgroup [ref=e76]:
+      - 'row "拖拽排序分组 大消费 大消费 1 支 板块持有金额: ¥19,721.04 当日盈亏: -615.08" [ref=e77]':
+        - 'cell "拖拽排序分组 大消费 大消费 1 支 板块持有金额: ¥19,721.04 当日盈亏: -615.08" [ref=e78]':
+          - generic [ref=e79]:
+            - button "拖拽排序分组 大消费" [ref=e80]:
+              - img [ref=e81]
+            - 'button "大消费 1 支 板块持有金额: ¥19,721.04 当日盈亏: -615.08" [ref=e88] [cursor=pointer]':
+              - generic [ref=e89]:
+                - img [ref=e90]
+                - img [ref=e92]
+                - text: 大消费
+                - generic [ref=e95]: 1 支
+              - generic [ref=e96]:
+                - generic [ref=e97]: "板块持有金额: ¥19,721.04"
+                - generic [ref=e98]: "当日盈亏:"
+                - generic [ref=e100]: "-615.08"
+      - row "浦银安盛数字经济混合C 025422 · 9,857.07 份 ¥19,721.04 -3.03% -615.08 -1.39% -278.96 0.00 0.00 详情" [ref=e101]:
+        - cell "浦银安盛数字经济混合C 025422 · 9,857.07 份" [ref=e102]:
+          - button "浦银安盛数字经济混合C" [ref=e103]:
+            - generic [ref=e104]: 浦银安盛数字经济混合C
+          - generic [ref=e105]: 025422 · 9,857.07 份
+        - cell "¥19,721.04" [ref=e106]
+        - cell "-3.03%" [ref=e107]:
+          - generic [ref=e108]: "-3.03%"
+        - cell "-615.08" [ref=e109]:
+          - generic [ref=e110]: "-615.08"
+        - cell "-1.39%" [ref=e111]:
+          - generic [ref=e112]: "-1.39%"
+        - cell "-278.96" [ref=e113]:
+          - generic [ref=e114]: "-278.96"
+        - cell "0.00" [ref=e115]
+        - cell "0.00" [ref=e116]
+        - cell "详情" [ref=e117]:
+          - generic [ref=e118]:
+            - button "详情" [ref=e119]
+            - button "交易记录" [ref=e120]:
+              - img [ref=e121]
+            - button "设置" [ref=e125]:
+              - img [ref=e126]
+    - rowgroup [ref=e129]:
+      - 'row "拖拽排序分组 科技半导体 科技半导体 1 支 板块持有金额: ¥9,860.52 当日盈亏: -307.54" [ref=e130]':
+        - 'cell "拖拽排序分组 科技半导体 科技半导体 1 支 板块持有金额: ¥9,860.52 当日盈亏: -307.54" [ref=e131]':
+          - generic [ref=e132]:
+            - button "拖拽排序分组 科技半导体" [ref=e133]:
+              - img [ref=e134]
+            - 'button "科技半导体 1 支 板块持有金额: ¥9,860.52 当日盈亏: -307.54" [ref=e141] [cursor=pointer]':
+              - generic [ref=e142]:
+                - img [ref=e143]
+                - img [ref=e145]
+                - text: 科技半导体
+                - generic [ref=e148]: 1 支
+              - generic [ref=e149]:
+                - generic [ref=e150]: "板块持有金额: ¥9,860.52"
+                - generic [ref=e151]: "当日盈亏:"
+                - generic [ref=e153]: "-307.54"
+      - row "浦银安盛数字经济混合C 025422 · 4,928.54 份 ¥9,860.52 -3.03% -307.54 -1.39% -139.48 0.00 0.00 详情" [ref=e154]:
+        - cell "浦银安盛数字经济混合C 025422 · 4,928.54 份" [ref=e155]:
+          - button "浦银安盛数字经济混合C" [ref=e156]:
+            - generic [ref=e157]: 浦银安盛数字经济混合C
+          - generic [ref=e158]: 025422 · 4,928.54 份
+        - cell "¥9,860.52" [ref=e159]
+        - cell "-3.03%" [ref=e160]:
+          - generic [ref=e161]: "-3.03%"
+        - cell "-307.54" [ref=e162]:
+          - generic [ref=e163]: "-307.54"
+        - cell "-1.39%" [ref=e164]:
+          - generic [ref=e165]: "-1.39%"
+        - cell "-139.48" [ref=e166]:
+          - generic [ref=e167]: "-139.48"
+        - cell "0.00" [ref=e168]
+        - cell "0.00" [ref=e169]
+        - cell "详情" [ref=e170]:
+          - generic [ref=e171]:
+            - button "详情" [ref=e172]
+            - button "交易记录" [ref=e173]:
+              - img [ref=e174]
+            - button "设置" [ref=e178]:
+              - img [ref=e179]
+    - rowgroup [ref=e182]:
+      - 'row "拖拽排序分组 医疗医药 医疗医药 0 支 板块持有金额: ¥0.00 当日盈亏: 0.00" [ref=e183]':
+        - 'cell "拖拽排序分组 医疗医药 医疗医药 0 支 板块持有金额: ¥0.00 当日盈亏: 0.00" [ref=e184]':
+          - generic [ref=e185]:
+            - button "拖拽排序分组 医疗医药" [ref=e186]:
+              - img [ref=e187]
+            - 'button "医疗医药 0 支 板块持有金额: ¥0.00 当日盈亏: 0.00" [ref=e194] [cursor=pointer]':
+              - generic [ref=e195]:
+                - img [ref=e196]
+                - img [ref=e198]
+                - text: 医疗医药
+                - generic [ref=e201]: 0 支
+              - generic [ref=e202]:
+                - generic [ref=e203]: "板块持有金额: ¥0.00"
+                - generic [ref=e204]: "当日盈亏:"
+                - generic [ref=e205]: "0.00"
+      - row "该分组下暂无持仓" [ref=e206]:
+        - cell "该分组下暂无持仓" [ref=e207]
+    - rowgroup [ref=e208]:
+      - 'row "拖拽排序分组 均衡宽基 均衡宽基 0 支 板块持有金额: ¥0.00 当日盈亏: 0.00" [ref=e209]':
+        - 'cell "拖拽排序分组 均衡宽基 均衡宽基 0 支 板块持有金额: ¥0.00 当日盈亏: 0.00" [ref=e210]':
+          - generic [ref=e211]:
+            - button "拖拽排序分组 均衡宽基" [ref=e212]:
+              - img [ref=e213]
+            - 'button "均衡宽基 0 支 板块持有金额: ¥0.00 当日盈亏: 0.00" [ref=e220] [cursor=pointer]':
+              - generic [ref=e221]:
+                - img [ref=e222]
+                - img [ref=e224]
+                - text: 均衡宽基
+                - generic [ref=e227]: 0 支
+              - generic [ref=e228]:
+                - generic [ref=e229]: "板块持有金额: ¥0.00"
+                - generic [ref=e230]: "当日盈亏:"
+                - generic [ref=e231]: "0.00"
+      - row "该分组下暂无持仓" [ref=e232]:
+        - cell "该分组下暂无持仓" [ref=e233]
