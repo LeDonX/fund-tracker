@@ -1962,7 +1962,7 @@ export default function FundTrackerApp() {
                 })}
             </table>
           </div>
-          {funds.length === 0 && (
+  {funds.length === 0 && sectors.length === 0 && (
              <div className="p-12 text-center text-slate-500 absolute inset-0 flex items-center justify-center pointer-events-none mt-10">
                暂无基金持仓数据，请点击上方“新增持仓”添加
              </div>
