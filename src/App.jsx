@@ -5,20 +5,23 @@ import {
   Download, 
   Upload, 
   ArrowRightLeft, 
-  TrendingUp, 
-  Wallet,
+  TrendingUp,
   Settings,
-  History,
-  ChevronDown,
-  ChevronRight,
-  GripVertical,
   FolderPlus,
-  X,
-  AlertCircle,
-  Trash2,
   Clock
 } from 'lucide-react';
 import Sortable from 'sortablejs';
+import FormatNumber from './components/common/FormatNumber';
+import Modal from './components/common/Modal';
+import FundDetailPanel from './components/detail/FundDetailPanel';
+import HistoryModal from './components/modals/HistoryModal';
+import ImportModal from './components/modals/ImportModal';
+import ExportModal from './components/modals/ExportModal';
+import GroupModal from './components/modals/GroupModal';
+import SyncTradeModal from './components/modals/SyncTradeModal';
+import FundTable from './components/FundTable';
+import AddFundModal from './components/forms/AddFundModal';
+import EditFundModal from './components/forms/EditFundModal';
 import {
   buildDetailCacheEntry,
   buildFundDetailModel,
@@ -27,48 +30,32 @@ import {
   isDetailCacheStale,
   normalizeStoredDetailCacheStore,
 } from './fundDetails';
+import {
+  buildTradeImpact,
+  buildTransactionRecord,
+  filterTransactionsByFundCode,
+  sortTransactionsByDateDesc,
+} from './domain/fundTrade';
+import {
+  loadTransactions,
+  normalizeStoredTransactionStore,
+  saveTransactions,
+} from './storage/transactionsStorage';
+import {
+  buildExportBundle,
+  buildImportPreview,
+  mergeDetailCacheEntries,
+  mergeImportedFunds,
+  mergeStringArrays,
+  mergeTransactionsById,
+  validateImportBundle,
+} from './domain/importExport';
 
 // --- 初始分组数据 ---
-const INITIAL_SECTORS = ['大消费', '科技半导体', '医疗医药', '均衡宽基'];
-
-// --- 模拟交易记录数据生成器 (历史记录弹窗用) ---
-const generateMockHistory = () => {
-  return [
-    { id: 101, date: '2026-03-15', type: '买入', amount: 10000, status: '确认成功' },
-    { id: 102, date: '2026-02-20', type: '买入', amount: 20000, status: '确认成功' },
-    { id: 103, date: '2025-12-10', type: '分红', amount: 500, status: '已发放' },
-    { id: 104, date: '2025-08-05', type: '买入', amount: 30000, status: '确认成功' },
-  ];
-};
-
-// --- 辅助组件：涨跌颜色格式化 ---
-const FormatNumber = ({ value, isPercent = false, isCurrency = false, showSign = true }) => {
-  if (value === null || value === undefined || !Number.isFinite(value)) {
-    return <span className="text-slate-400">--</span>;
-  }
-
-  if (value === 0) {
-    const zeroValue = isCurrency
-      ? Number(0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : '0.00';
-
-    return <span className="text-slate-500">{zeroValue}{isPercent ? '%' : ''}</span>;
-  }
-  
-  const colorClass = value > 0 ? 'text-red-500' : 'text-green-500';
-  const sign = value > 0 && showSign ? '+' : '';
-  
-  let formattedValue = Math.abs(value).toFixed(2);
-  if (isCurrency) {
-    formattedValue = Math.abs(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  return (
-    <span className={`font-medium ${colorClass}`}>
-      {sign}{value < 0 ? '-' : ''}{formattedValue}{isPercent ? '%' : ''}
-    </span>
-  );
-};
+const UNGROUPED_SECTOR = '未分组';
+const INITIAL_SECTORS = [];
+const DATA_SOURCE_STORAGE_KEY = 'fundTrackerSelectedDataSource';
+const DEFAULT_DATA_SOURCE = 'tiantian';
 
 const formatCurrencyAmount = (value) => {
   if (!Number.isFinite(value)) return '--';
@@ -85,219 +72,46 @@ const formatDayCount = (value) => {
   return `${value} 天`;
 };
 
-// --- 辅助组件：弹窗 Modal ---
-const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-md" }) => {
-  if (!isOpen) return null;
+const formatDateTimeLabel = (value) => {
+  if (!Number.isFinite(value) || value <= 0) return '--';
+
+  return new Date(value).toLocaleString('zh-CN', {
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const renderShareDelta = (value) => {
+  if (!Number.isFinite(value)) {
+    return <span className="text-slate-400">--</span>;
+  }
+
+  if (value === 0) {
+    return <span className="text-slate-500">0.00 份</span>;
+  }
+
+  const colorClass = value > 0 ? 'text-red-500' : 'text-green-500';
+  const sign = value > 0 ? '+' : '';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-      <div className={`bg-white rounded-2xl shadow-xl w-full ${maxWidth} flex flex-col max-h-[90vh]`}>
-        <div className="flex justify-between items-center p-5 border-b border-slate-100 flex-shrink-0">
-          <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="p-6 overflow-y-auto">
-          {children}
-        </div>
-      </div>
-    </div>
+    <span className={`font-medium ${colorClass}`}>
+      {sign}{value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份
+    </span>
   );
 };
 
-const DetailMetricCard = ({ label, value, testId, hint, accent = 'slate', children }) => {
-  const accentClass = accent === 'blue'
-    ? 'border-blue-200 bg-blue-50/80'
-    : accent === 'emerald'
-      ? 'border-emerald-200 bg-emerald-50/80'
-      : 'border-slate-200 bg-white/90';
-
-  return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${accentClass}`} data-testid={testId}>
-      <div className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">{label}</div>
-      <div className="mt-3 text-2xl font-semibold text-slate-900">{children ?? value}</div>
-      {hint && <p className="mt-2 text-xs leading-5 text-slate-500">{hint}</p>}
-    </div>
-  );
-};
-
-const DetailStatRow = ({ label, value, testId, hint }) => {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm" data-testid={testId}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm font-medium text-slate-700">{label}</div>
-          {hint && <p className="mt-1 text-xs leading-5 text-slate-500">{hint}</p>}
-        </div>
-        <div className="text-right text-lg font-semibold text-slate-900">{value}</div>
-      </div>
-    </div>
-  );
-};
-
-const FundDetailPanel = ({
-  isOpen,
-  onClose,
-  onRefresh,
-  detailModel,
-  isLoading,
-  hasStaleCache,
-  errorMessage,
-}) => {
-  if (!isOpen || !detailModel) return null;
-
-  const valuationSourceLabel = detailModel.valuationSource === 'official'
-    ? '当前列表使用官方净值口径'
-    : detailModel.valuationSource === 'estimate'
-      ? '当前列表使用盘中估值口径'
-      : detailModel.valuationSource === 'quote'
-        ? '当前列表使用最新净值口径'
-        : '当前列表使用本地快照口径';
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm" data-testid="fund-detail-overlay">
-      <div className="absolute inset-0 overflow-y-auto">
-        <div className="min-h-full px-4 py-6 md:px-6 lg:px-8">
-          <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50 shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
-            <div className="border-b border-slate-200 bg-white/95 px-5 py-4 md:px-8 md:py-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 font-medium text-slate-600">{detailModel.code}</span>
-                    <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700">{valuationSourceLabel}</span>
-                    {detailModel.cacheFetchedAt > 0 && (
-                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-500">
-                        详情缓存已更新
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl" data-testid="detail-fund-name">{detailModel.name}</h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                    详情页将当前列表口径与官方净值历史拆开展示：持有金额 / 当日收益沿用列表展示口径，昨日收益与阶段涨幅只在有官方净值历史时展示。
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={onRefresh}
-                    className="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={isLoading}
-                    data-testid="refresh-fund-detail"
-                  >
-                    {isLoading ? '刷新中...' : '刷新详情'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-100"
-                    data-testid="close-fund-detail"
-                  >
-                    返回列表
-                  </button>
-                </div>
-              </div>
-
-              {(isLoading || errorMessage || hasStaleCache) && (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" data-testid="detail-fetch-status">
-                  {isLoading && <p>正在刷新详情缓存，列表口径不会被这次详情请求阻塞。</p>}
-                  {!isLoading && hasStaleCache && <p>远端详情暂时不可用，当前显示的是最近一次成功缓存的数据。</p>}
-                  {!isLoading && errorMessage && !hasStaleCache && <p>{errorMessage}</p>}
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-5 md:px-8 md:py-7">
-              <section className="grid gap-4 lg:grid-cols-4">
-                <DetailMetricCard
-                  label="持有金额"
-                  testId="detail-field-holding-amount"
-                  value={formatCurrencyAmount(detailModel.holdingAmount)}
-                  hint="当前列表展示口径下的持仓金额。"
-                  accent="blue"
-                />
-                <DetailMetricCard
-                  label="当日收益"
-                  testId="detail-field-daily-profit"
-                  hint="沿用当前列表的展示口径；若列表正在用估值，这里也显示估值口径。"
-                  accent="blue"
-                >
-                  <FormatNumber value={detailModel.dailyProfit} isCurrency={true} />
-                </DetailMetricCard>
-                <DetailMetricCard
-                  label="最新净值"
-                  testId="detail-field-latest-net-value"
-                  value={formatPlainNumber(detailModel.latestNetValue)}
-                  hint={detailModel.officialLatestDate ? `优先官方净值，最新日期 ${detailModel.officialLatestDate}` : '官方净值缺失时回退最新可用净值。'}
-                  accent="emerald"
-                />
-                <DetailMetricCard
-                  label="估算净值"
-                  testId="detail-field-estimated-net-value"
-                  value={formatPlainNumber(detailModel.estimatedNetValue)}
-                  hint={detailModel.quoteUpdateTime ? `盘中估值更新时间 ${detailModel.quoteUpdateTime}` : '盘中估值不可用时显示 --。'}
-                  accent="emerald"
-                />
-              </section>
-
-              <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
-                <section className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">持仓语义</h3>
-                    <p className="mt-2 text-sm text-slate-500">这里的字段只根据源持仓、列表展示值、组合总额和详情缓存派生，不会把详情页推导值反写回持仓列表。</p>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <DetailStatRow label="持有份额" testId="detail-field-shares" value={formatPlainNumber(detailModel.shares, ' 份')} />
-                    <DetailStatRow label="持仓占比" testId="detail-field-holding-ratio" value={<FormatNumber value={detailModel.holdingRatio} isPercent={true} />} hint="持有金额 / 当前组合持有金额" />
-                    <DetailStatRow label="持有收益" testId="detail-field-holding-profit" value={<FormatNumber value={detailModel.holdingProfit} isCurrency={true} />} hint="持有金额 - 总持仓成本" />
-                    <DetailStatRow label="持有收益率" testId="detail-field-holding-profit-rate" value={<FormatNumber value={detailModel.holdingProfitRate} isPercent={true} />} hint="持有收益 / 总持仓成本" />
-                    <DetailStatRow label="持仓成本" testId="detail-field-unit-cost" value={formatPlainNumber(detailModel.unitCost)} hint={Number.isFinite(detailModel.totalCostAmount) ? `单位持仓成本；总成本约 ${formatCurrencyAmount(detailModel.totalCostAmount)}` : '缺少可用总成本时显示 --。'} />
-                    <DetailStatRow label="持有天数" testId="detail-field-holding-days" value={formatDayCount(detailModel.holdingDays)} hint={detailModel.holdingStartDate ? `起始日 ${detailModel.holdingStartDate}` : '旧持仓没有起始日期，不回填历史。'} />
-                  </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">净值与行情口径</h3>
-                        <p className="mt-2 text-sm text-slate-500">当日收益与最新净值故意拆开，避免把估值和官方净值混成一个字段。</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <DetailStatRow label="昨日收益" testId="detail-field-yesterday-profit" value={<FormatNumber value={detailModel.yesterdayProfit} isCurrency={true} />} hint={detailModel.officialLatestDate && detailModel.officialPreviousDate ? `按 ${detailModel.officialLatestDate} 与 ${detailModel.officialPreviousDate} 两个官方净值点计算` : '缺少连续两个官方净值点时显示 --。'} />
-                      <DetailStatRow label="关联板块" testId="detail-field-related-themes" value={detailModel.relatedThemes.length > 0 ? detailModel.relatedThemes.join(' / ') : '--'} hint={detailModel.isRelatedThemesFallback ? '远端主题标签暂不可用，当前回退到本地分组。' : '优先显示远端主题 / 板块标签。'} />
-                    </div>
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">阶段表现</h3>
-                    <p className="mt-2 text-sm text-slate-500">只根据官方净值历史推导；历史不够长时维持 --，不做补猜。</p>
-                    <div className="mt-4 space-y-3">
-                      <DetailStatRow label="今年涨幅" testId="detail-field-performance-ytd" value={<FormatNumber value={detailModel.performance.ytd} isPercent={true} />} />
-                      <DetailStatRow label="近1年" testId="detail-field-performance-1y" value={<FormatNumber value={detailModel.performance.oneYear} isPercent={true} />} />
-                      <DetailStatRow label="近3年" testId="detail-field-performance-3y" value={<FormatNumber value={detailModel.performance.threeYear} isPercent={true} />} />
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 text-slate-100 shadow-sm">
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">数据来源</h3>
-                    <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-                      <p>持有金额 / 当日收益：来自当前列表的展示 fund snapshot。</p>
-                      <p>昨日收益 / 今年涨幅 / 近1年 / 近3年：来自东财官方净值历史缓存。</p>
-                      <p>估算净值 / 最新净值补位：来自天天基金估值 JSONP 缓存。</p>
-                      <p>关联板块：优先远端主题标签，拿不到时回退本地分组。</p>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+const formatExportFileStamp = (value = new Date()) => {
+  const year = value.getFullYear();
+  const month = `${value.getMonth() + 1}`.padStart(2, '0');
+  const day = `${value.getDate()}`.padStart(2, '0');
+  const hour = `${value.getHours()}`.padStart(2, '0');
+  const minute = `${value.getMinutes()}`.padStart(2, '0');
+  const second = `${value.getSeconds()}`.padStart(2, '0');
+  return `${year}-${month}-${day}-${hour}-${minute}-${second}`;
 };
 
 // ============================================================================
@@ -365,12 +179,13 @@ const normalizeStoredFund = (fund, index) => {
   }
 
   const hasTrackedShares = fund.shares !== undefined || fund.costAmount !== undefined;
+  const normalizedSector = typeof fund.sector === 'string' ? fund.sector.trim() : '';
 
   return {
     id: fund.id ?? Date.now() + index,
     name: typeof fund.name === 'string' && fund.name.trim() ? fund.name.trim() : '未命名基金',
     code: String(fund.code || '').trim(),
-    sector: typeof fund.sector === 'string' ? fund.sector : '',
+    sector: normalizedSector || UNGROUPED_SECTOR,
     amount: Math.max(0, toNumber(fund.amount)),
     dailyRate: toNumber(fund.dailyRate),
     dailyProfit: toNumber(fund.dailyProfit),
@@ -654,10 +469,26 @@ const shouldPreferOfficialValuation = (fund) => {
   return Boolean(officialNetValueDate && officialNetValueDate >= quoteNetValueDate);
 };
 
-const buildDisplayedFund = (fund) => {
+const buildDisplayedFund = (fund, preferredDataSource = DEFAULT_DATA_SOURCE) => {
   const quoteSource = inferStoredQuoteSource(fund);
 
-  if (shouldPreferOfficialValuation({ ...fund, quoteSource })) {
+  if (preferredDataSource === 'eastmoney') {
+    if (hasUsableOfficialSnapshot(fund)) {
+      return {
+        ...buildOfficialValuationFund(fund),
+        quoteSource,
+        valuationSource: 'official',
+      };
+    }
+
+    return {
+      ...buildBaseValuationFund(fund),
+      quoteSource,
+      valuationSource: quoteSource === 'estimate' ? 'estimate' : (quoteSource === 'quote' ? 'quote' : 'fallback'),
+    };
+  }
+
+  if (preferredDataSource === 'auto' && shouldPreferOfficialValuation({ ...fund, quoteSource })) {
     return {
       ...buildOfficialValuationFund(fund),
       quoteSource,
@@ -1061,41 +892,24 @@ const alignFundMarketValue = async (fund, nextMarketValue, fallbackName = fund.n
 const applyTradeToFund = (fund, trade, quote) => {
   const normalizedFund = quote ? reconcileFundWithQuote(fund, quote) : { ...fund, quoteSource: inferStoredQuoteSource(fund) };
   const referenceNetValue = getDisplayedReferenceNetValue(normalizedFund);
-  const tradeAmount = Math.max(0, toNumber(trade.amount));
-  const todayKey = getTodayDateKey();
-
-  if (referenceNetValue <= 0 || tradeAmount <= 0) {
-    return normalizedFund;
-  }
-
   const currentShares = Math.max(0, toNumber(normalizedFund.shares) || deriveSharesFromDisplayedAmount(normalizedFund) || 0);
-  const currentCostAmount = Math.max(0, toNumber(normalizedFund.costAmount));
-  let nextShares = currentShares;
-  let nextCostAmount = currentCostAmount;
+  const tradeImpact = buildTradeImpact({
+    fund: normalizedFund,
+    trade,
+    referenceNetValue,
+    currentShares,
+    currentCostAmount: Math.max(0, toNumber(normalizedFund.costAmount)),
+  });
 
-  if (trade.type === '买入') {
-    nextShares += tradeAmount / referenceNetValue;
-    nextCostAmount += tradeAmount;
-  } else if (trade.type === '卖出') {
-    if (currentShares <= 0) {
-      return normalizedFund;
-    }
-
-    const soldShares = Math.min(currentShares, tradeAmount / referenceNetValue);
-    const soldRatio = currentShares > 0 ? soldShares / currentShares : 0;
-    nextShares = Math.max(0, currentShares - soldShares);
-    nextCostAmount = Math.max(0, currentCostAmount - currentCostAmount * soldRatio);
-  } else if (trade.type === '分红') {
-    nextCostAmount = Math.max(0, currentCostAmount - tradeAmount);
+  if (!tradeImpact) {
+    return normalizedFund;
   }
 
   return buildFundSnapshot(normalizedFund, {
     name: quote?.name || normalizedFund.name,
-    shares: nextShares,
-    costAmount: nextCostAmount,
-    holdingStartDate: trade.type === '买入'
-      ? (normalizedFund.holdingStartDate || todayKey)
-      : (trade.type === '卖出' && nextShares === 0 ? '' : normalizedFund.holdingStartDate),
+    shares: tradeImpact.nextShares,
+    costAmount: tradeImpact.nextCostAmount,
+    holdingStartDate: tradeImpact.nextHoldingStartDate,
   });
 };
 
@@ -1129,6 +943,7 @@ export default function FundTrackerApp() {
   const [detailCacheEntries, setDetailCacheEntries] = useState(() => {
     return normalizeStoredDetailCacheStore(readStoredJson(DETAIL_CACHE_STORAGE_KEY, {})).entries;
   });
+  const [transactions, setTransactions] = useState(() => loadTransactions());
 
   // 2. 初始化分组
   const [sectors, setSectors] = useState(() => {
@@ -1144,6 +959,10 @@ export default function FundTrackerApp() {
     localStorage.setItem(DETAIL_CACHE_STORAGE_KEY, JSON.stringify(buildStoredDetailCachePayload(detailCacheEntries)));
   }, [detailCacheEntries]);
 
+  useEffect(() => {
+    saveTransactions(transactions);
+  }, [transactions]);
+
   // 4. 监听变化：只要分组变了，立刻存入本地缓存
   useEffect(() => {
     localStorage.setItem('fundTrackerSectors', JSON.stringify(sectors));
@@ -1156,9 +975,20 @@ export default function FundTrackerApp() {
   const [selectedFund, setSelectedFund] = useState(null);
   const [detailView, setDetailView] = useState({ isOpen: false, code: '' });
   const [detailRequestStates, setDetailRequestStates] = useState({});
+  const [selectedDataSource, setSelectedDataSource] = useState(() => {
+    const stored = readStoredJson(DATA_SOURCE_STORAGE_KEY, DEFAULT_DATA_SOURCE);
+    return stored === 'eastmoney' || stored === 'auto' || stored === 'tiantian'
+      ? stored
+      : DEFAULT_DATA_SOURCE;
+  });
   const hasAutoRefreshedRef = useRef(false);
   const fundLookupRequestRef = useRef(0);
   const groupTableRef = useRef(null);
+  const importFileInputRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem(DATA_SOURCE_STORAGE_KEY, JSON.stringify(selectedDataSource));
+  }, [selectedDataSource]);
 
   const [modals, setModals] = useState({
     group: false, fund: false, sync: false, import: false, export: false, history: false, settings: false
@@ -1167,11 +997,19 @@ export default function FundTrackerApp() {
   const openModal = (type) => setModals(prev => ({ ...prev, [type]: true }));
   const closeModal = (type) => setModals(prev => ({ ...prev, [type]: false }));
 
-  const [newGroupName, setNewGroupName] = useState('');
-  const [fundForm, setFundForm] = useState(() => createEmptyFundForm(sectors[0] || ''));
+  const [groupForm, setGroupForm] = useState({ mode: 'create', originalName: '', name: '' });
+  const [fundForm, setFundForm] = useState(() => createEmptyFundForm(UNGROUPED_SECTOR));
   const [fundLookup, setFundLookup] = useState(createEmptyFundLookup);
   const [syncForm, setSyncForm] = useState({ code: '', type: '买入', amount: '' });
   const [editForm, setEditForm] = useState({ id: null, name: '', code: '', sector: '', amount: '' });
+  const [importState, setImportState] = useState({
+    fileName: '',
+    error: '',
+    preview: null,
+    payload: null,
+    mode: 'replace-all',
+    isParsing: false,
+  });
 
   const normalizedFundCode = String(fundForm.code || '').trim();
   const normalizedFundSector = String(fundForm.sector || '').trim();
@@ -1195,7 +1033,7 @@ export default function FundTrackerApp() {
   const canSubmitFund = fundLookup.status === 'success' && isHoldingAmountValid && isHoldingProfitValid && isHoldingSharesValid && isDerivedCostAmountValid && isFundSectorValid;
 
   const resetFundModalState = useCallback(() => {
-    const defaultSector = sectors[0] || '';
+    const defaultSector = sectors.includes(UNGROUPED_SECTOR) ? UNGROUPED_SECTOR : (sectors[0] || UNGROUPED_SECTOR);
     fundLookupRequestRef.current += 1;
     setFundForm(createEmptyFundForm(defaultSector));
     setFundLookup(createEmptyFundLookup());
@@ -1209,6 +1047,31 @@ export default function FundTrackerApp() {
   const handleCloseFundModal = () => {
     resetFundModalState();
     closeModal('fund');
+  };
+
+  const resetImportState = useCallback(() => {
+    setImportState({
+      fileName: '',
+      error: '',
+      preview: null,
+      payload: null,
+      mode: 'replace-all',
+      isParsing: false,
+    });
+
+    if (importFileInputRef.current) {
+      importFileInputRef.current.value = '';
+    }
+  }, []);
+
+  const handleOpenImportModal = () => {
+    resetImportState();
+    openModal('import');
+  };
+
+  const handleCloseImportModal = () => {
+    resetImportState();
+    closeModal('import');
   };
 
   const handleFundCodeChange = (value) => {
@@ -1252,10 +1115,10 @@ export default function FundTrackerApp() {
 
   const displayedFunds = useMemo(() => {
     return funds.map((fund) => ({
-      ...buildDisplayedFund(fund),
+      ...buildDisplayedFund(fund, selectedDataSource),
       sourceFund: fund,
     }));
-  }, [funds]);
+  }, [funds, selectedDataSource]);
 
   const latestOfficialDate = useMemo(() => {
     return funds.reduce((latestDate, fund) => {
@@ -1277,12 +1140,16 @@ export default function FundTrackerApp() {
     }, { official: 0, estimate: 0, quote: 0, fallback: 0 });
   }, [displayedFunds]);
 
-  const valuationSourceHint = [
-    valuationSourceSummary.estimate > 0 ? `${valuationSourceSummary.estimate} 支盘中估值` : '',
-    valuationSourceSummary.official > 0 ? `${valuationSourceSummary.official} 支官方净值` : '',
-    valuationSourceSummary.quote > 0 ? `${valuationSourceSummary.quote} 支最新净值` : '',
-    valuationSourceSummary.fallback > 0 ? `${valuationSourceSummary.fallback} 支回退快照` : '',
-  ].filter(Boolean).join(' · ');
+  const valuationSourceHint = selectedDataSource === 'tiantian'
+    ? '当前列表口径：天天基金'
+    : selectedDataSource === 'eastmoney'
+      ? '当前列表口径：东财官方净值'
+      : [
+          valuationSourceSummary.estimate > 0 ? `${valuationSourceSummary.estimate} 支盘中估值` : '',
+          valuationSourceSummary.official > 0 ? `${valuationSourceSummary.official} 支官方净值` : '',
+          valuationSourceSummary.quote > 0 ? `${valuationSourceSummary.quote} 支最新净值` : '',
+          valuationSourceSummary.fallback > 0 ? `${valuationSourceSummary.fallback} 支回退快照` : '',
+        ].filter(Boolean).join(' · ');
 
   const updateBadgeText = [
     lastUpdateTime ? `最近刷新 ${lastUpdateTime}` : '',
@@ -1310,7 +1177,7 @@ export default function FundTrackerApp() {
     }, {});
 
     displayedFunds.forEach((fund) => {
-      const targetSector = groups[fund.sector] ? fund.sector : (groups.其他 ? '其他' : sectors[0]);
+      const targetSector = groups[fund.sector] ? fund.sector : UNGROUPED_SECTOR;
       
       if (!groups[targetSector]) {
          groups[targetSector] = { funds: [], sectorDailyProfit: 0, sectorAmount: 0, sectorTotalProfit: 0, hasIncompleteDaily: false, hasIncompleteAmount: false, hasIncompleteProfit: false };
@@ -1378,19 +1245,39 @@ export default function FundTrackerApp() {
   }, [activeDetailDisplayedFund, activeDetailEntry, activeDetailSourceFund, totalAmount]);
 
   const orderedGroups = useMemo(() => {
-    return sectors.map((sector) => ({
-      sector,
-      data: groupedFunds[sector] ?? {
-        funds: [],
-        sectorDailyProfit: 0,
-        sectorAmount: 0,
-        sectorTotalProfit: 0,
-        hasIncompleteDaily: false,
-        hasIncompleteAmount: false,
-        hasIncompleteProfit: false,
-      },
-    }));
+    const customGroups = sectors
+      .filter((sector) => sector !== UNGROUPED_SECTOR)
+      .map((sector) => ({
+        sector,
+        data: groupedFunds[sector] ?? {
+          funds: [],
+          sectorDailyProfit: 0,
+          sectorAmount: 0,
+          sectorTotalProfit: 0,
+          hasIncompleteDaily: false,
+          hasIncompleteAmount: false,
+          hasIncompleteProfit: false,
+        },
+      }));
+
+    const ungroupedData = groupedFunds[UNGROUPED_SECTOR];
+    if (ungroupedData && ungroupedData.funds.length > 0) {
+      customGroups.push({
+        sector: UNGROUPED_SECTOR,
+        data: ungroupedData,
+      });
+    }
+
+    return customGroups;
   }, [groupedFunds, sectors]);
+
+  const selectedFundTransactions = useMemo(() => {
+    if (!selectedFund?.code) {
+      return [];
+    }
+
+    return sortTransactionsByDateDesc(filterTransactionsByFundCode(transactions, selectedFund.code));
+  }, [selectedFund?.code, transactions]);
 
   const refreshFundDetail = useCallback(async (fundCode, { force = false } = {}) => {
     const normalizedCode = String(fundCode || '').trim();
@@ -1524,12 +1411,75 @@ export default function FundTrackerApp() {
 
   const handleCreateGroup = (e) => {
     e.preventDefault();
-    if (!newGroupName.trim()) return;
-    if (!sectors.includes(newGroupName.trim())) {
-      setSectors([...sectors, newGroupName.trim()]);
+
+    const normalizedName = String(groupForm.name || '').trim();
+    if (!normalizedName) return;
+
+    if (groupForm.mode === 'edit') {
+      const originalName = String(groupForm.originalName || '').trim();
+      if (!originalName || originalName === UNGROUPED_SECTOR) return;
+      if (normalizedName !== originalName && sectors.includes(normalizedName)) {
+        alert('已存在同名分组，请换一个名称。');
+        return;
+      }
+
+      setSectors((current) => current.map((sector) => (sector === originalName ? normalizedName : sector)));
+      setFunds((current) => current.map((fund) => (
+        fund.sector === originalName
+          ? { ...fund, sector: normalizedName }
+          : fund
+      )));
+    } else if (!sectors.includes(normalizedName)) {
+      setSectors((current) => [...current, normalizedName]);
     }
-    setNewGroupName('');
+
+    setGroupForm({ mode: 'create', originalName: '', name: '' });
     closeModal('group');
+  };
+
+  const handleOpenCreateGroup = () => {
+    setGroupForm({ mode: 'create', originalName: '', name: '' });
+    openModal('group');
+  };
+
+  const handleOpenEditGroup = (sector) => {
+    if (sector === UNGROUPED_SECTOR) {
+      return;
+    }
+
+    setGroupForm({ mode: 'edit', originalName: sector, name: sector });
+    openModal('group');
+  };
+
+  const handleCloseGroupModal = () => {
+    setGroupForm({ mode: 'create', originalName: '', name: '' });
+    closeModal('group');
+  };
+
+  const handleDeleteGroup = (sector) => {
+    if (!sector || sector === UNGROUPED_SECTOR) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(`确认删除分组“${sector}”吗？该分组下的基金将移动到“${UNGROUPED_SECTOR}”。`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setSectors((current) => {
+      const next = current.filter((item) => item !== sector);
+      return next.includes(UNGROUPED_SECTOR) ? next : [UNGROUPED_SECTOR, ...next];
+    });
+    setFunds((current) => current.map((fund) => (
+      fund.sector === sector
+        ? { ...fund, sector: UNGROUPED_SECTOR }
+        : fund
+    )));
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      next.delete(sector);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -1670,22 +1620,46 @@ export default function FundTrackerApp() {
     }
 
     const tradeReferenceFund = quote ? reconcileFundWithQuote(targetFund, quote) : { ...targetFund, quoteSource: inferStoredQuoteSource(targetFund) };
+    const referenceNetValue = getDisplayedReferenceNetValue(tradeReferenceFund);
 
-    if (getDisplayedReferenceNetValue(tradeReferenceFund) <= 0) {
+    if (referenceNetValue <= 0) {
       alert('暂时无法获取这只基金的可用净值，无法按份额口径同步交易，请先刷新数据后再试。');
       return;
     }
+
+    const tradePayload = {
+      type: syncForm.type,
+      amount: syncForm.amount,
+    };
+    const currentShares = Math.max(0, toNumber(tradeReferenceFund.shares) || deriveSharesFromDisplayedAmount(tradeReferenceFund) || 0);
+    const tradeImpact = buildTradeImpact({
+      fund: tradeReferenceFund,
+      trade: tradePayload,
+      referenceNetValue,
+      currentShares,
+      currentCostAmount: Math.max(0, toNumber(tradeReferenceFund.costAmount)),
+    });
+
+    if (!tradeImpact) {
+      alert('当前交易信息无效，暂时无法完成同步，请检查金额后重试。');
+      return;
+    }
+
+    const transactionRecord = buildTransactionRecord({
+      fund: tradeReferenceFund,
+      tradeImpact,
+    });
 
     setFunds((currentFunds) => currentFunds.map((fund) => {
       if (fund.id !== targetFund.id) {
         return fund;
       }
 
-      return applyTradeToFund(fund, {
-        type: syncForm.type,
-        amount: syncForm.amount,
-      }, quote);
+      return applyTradeToFund(fund, tradePayload, quote);
     }));
+    if (transactionRecord) {
+      setTransactions((currentTransactions) => sortTransactionsByDateDesc([...currentTransactions, transactionRecord]));
+    }
 
     closeModal('sync');
     setSyncForm({ code: '', type: '买入', amount: '' });
@@ -1694,6 +1668,137 @@ export default function FundTrackerApp() {
   const handleOpenHistory = (fund) => {
     setSelectedFund(fund);
     openModal('history');
+  };
+
+  const handleCloseHistory = () => {
+    setSelectedFund(null);
+    closeModal('history');
+  };
+
+  const handleExportData = () => {
+    const exportBundle = buildExportBundle({
+      funds,
+      sectors,
+      detailCache: buildStoredDetailCachePayload(detailCacheEntries),
+      transactions,
+    });
+
+    const blob = new Blob([JSON.stringify(exportBundle, null, 2)], { type: 'application/json;charset=utf-8' });
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `fund-tracker-export-${formatExportFileStamp()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+    closeModal('export');
+  };
+
+  const handleImportFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setImportState((current) => ({
+      ...current,
+      fileName: file.name,
+      error: '',
+      preview: null,
+      payload: null,
+      isParsing: true,
+    }));
+
+    try {
+      const fileText = await file.text();
+      const parsedPayload = JSON.parse(fileText);
+      const validationResult = validateImportBundle(parsedPayload);
+
+      if (!validationResult.ok) {
+        setImportState((current) => ({
+          ...current,
+          error: validationResult.error,
+          preview: null,
+          payload: null,
+          isParsing: false,
+        }));
+        return;
+      }
+
+      const normalizedFunds = normalizeStoredFunds(parsedPayload.data.funds);
+      const normalizedSectors = normalizeStoredSectors(parsedPayload.data.sectors);
+      const normalizedDetailCacheEntries = normalizeStoredDetailCacheStore(parsedPayload.data.detailCache ?? {}).entries;
+      const normalizedTransactions = normalizeStoredTransactionStore(parsedPayload.data.transactions ?? []).entries;
+
+      const hasImportData = normalizedFunds.length > 0
+        || normalizedSectors.length > 0
+        || normalizedTransactions.length > 0
+        || Object.keys(normalizedDetailCacheEntries).length > 0;
+
+      if (!hasImportData) {
+        setImportState((current) => ({
+          ...current,
+          error: '导入文件中没有可用数据。',
+          preview: null,
+          payload: null,
+          isParsing: false,
+        }));
+        return;
+      }
+
+      const preview = {
+        ...buildImportPreview(parsedPayload),
+        fundsCount: normalizedFunds.length,
+        sectorsCount: normalizedSectors.length,
+        transactionsCount: normalizedTransactions.length,
+        detailCacheCount: Object.keys(normalizedDetailCacheEntries).length,
+      };
+
+      setImportState((current) => ({
+        ...current,
+        error: '',
+        preview,
+        payload: {
+          funds: normalizedFunds,
+          sectors: normalizedSectors,
+          detailCacheEntries: normalizedDetailCacheEntries,
+          transactions: normalizedTransactions,
+        },
+        isParsing: false,
+      }));
+    } catch (error) {
+      setImportState((current) => ({
+        ...current,
+        error: error instanceof SyntaxError ? '文件内容不是有效的 JSON，请检查后重试。' : (error?.message || '导入文件解析失败。'),
+        preview: null,
+        payload: null,
+        isParsing: false,
+      }));
+    }
+  };
+
+  const handleConfirmImport = () => {
+    if (!importState.payload) {
+      return;
+    }
+
+    if (importState.mode === 'replace-all') {
+      setFunds(importState.payload.funds);
+      setSectors(importState.payload.sectors);
+      setDetailCacheEntries(importState.payload.detailCacheEntries);
+      setTransactions(sortTransactionsByDateDesc(importState.payload.transactions));
+    } else {
+      setFunds((currentFunds) => mergeImportedFunds(currentFunds, importState.payload.funds));
+      setSectors((currentSectors) => mergeStringArrays(currentSectors, importState.payload.sectors));
+      setDetailCacheEntries((currentEntries) => mergeDetailCacheEntries(currentEntries, importState.payload.detailCacheEntries));
+      setTransactions((currentTransactions) => sortTransactionsByDateDesc(mergeTransactionsById(currentTransactions, importState.payload.transactions)));
+    }
+
+    setSelectedFund(null);
+    setDetailView({ isOpen: false, code: '' });
+    handleCloseImportModal();
+    alert(importState.mode === 'replace-all' ? '导入成功，当前数据已完成替换。' : '导入成功，已按追加模式合并数据。');
   };
 
   const handleOpenSettings = (fund) => {
@@ -1794,7 +1899,7 @@ export default function FundTrackerApp() {
             <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm shadow-sm">
               <Plus className="w-4 h-4" /> 新增持仓
             </button>
-            <button type="button" onClick={() => openModal('group')} className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm border border-indigo-200">
+            <button type="button" onClick={handleOpenCreateGroup} className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm border border-indigo-200">
               <FolderPlus className="w-4 h-4" /> 创建分组
             </button>
             <button type="button" onClick={() => openModal('sync')} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
@@ -1803,12 +1908,19 @@ export default function FundTrackerApp() {
           </div>
           
           <div className="flex flex-wrap gap-2">
-            <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              <span className="font-medium text-slate-700">自动口径</span>
-              <span className="mx-2 text-slate-300">·</span>
-              <span>{valuationSourceHint || '刷新后自动选择可用估值'}</span>
+            <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 gap-3">
+              <span className="font-medium text-slate-700">数据源</span>
+              <select
+                value={selectedDataSource}
+                onChange={(e) => setSelectedDataSource(e.target.value)}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="tiantian">天天基金</option>
+                <option value="eastmoney">东财官方</option>
+              </select>
+              <span className="text-slate-400">{valuationSourceHint || '按所选数据源展示'}</span>
             </div>
-            <button type="button" onClick={() => openModal('import')} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
+            <button type="button" onClick={handleOpenImportModal} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
               <Upload className="w-4 h-4" /> 导入
             </button>
             <button type="button" onClick={() => openModal('export')} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg font-medium transition-colors text-sm border border-slate-200">
@@ -1822,153 +1934,25 @@ export default function FundTrackerApp() {
         </div>
 
         {/* --- 主体表格区 --- */}
-        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-[300px] overflow-hidden">
-          <div className="flex-1 overflow-auto relative custom-scrollbar">
-            <table ref={groupTableRef} className="w-full text-left border-collapse min-w-[900px]">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider shadow-[0_1px_0_0_#e2e8f0]">
-                  <th className="p-4 font-medium bg-slate-50">基金名称 (代码)</th>
-                  <th className="p-4 font-medium text-right bg-slate-50">持有金额</th>
-                  <th className="p-4 font-medium text-right bg-slate-50">{dailyRateColumnLabel}</th>
-                  <th className="p-4 font-medium text-right bg-blue-50/80">{dailyProfitColumnLabel}</th>
-                  <th className="p-4 font-medium text-right bg-slate-50">持有收益率</th>
-                  <th className="p-4 font-medium text-right bg-slate-50">持有总收益</th>
-                  <th className="p-4 font-medium text-right bg-slate-50">本周收益</th>
-                  <th className="p-4 font-medium text-right bg-slate-50">本月收益</th>
-                  <th className="p-4 font-medium text-center bg-slate-50">操作</th>
-                </tr>
-              </thead>
-              {orderedGroups.map(({ sector, data }) => {
-                  const isCollapsed = collapsedGroups.has(sector);
-                  return (
-  <tbody key={sector} data-sector={sector} id={`sector-body-${sector}`}>
-                      <tr className="bg-slate-100/70 border-b border-slate-200 group hover:bg-slate-100 transition-colors">
-                        <td colSpan={9} className="p-0">
-                          <div className="flex items-stretch">
-                            <button
-                              type="button"
-                              data-drag-handle
-                              className="flex shrink-0 cursor-grab items-center justify-center border-r border-slate-200 px-3 text-slate-400 transition-colors hover:bg-white/80 hover:text-blue-600 active:cursor-grabbing"
-                              aria-label={`拖拽排序分组 ${sector}`}
-                              title="拖拽排序"
-                            >
-                              <GripVertical className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              className="group flex w-full items-center justify-between px-4 py-2.5 border-l-4 border-blue-500 cursor-pointer select-none text-left"
-                              onClick={() => toggleGroup(sector)}
-                              aria-expanded={!isCollapsed}
-                              aria-controls={`sector-body-${sector}`}
-                            >
-                              <span className="font-semibold text-slate-700 text-sm flex items-center gap-2">
-                                {isCollapsed ? <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600" /> : <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />}
-                                <Wallet className="w-4 h-4 text-slate-500" />
-                                {sector}
-                                <span className="text-xs font-normal text-slate-500 ml-2 bg-white px-2 py-0.5 rounded border border-slate-200">
-                                  {data.funds.length} 支
-                                </span>
-                              </span>
-                              <div className="flex items-center gap-6 text-sm pr-4">
-                                <span className="text-slate-500">板块持有金额: <span className="font-medium text-slate-800">{data.hasIncompleteAmount ? '--' : formatCurrencyAmount(data.sectorAmount)}</span></span>
-                                <span className="text-slate-500">{groupDailyLabel}: </span>
-                                <span className="text-base">
-                                  <FormatNumber value={data.hasIncompleteDaily ? null : data.sectorDailyProfit} isCurrency={true} />
-                                </span>
-                              </div>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      
-                      {!isCollapsed && data.funds.length === 0 && (
-                        <tr className="border-b border-slate-100">
-                          <td colSpan={9} className="p-6 text-center text-sm text-slate-400 bg-white">
-                            该分组下暂无持仓
-                          </td>
-                        </tr>
-                      )}
-
-                      {!isCollapsed && data.funds.map((fund) => (
-                        <tr key={fund.id} className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors bg-white" data-testid={`fund-row-${fund.code}`}>
-                          <td className="p-4">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenFundDetail(fund)}
-                              className="text-left"
-                              data-testid={`open-fund-detail-${fund.code}`}
-                            >
-                              <div className="font-medium text-slate-800 transition-colors hover:text-blue-700">{fund.name}</div>
-                            </button>
-                            <div className="text-xs text-slate-400 mt-0.5">
-                              {fund.code}
-                              {toNumber(fund.shares) > 0 && ` · ${toNumber(fund.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份`}
-                            </div>
-                          </td>
-                          <td className="p-4 text-right font-medium text-slate-700">
-                            {formatCurrencyAmount(fund.amount)}
-                          </td>
-                          <td className="p-4 text-right">
-                            <FormatNumber value={fund.dailyRate} isPercent={true} />
-                          </td>
-                          <td className="p-4 text-right bg-blue-50/10 font-bold text-base">
-                            <FormatNumber value={fund.dailyProfit} isCurrency={true} />
-                          </td>
-                          <td className="p-4 text-right">
-                            <FormatNumber value={fund.totalRate} isPercent={true} />
-                          </td>
-                          <td className="p-4 text-right">
-                            <FormatNumber value={fund.totalProfit} isCurrency={true} />
-                          </td>
-                          <td className="p-4 text-right">
-                            <FormatNumber value={fund.weeklyProfit} />
-                          </td>
-                          <td className="p-4 text-right">
-                            <FormatNumber value={fund.monthlyProfit} />
-                          </td>
-                          <td className="p-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenFundDetail(fund)}
-                                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                                title="详情"
-                                data-testid={`detail-entry-${fund.code}`}
-                              >
-                                详情
-                              </button>
-                              <button 
-                                type="button"
-                                onClick={() => handleOpenHistory(fund)}
-                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors" 
-                                title="交易记录"
-                              >
-                                <History className="w-4 h-4" />
-                              </button>
-                              <button 
-                                type="button"
-                                onClick={() => handleOpenSettings(fund)}
-                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors" 
-                                title="设置"
-                              >
-                                <Settings className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  )
-                })}
-            </table>
-          </div>
-  {funds.length === 0 && sectors.length === 0 && (
-             <div className="p-12 text-center text-slate-500 absolute inset-0 flex items-center justify-center pointer-events-none mt-10">
-               暂无基金持仓数据，请点击上方“新增持仓”添加
-             </div>
-          )}
-        </div>
-      </div>
+        <FundTable
+          groupTableRef={groupTableRef}
+          orderedGroups={orderedGroups}
+          collapsedGroups={collapsedGroups}
+          toggleGroup={toggleGroup}
+          formatCurrencyAmount={formatCurrencyAmount}
+          groupDailyLabel={groupDailyLabel}
+          toNumber={toNumber}
+          handleOpenFundDetail={handleOpenFundDetail}
+          handleOpenHistory={handleOpenHistory}
+          handleOpenSettings={handleOpenSettings}
+          handleEditGroup={handleOpenEditGroup}
+          handleDeleteGroup={handleDeleteGroup}
+          ungroupedSector={UNGROUPED_SECTOR}
+          funds={funds}
+          sectors={sectors}
+          dailyRateColumnLabel={dailyRateColumnLabel}
+          dailyProfitColumnLabel={dailyProfitColumnLabel}
+        />
 
       <FundDetailPanel
         isOpen={detailView.isOpen}
@@ -1990,278 +1974,89 @@ export default function FundTrackerApp() {
         .add-fund-number-input { appearance: textfield; -moz-appearance: textfield; }
       `}</style>
 
-      <Modal isOpen={modals.group} onClose={() => closeModal('group')} title="创建新分组">
-        <form onSubmit={handleCreateGroup} className="space-y-4">
-          <div>
-            <label htmlFor="group-name" className="block text-sm font-medium text-slate-700 mb-1">分组名称</label>
-            <input 
-              id="group-name" type="text" required value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="如：海外QDII、固收+" 
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <button type="button" onClick={() => closeModal('group')} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">取消</button>
-            <button type="submit" className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors">确认创建</button>
-          </div>
-        </form>
-      </Modal>
+      <GroupModal
+        isOpen={modals.group}
+        onClose={handleCloseGroupModal}
+        onSubmit={handleCreateGroup}
+        value={groupForm.name}
+        onChange={(name) => setGroupForm((current) => ({ ...current, name }))}
+        mode={groupForm.mode}
+        originalName={groupForm.originalName}
+        canDelete={groupForm.mode === 'edit' && groupForm.originalName !== UNGROUPED_SECTOR}
+        onDelete={() => {
+          handleCloseGroupModal();
+          handleDeleteGroup(groupForm.originalName);
+        }}
+      />
 
-      <Modal isOpen={modals.fund} onClose={handleCloseFundModal} title="新增基金持仓" maxWidth="max-w-lg">
-        <form onSubmit={handleAddFund} className="space-y-4">
-          <div>
-            <label htmlFor="fund-code" className="block text-sm font-medium text-slate-700 mb-1">基金代码</label>
-            <input 
-              id="fund-code" type="text" required value={fundForm.code} onChange={(e) => handleFundCodeChange(e.target.value)}
-              placeholder="如：005827"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-            <div className="mt-2 space-y-1">
-              <p className={`flex items-center gap-2 text-sm ${fundLookup.status === 'success' ? 'text-emerald-700' : fundLookup.status === 'error' ? 'text-rose-700' : fundLookup.status === 'loading' ? 'text-blue-700' : 'text-slate-500'}`}>
-                <span className={`h-2 w-2 rounded-full ${fundLookup.status === 'success' ? 'bg-emerald-500' : fundLookup.status === 'error' ? 'bg-rose-500' : fundLookup.status === 'loading' ? 'bg-blue-500' : 'bg-slate-300'}`}></span>
-                <span>{fundLookup.message}</span>
-              </p>
-              <p className="text-xs text-slate-500">基金名称：<span className="font-medium text-slate-700">{fundLookup.quote?.name || '待自动解析'}</span></p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="fund-sector" className="block text-sm font-medium text-slate-700 mb-1">所属分组</label>
-              <select 
-                id="fund-sector"
-                required
-                value={fundForm.sector} onChange={(e) => setFundForm({...fundForm, sector: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-              >
-                {sectors.map(sector => <option key={sector} value={sector}>{sector}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="fund-shares" className="block text-sm font-medium text-slate-700 mb-1">持有份额 (选填)</label>
-              <input 
-                id="fund-shares" type="number" min="0" step="0.01" value={fundForm.shares} onChange={(e) => setFundForm({...fundForm, shares: e.target.value})}
-                placeholder="如已知可直接填写"
-                className="add-fund-number-input w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <p className={`text-xs mt-1 ${hasHoldingSharesInput && !isHoldingSharesValid ? 'text-rose-600' : 'text-slate-400'}`}>留空则继续按当前可用净值自动换算份额；如填写则以份额为准。</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="fund-amount" className="block text-sm font-medium text-slate-700 mb-1">持有金额 / 当前持仓金额 (元)</label>
-              <input 
-                id="fund-amount" type="number" min="0" step="0.01" required value={fundForm.amount} onChange={(e) => setFundForm({...fundForm, amount: e.target.value})}
-                placeholder="当前持仓总金额"
-                className="add-fund-number-input w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <p className="text-xs text-slate-400 mt-1">这里填当前持有金额，已包含累计收益；详情页中的“持有金额”会直接沿用这个展示口径。</p>
-            </div>
-            <div>
-              <label htmlFor="fund-profit" className="block text-sm font-medium text-slate-700 mb-1">持有收益 (元)</label>
-              <input 
-                id="fund-profit" type="number" step="0.01" required value={fundForm.holdingProfit} onChange={(e) => setFundForm({...fundForm, holdingProfit: e.target.value})}
-                placeholder="累计持有收益"
-                className="add-fund-number-input w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <p className="text-xs text-slate-400 mt-1">支持填写负数，系统会据此反推出持仓成本。</p>
-            </div>
-          </div>
-          <div className={`rounded-xl border px-4 py-3 text-sm ${isDerivedCostAmountValid ? 'border-slate-200 bg-slate-50 text-slate-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
-            <div className="font-medium">自动换算结果</div>
-            <p className="mt-1">总成本金额 = 持有金额 - 持有收益 = {Number.isFinite(derivedCostAmount) ? `¥${derivedCostAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--'}</p>
-            {!isDerivedCostAmountValid && hasHoldingAmountInput && hasHoldingProfitInput && (
-              <p className="mt-1">当前填写会导致成本金额为负数，暂时不能保存。</p>
-            )}
-            <p className="mt-1 text-xs text-slate-500">保存后会沿用当前自动口径同步逻辑；若未填写份额，系统会继续按当前可用净值自动换算。</p>
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
-            <button type="button" onClick={handleCloseFundModal} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">取消</button>
-            <button type="submit" disabled={!canSubmitFund} className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:cursor-not-allowed">保存持仓</button>
-          </div>
-        </form>
-      </Modal>
+      <AddFundModal
+        isOpen={modals.fund}
+        onClose={handleCloseFundModal}
+        onSubmit={handleAddFund}
+        fundForm={fundForm}
+        setFundForm={setFundForm}
+        handleFundCodeChange={handleFundCodeChange}
+        fundLookup={fundLookup}
+        sectors={sectors}
+        hasHoldingSharesInput={hasHoldingSharesInput}
+        isHoldingSharesValid={isHoldingSharesValid}
+        hasHoldingAmountInput={hasHoldingAmountInput}
+        hasHoldingProfitInput={hasHoldingProfitInput}
+        isDerivedCostAmountValid={isDerivedCostAmountValid}
+        derivedCostAmount={derivedCostAmount}
+        canSubmitFund={canSubmitFund}
+      />
 
-      <Modal isOpen={modals.sync} onClose={() => closeModal('sync')} title="同步交易记录" maxWidth="max-w-md">
-        <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-start gap-2 mb-4 text-sm">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <p>录入后会按当前自动口径同步份额、持有金额与成本估算，不回算历史日期净值。</p>
-        </div>
-        <form onSubmit={handleSyncTrade} className="space-y-4">
-          <div>
-            <label htmlFor="sync-code" className="block text-sm font-medium text-slate-700 mb-1">基金代码/拼音简写</label>
-            <input 
-              id="sync-code" type="text" required value={syncForm.code} onChange={(e) => setSyncForm({...syncForm, code: e.target.value})}
-              placeholder="输入代码选择现有基金" 
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="sync-type" className="block text-sm font-medium text-slate-700 mb-1">交易类型</label>
-              <select 
-                id="sync-type"
-                value={syncForm.type} onChange={(e) => setSyncForm({...syncForm, type: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-              >
-                <option value="买入">买入 / 申购</option>
-                  <option value="卖出">卖出 / 赎回</option>
-                  <option value="分红">分红</option>
-                </select>
-              </div>
-            <div className="flex items-end rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              当前按最新可用净值换算份额
-            </div>
-          </div>
-          <div>
-            <label htmlFor="sync-amount" className="block text-sm font-medium text-slate-700 mb-1">确认金额 (元)</label>
-            <input 
-              id="sync-amount" type="number" min="0" step="0.01" required value={syncForm.amount} onChange={(e) => setSyncForm({...syncForm, amount: e.target.value})}
-              placeholder="请输入发生金额" 
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
-            <button type="button" onClick={() => closeModal('sync')} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">取消</button>
-            <button type="submit" className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors">确认同步</button>
-          </div>
-        </form>
-      </Modal>
+      <SyncTradeModal
+        isOpen={modals.sync}
+        onClose={() => closeModal('sync')}
+        onSubmit={handleSyncTrade}
+        syncForm={syncForm}
+        onChange={setSyncForm}
+      />
 
-      <Modal isOpen={modals.import} onClose={() => closeModal('import')} title="导入基金数据">
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer">
-          <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-          <p className="text-slate-700 font-medium">点击或拖拽文件到此处</p>
-          <p className="text-slate-400 text-sm mt-1">支持 Excel (.xlsx, .xls) 或 CSV 格式</p>
-        </div>
-        <div className="flex justify-end gap-3 pt-6">
-          <button type="button" onClick={() => closeModal('import')} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium">取消</button>
-          <button type="button" className="px-4 py-2 text-white bg-slate-300 rounded-lg font-medium cursor-not-allowed">开始导入</button>
-        </div>
-      </Modal>
+      <ImportModal
+        isOpen={modals.import}
+        onClose={handleCloseImportModal}
+        importFileInputRef={importFileInputRef}
+        importState={importState}
+        onFileChange={handleImportFileChange}
+        onModeChange={(mode) => setImportState((current) => ({ ...current, mode }))}
+        onConfirm={handleConfirmImport}
+      />
 
-      <Modal isOpen={modals.export} onClose={() => closeModal('export')} title="导出基金数据">
-        <div className="space-y-4">
-          <p className="text-slate-600 text-sm">选择您要导出的数据内容，系统将生成 Excel 文件供您下载分析。</p>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
-              <input type="radio" name="exportType" defaultChecked className="w-4 h-4 text-blue-600 focus:ring-blue-500" />
-              <span className="text-slate-700">当前持仓快照</span>
-            </label>
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 mt-6">
-          <button type="button" onClick={() => closeModal('export')} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium">取消</button>
-          <button type="button" onClick={() => closeModal('export')} className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium flex items-center gap-2"><Download className="w-4 h-4" /> 立即导出</button>
-        </div>
-      </Modal>
+      <ExportModal
+        isOpen={modals.export}
+        onClose={() => closeModal('export')}
+        onExport={handleExportData}
+        fundsCount={funds.length}
+        sectorsCount={sectors.length}
+        transactionsCount={transactions.length}
+        detailCacheCount={Object.keys(detailCacheEntries).length}
+      />
 
-      <Modal isOpen={modals.history} onClose={() => closeModal('history')} title={`${selectedFund?.name || '基金'} - 交易记录`} maxWidth="max-w-lg">
-        <div className="space-y-4">
-          <div className="flex justify-between items-center text-sm mb-2">
-            <span className="text-slate-500">基金代码: {selectedFund?.code}</span>
-            <span className="text-slate-500">当前市值: <span className="font-medium text-slate-800">{formatCurrencyAmount(selectedFund?.amount)}</span></span>
-          </div>
-          {toNumber(selectedFund?.shares) > 0 && (
-            <div className="text-xs text-slate-400 -mt-2">
-              当前持有份额：{toNumber(selectedFund?.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份
-            </div>
-          )}
-          
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
-                <tr>
-                  <th className="p-3 font-medium">日期</th>
-                  <th className="p-3 font-medium">类型</th>
-                  <th className="p-3 font-medium text-right">金额(元)</th>
-                  <th className="p-3 font-medium text-center">状态</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {generateMockHistory().map((record) => (
-                  <tr key={record.id} className="hover:bg-slate-50">
-                    <td className="p-3 text-slate-600">{record.date}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        record.type === '买入' ? 'bg-blue-100 text-blue-700' :
-                        record.type === '卖出' ? 'bg-slate-100 text-slate-700' : 'bg-green-100 text-green-700'
-                      }`}>
-                        {record.type}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right font-medium text-slate-800">
-                      {record.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="text-xs text-slate-500 flex items-center justify-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> {record.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </Modal>
+      <HistoryModal
+        isOpen={modals.history}
+        onClose={handleCloseHistory}
+        selectedFund={selectedFund}
+        transactions={selectedFundTransactions}
+        formatCurrencyAmount={formatCurrencyAmount}
+        formatDateTimeLabel={formatDateTimeLabel}
+        renderShareDelta={renderShareDelta}
+        toNumber={toNumber}
+      />
 
-      <Modal isOpen={modals.settings} onClose={() => closeModal('settings')} title="编辑持仓信息" maxWidth="max-w-lg">
-        <form onSubmit={handleUpdateFund} className="space-y-4">
-          <div>
-            <label htmlFor="edit-name" className="block text-sm font-medium text-slate-700 mb-1">基金名称</label>
-            <input 
-              id="edit-name" type="text" required value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="edit-code" className="block text-sm font-medium text-slate-700 mb-1">基金代码</label>
-              <input 
-                id="edit-code" type="text" required value={editForm.code} onChange={(e) => setEditForm({...editForm, code: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
-                readOnly 
-              />
-            </div>
-            <div>
-              <label htmlFor="edit-sector" className="block text-sm font-medium text-slate-700 mb-1">所属分组</label>
-              <select 
-                id="edit-sector"
-                value={editForm.sector} onChange={(e) => setEditForm({...editForm, sector: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-              >
-                {sectors.map(sector => <option key={sector} value={sector}>{sector}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label htmlFor="edit-market-value" className="block text-sm font-medium text-slate-700 mb-1">持有金额校准 (元)</label>
-            <input 
-              id="edit-market-value" type="number" min="0" step="0.01" required value={editForm.amount} onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-            <p className="text-xs text-slate-400 mt-1">如当前持有金额不准，可在此处覆盖，系统会按最新可用净值反推份额。</p>
-            {toNumber(editForm.shares) > 0 && (
-              <p className="text-xs text-slate-400 mt-1">当前记录份额：{toNumber(editForm.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份</p>
-            )}
-          </div>
-
-          <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-6">
-            <button 
-              type="button" 
-              onClick={handleDeleteFund}
-              className="flex items-center gap-1.5 px-3 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-medium transition-colors text-sm"
-            >
-              <Trash2 className="w-4 h-4" /> 删除该持仓
-            </button>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => closeModal('settings')} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">取消</button>
-              <button type="submit" className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors">保存更改</button>
-            </div>
-          </div>
-        </form>
-      </Modal>
-
+      <EditFundModal
+        isOpen={modals.settings}
+        onClose={() => closeModal('settings')}
+        onSubmit={handleUpdateFund}
+        onDelete={handleDeleteFund}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        sectors={sectors}
+        toNumber={toNumber}
+      />
     </div>
+  </div>
   );
 }
