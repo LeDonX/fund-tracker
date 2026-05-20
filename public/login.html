@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - 智能基金追踪 Pro</title>
+  <!-- Modern Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.300.0/font/lucide.min.css">
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <!-- Atmospheric Glowing Orbs for Warmth and Dynamics -->
+  <div class="glowing-orb orb-1"></div>
+  <div class="glowing-orb orb-2"></div>
+  <div class="glowing-orb orb-3"></div>
+  
+  <div class="container">
+    <!-- Brand / Product Intro Section (Left) -->
+    <div class="brand-showcase">
+      <div class="brand-content">
+        <div class="brand-logo">
+          <i class="icon-trending-up animate-pulse"></i>
+          <span>智能基金追踪 Pro</span>
+        </div>
+        <h1 class="brand-title">全天候精准的<br><span class="highlight-text">基金组合追踪</span></h1>
+        <p class="brand-description">
+          欢迎进入智能基金追踪 PRO 版系统。本系统完全基于 Cloudflare Pages 和 D1 Serverless 分布式数据库构建，在边缘以毫秒级的速度和金融级的安全性护航您的基金估值与持仓。
+        </p>
+        <div class="feature-tags">
+          <span class="tag"><i class="icon-zap"></i> 盘中实时估值</span>
+          <span class="tag"><i class="icon-shield-check"></i> 安全加密存储</span>
+          <span class="tag"><i class="icon-cloud"></i> 部署在边缘端</span>
+        </div>
+      </div>
+      <div class="brand-footer">
+        © 2026 Smart Fund Tracker. All rights reserved.
+      </div>
+    </div>
+    
+    <!-- Authentication Card Section (Right) -->
+    <div class="auth-card-wrapper">
+      
+      <!-- Card: Auth (Login & Register) Form -->
+      <div class="auth-card" id="auth-panel">
+        <div class="tab-header">
+          <div class="tab-slider" id="tab-slider"></div>
+          <button class="tab-btn active" id="tab-login-btn" onclick="switchTab('login')">
+            <i class="icon-log-in"></i> 账号登录
+          </button>
+          <button class="tab-btn" id="tab-register-btn" onclick="switchTab('register')">
+            <i class="icon-user-plus"></i> 快速注册
+          </button>
+        </div>
+        
+        <div class="auth-form-container">
+          <!-- FORM Title & Subtitle -->
+          <div class="form-intro">
+            <h2 id="form-title" class="form-title">欢迎回来</h2>
+            <p id="form-subtitle" class="form-subtitle">请输入您的电子邮箱与密码以进入控制台</p>
+          </div>
+          
+          <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+            <!-- Email Input -->
+            <div class="input-group email-group">
+              <input type="email" id="email" required autocomplete="off" placeholder=" ">
+              <label for="email"><i class="icon-mail"></i> 电子邮箱地址</label>
+              <div class="input-glow"></div>
+            </div>
+            
+            <!-- Password Input -->
+            <div class="input-group">
+              <input type="password" id="password" required autocomplete="current-password" placeholder=" ">
+              <label for="password"><i class="icon-lock"></i> 账户密码</label>
+              <div class="input-glow"></div>
+              <button type="button" class="password-toggle" onclick="togglePasswordVisibility()" aria-label="切换密码可见性">
+                <i class="icon-eye" id="password-toggle-icon"></i>
+              </button>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submit-btn">
+              <span id="submit-btn-text">立即安全登录</span>
+              <div class="btn-shimmer"></div>
+              <div class="btn-spinner" id="btn-spinner"></div>
+            </button>
+          </form>
+          
+          <div class="auth-footer">
+            托管于 Cloudflare Pages 边缘节点 · 数据库由 D1 强力驱动
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <!-- Email Autocomplete Suggestions (body-level to avoid clipping) -->
+  <div class="email-suggestions" id="email-suggestions"></div>
+
+  <!-- Sleek Custom Toast Container for notifications -->
+  <div class="toast-container" id="toast-container"></div>
+  
+  <script src="login.js"></script>
+</body>
+</html>

@@ -13,7 +13,7 @@ export default function FormatNumber({ value, isPercent = false, isCurrency = fa
     return <span className="text-slate-500">{zeroValue}{isPercent ? '%' : ''}</span>;
   }
 
-  const colorClass = value > 0 ? 'text-red-500' : 'text-green-500';
+  const colorClass = value > 0 ? 'text-red-600 font-semibold' : 'text-emerald-600 font-semibold';
   const sign = value > 0 && showSign ? '+' : '';
 
   let formattedValue = Math.abs(value).toFixed(2);
@@ -22,7 +22,7 @@ export default function FormatNumber({ value, isPercent = false, isCurrency = fa
   }
 
   return (
-    <span className={`font-medium ${colorClass}`}>
+    <span className={colorClass}>
       {sign}{value < 0 ? '-' : ''}{formattedValue}{isPercent ? '%' : ''}
     </span>
   );

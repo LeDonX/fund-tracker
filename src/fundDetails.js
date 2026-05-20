@@ -8,6 +8,12 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const roundAmount = (v) => {
+  if (v === undefined || v === null || Number.isNaN(v)) return v;
+  const num = Number.parseFloat(v);
+  return Number.isFinite(num) ? Math.round(num * 100) / 100 : num;
+};
+
 const toPositiveNumberOrNull = (value) => {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -103,6 +109,7 @@ export const normalizeStoredDetailCacheStore = (storedValue) => {
           },
           officialHistory: normalizeOfficialHistory(entry.officialHistory),
           remoteThemes: normalizeRemoteThemes(entry.remoteThemes),
+          holdings: Array.isArray(entry.holdings) ? entry.holdings : [],
         }];
       })
       .filter(Boolean),
@@ -119,7 +126,7 @@ export const buildStoredDetailCachePayload = (entries) => ({
   entries,
 });
 
-export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThemes }) => ({
+export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThemes, holdings }) => ({
   code: String(code || '').trim(),
   fetchedAt: Date.now(),
   quote: {
@@ -130,6 +137,7 @@ export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThem
   },
   officialHistory: normalizeOfficialHistory(officialHistory),
   remoteThemes: normalizeRemoteThemes(remoteThemes),
+  holdings: Array.isArray(holdings) ? holdings : [],
 });
 
 export const isDetailCacheStale = (entry, now = Date.now()) => {
@@ -250,11 +258,11 @@ const resolveQuoteValues = (sourceFund, detailEntry) => {
 const getTotalCostAmount = (sourceFund, displayedFund, holdingAmount) => {
   const sourceCostAmount = Number.parseFloat(sourceFund?.costAmount);
   if (Number.isFinite(sourceCostAmount) && sourceCostAmount >= 0) {
-    return sourceCostAmount;
+    return roundAmount(sourceCostAmount);
   }
 
   if (Number.isFinite(holdingAmount) && Number.isFinite(displayedFund?.totalProfit)) {
-    return Math.max(0, holdingAmount - Number.parseFloat(displayedFund.totalProfit));
+    return roundAmount(Math.max(0, holdingAmount - Number.parseFloat(displayedFund.totalProfit)));
   }
 
   return null;
@@ -284,12 +292,12 @@ export const buildFundDetailModel = ({
   }
 
   const code = String(sourceFund.code || displayedFund.code || '').trim();
-  const holdingAmount = Number.isFinite(displayedFund.amount) ? Number.parseFloat(displayedFund.amount) : null;
+  const holdingAmount = Number.isFinite(displayedFund.amount) ? roundAmount(Number.parseFloat(displayedFund.amount)) : null;
   const shares = toPositiveNumberOrNull(sourceFund.shares) ?? toPositiveNumberOrNull(displayedFund.shares);
-  const totalCostAmount = getTotalCostAmount(sourceFund, displayedFund, holdingAmount);
-  const holdingProfit = Number.isFinite(holdingAmount) && Number.isFinite(totalCostAmount)
+  const totalCostAmount = roundAmount(getTotalCostAmount(sourceFund, displayedFund, holdingAmount));
+  const holdingProfit = roundAmount(Number.isFinite(holdingAmount) && Number.isFinite(totalCostAmount)
     ? holdingAmount - totalCostAmount
-    : (Number.isFinite(displayedFund.totalProfit) ? Number.parseFloat(displayedFund.totalProfit) : null);
+    : (Number.isFinite(displayedFund.totalProfit) ? Number.parseFloat(displayedFund.totalProfit) : null));
   const holdingProfitRate = Number.isFinite(holdingProfit) && Number.isFinite(totalCostAmount) && totalCostAmount > 0
     ? (holdingProfit / totalCostAmount) * 100
     : (Number.isFinite(displayedFund.totalRate) ? Number.parseFloat(displayedFund.totalRate) : null);
@@ -310,7 +318,7 @@ export const buildFundDetailModel = ({
     && previousOfficialPoint
     && Number.isFinite(latestOfficialPoint.netValue)
     && Number.isFinite(previousOfficialPoint.netValue)
-    ? shares * (latestOfficialPoint.netValue - previousOfficialPoint.netValue)
+    ? roundAmount(shares * (latestOfficialPoint.netValue - previousOfficialPoint.netValue))
     : null;
   const latestNetValue = latestOfficialPoint?.netValue ?? quoteValues.lastNetValue ?? null;
   const relatedThemes = detailEntry?.remoteThemes?.length > 0
@@ -329,7 +337,7 @@ export const buildFundDetailModel = ({
     holdingProfitRate,
     unitCost,
     totalCostAmount,
-    dailyProfit: Number.isFinite(displayedFund.dailyProfit) ? Number.parseFloat(displayedFund.dailyProfit) : null,
+    dailyProfit: Number.isFinite(displayedFund.dailyProfit) ? roundAmount(Number.parseFloat(displayedFund.dailyProfit)) : null,
     yesterdayProfit,
     estimatedNetValue: quoteValues.estimatedNetValue,
     latestNetValue,
@@ -343,6 +351,7 @@ export const buildFundDetailModel = ({
     quoteUpdateTime: quoteValues.updateTime,
     quoteNetValueDate: quoteValues.netValueDate,
     cacheFetchedAt: detailEntry?.fetchedAt || 0,
+    holdings: detailEntry?.holdings || [],
   };
 };
 

@@ -54,20 +54,20 @@ export default function FundTable({
   }, [openGroupMenu]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-[300px] overflow-hidden">
+    <div className="flex-1 bg-white rounded-3xl shadow-md border border-slate-200/60 flex flex-col min-h-[300px] overflow-hidden">
       <div className="flex-1 overflow-auto relative custom-scrollbar">
         <table ref={groupTableRef} className="w-full text-left border-collapse min-w-[900px]">
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider shadow-[0_1px_0_0_#e2e8f0]">
-              <th className="p-4 font-medium bg-slate-50">基金名称 (代码)</th>
-              <th className="p-4 font-medium text-right bg-slate-50">持有金额</th>
-              <th className="p-4 font-medium text-right bg-slate-50">{dailyRateColumnLabel}</th>
-              <th className="p-4 font-medium text-right bg-blue-50/80">{dailyProfitColumnLabel}</th>
-              <th className="p-4 font-medium text-right bg-slate-50">持有收益率</th>
-              <th className="p-4 font-medium text-right bg-slate-50">持有总收益</th>
-              <th className="p-4 font-medium text-right bg-slate-50">本周收益</th>
-              <th className="p-4 font-medium text-right bg-slate-50">本月收益</th>
-              <th className="p-4 font-medium text-center bg-slate-50">操作</th>
+          <thead className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/80">
+            <tr className="text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200 shadow-sm">
+              <th className="p-4 font-semibold text-slate-600 bg-slate-50/40">基金名称 (代码)</th>
+              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">持有金额</th>
+              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">{dailyRateColumnLabel}</th>
+              <th className="p-4 font-semibold text-slate-600 text-right bg-blue-50/40">{dailyProfitColumnLabel}</th>
+              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">持有收益率</th>
+              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">持有总收益</th>
+              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">本周收益</th>
+              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">本月收益</th>
+              <th className="p-4 font-semibold text-slate-600 text-center bg-slate-50/40">操作</th>
             </tr>
           </thead>
           {orderedGroups.map(({ sector, data }) => {
@@ -77,56 +77,60 @@ export default function FundTable({
 
             return (
               <tbody key={sector} data-sector={sector} id={`sector-body-${sector}`}>
-                <tr className="bg-slate-100/70 border-b border-slate-200 group hover:bg-slate-100 transition-colors">
+                <tr className="bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 border-b border-slate-200 group transition-all">
                   <td colSpan={9} className="p-0">
                     <div className="flex items-stretch">
                       <button
                         type="button"
                         data-drag-handle
-                        className="flex shrink-0 cursor-grab items-center justify-center border-r border-slate-200 px-3 text-slate-400 transition-colors hover:bg-white/80 hover:text-blue-600 active:cursor-grabbing"
+                        className="flex shrink-0 cursor-grab items-center justify-center border-r border-slate-200 px-3 text-slate-400 transition-colors hover:bg-white/80 hover:text-indigo-600 active:cursor-grabbing"
                         aria-label={`拖拽排序分组 ${sector}`}
                         title="拖拽排序"
                       >
                         <GripVertical className="w-4 h-4" />
                       </button>
-                      <div className="flex w-full items-center justify-between px-4 py-2.5 border-l-4 border-blue-500 select-none text-left">
+                      <div className="flex w-full items-center justify-between px-4 py-3 border-l-4 border-indigo-600 select-none text-left">
                         <button
                           type="button"
-                          className="group flex items-center gap-2 text-left"
+                          className="group/btn flex items-center gap-2 text-left transition-all hover:translate-x-0.5"
                           onClick={() => toggleGroup(sector)}
                           aria-expanded={!isCollapsed}
                           aria-controls={`sector-body-${sector}`}
                         >
-                          {isCollapsed ? <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600" /> : <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />}
-                          <Wallet className="w-4 h-4 text-slate-500" />
-                          <span className="font-semibold text-slate-700 text-sm">{sector}</span>
-                          <span className="text-xs font-normal text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {isCollapsed ? (
+                            <ChevronRight className="w-4 h-4 text-slate-400 group-hover/btn:text-indigo-600" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-slate-400 group-hover/btn:text-indigo-600" />
+                          )}
+                          <Wallet className="w-4.5 h-4.5 text-indigo-500/80" />
+                          <span className="font-bold text-slate-700 text-sm tracking-tight">{sector}</span>
+                          <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50/80 border border-indigo-100 px-2 py-0.5 rounded-full">
                             {data.funds.length} 支
                           </span>
                         </button>
-                        <div className="flex items-center gap-4 text-sm pr-4">
+                        <div className="flex items-center gap-4 text-xs pr-4">
                           {canManageGroup && (
                             <div className="relative" ref={isMenuOpen ? groupMenuRef : null} onClick={(e) => e.stopPropagation()}>
                               <button
                                 type="button"
                                 onClick={() => setOpenGroupMenu((current) => (current === sector ? '' : sector))}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white hover:text-slate-600"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-white hover:text-slate-600 hover:scale-105 active:scale-95 shadow-sm border border-slate-200/40 bg-slate-50"
                                 title="分组操作"
                                 aria-label={`分组 ${sector} 的操作菜单`}
                               >
-                                <Ellipsis className="w-4 h-4" />
+                                <Ellipsis className="w-3.5 h-3.5" />
                               </button>
                               {isMenuOpen && (
-                                <div className="absolute right-0 top-10 z-20 min-w-[140px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                                <div className="absolute right-0 top-9 z-20 min-w-[140px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-150">
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setOpenGroupMenu('');
                                       handleEditGroup(sector);
                                     }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                                   >
-                                    <Pencil className="w-4 h-4" /> 编辑分组
+                                    <Pencil className="w-4 h-4 text-slate-400" /> 编辑分组
                                   </button>
                                   <button
                                     type="button"
@@ -134,7 +138,7 @@ export default function FundTable({
                                       setOpenGroupMenu('');
                                       handleDeleteGroup(sector);
                                     }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
                                   >
                                     <Trash2 className="w-4 h-4" /> 删除分组
                                   </button>
@@ -142,10 +146,12 @@ export default function FundTable({
                               )}
                             </div>
                           )}
-                          <span className="text-slate-500">板块持有金额: <span className="font-medium text-slate-800">{data.hasIncompleteAmount ? '--' : formatCurrencyAmount(data.sectorAmount)}</span></span>
-                          <span className="text-slate-500">{groupDailyLabel}: </span>
-                          <span className="text-base">
-                            <FormatNumber value={data.hasIncompleteDaily ? null : data.sectorDailyProfit} isCurrency={true} />
+                          <span className="text-slate-500 font-medium">
+                            板块持有金额: <span className="font-bold text-slate-800">{formatCurrencyAmount(data.sectorAmount)}{data.hasIncompleteAmount && <span className="ml-0.5 text-amber-500/70 text-[10px] font-bold cursor-help" title="该板块部分基金数据加载中">*</span>}</span>
+                          </span>
+                          <span className="text-slate-400">|</span>
+                          <span className="text-slate-500 font-medium">
+                            {groupDailyLabel}: <span className="font-bold text-base"><FormatNumber value={data.sectorDailyProfit} isCurrency={true} />{data.hasIncompleteDaily && <span className="ml-0.5 text-amber-500/70 text-[10px] font-bold cursor-help" title="该板块部分基金数据加载中">*</span>}</span>
                           </span>
                         </div>
                       </div>
@@ -162,28 +168,32 @@ export default function FundTable({
                 )}
 
                 {!isCollapsed && data.funds.map((fund) => (
-                  <tr key={fund.id} className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors bg-white" data-testid={`fund-row-${fund.code}`}>
+                  <tr 
+                    key={fund.id} 
+                    className="border-b border-slate-100 hover:bg-slate-50/80 hover:shadow-[inset_4px_0_0_#2563eb] hover:translate-x-[1px] transition-all duration-200 ease-out bg-white" 
+                    data-testid={`fund-row-${fund.code}`}
+                  >
                     <td className="p-4">
                       <button
                         type="button"
                         onClick={() => handleOpenFundDetail(fund)}
-                        className="text-left"
+                        className="text-left group/btn"
                         data-testid={`open-fund-detail-${fund.code}`}
                       >
-                        <div className="font-medium text-slate-800 transition-colors hover:text-blue-700">{fund.name}</div>
+                        <div className="font-semibold text-slate-800 transition-colors group-hover/btn:text-blue-700 text-[14.5px]">{fund.name}</div>
                       </button>
-                      <div className="text-xs text-slate-400 mt-0.5">
+                      <div className="text-xs text-slate-400 mt-0.5 font-medium">
                         {fund.code}
                         {toNumber(fund.shares) > 0 && ` · ${toNumber(fund.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份`}
                       </div>
                     </td>
-                    <td className="p-4 text-right font-medium text-slate-700">
+                    <td className="p-4 text-right font-bold text-slate-700 text-[14.5px] font-mono">
                       {formatCurrencyAmount(fund.amount)}
                     </td>
                     <td className="p-4 text-right">
                       <FormatNumber value={fund.dailyRate} isPercent={true} />
                     </td>
-                    <td className="p-4 text-right bg-blue-50/10 font-bold text-base">
+                    <td className="p-4 text-right bg-blue-50/20 font-extrabold text-[15.5px] border-r border-blue-50/10">
                       <FormatNumber value={fund.dailyProfit} isCurrency={true} />
                     </td>
                     <td className="p-4 text-right">
@@ -203,7 +213,7 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenFundDetail(fund)}
-                          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                          className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:scale-[1.03] active:scale-[0.97]"
                           title="详情"
                           data-testid={`detail-entry-${fund.code}`}
                         >
@@ -212,7 +222,7 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenHistory(fund)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 hover:scale-[1.08] active:scale-[0.92] rounded-lg transition-all"
                           title="交易记录"
                         >
                           <History className="w-4 h-4" />
@@ -220,7 +230,7 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenSettings(fund)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 hover:scale-[1.08] active:scale-[0.92] rounded-lg transition-all"
                           title="设置"
                         >
                           <Settings className="w-4 h-4" />
