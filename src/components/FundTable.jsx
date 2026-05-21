@@ -180,7 +180,14 @@ export default function FundTable({
                         className="text-left group/btn"
                         data-testid={`open-fund-detail-${fund.code}`}
                       >
-                        <div className="font-semibold text-slate-800 transition-colors group-hover/btn:text-blue-700 text-[14.5px]">{fund.name}</div>
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-800 transition-colors group-hover/btn:text-blue-700 text-[14.5px]">
+                          <span>{fund.name}</span>
+                          {fund.valuationSource === 'official' && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 select-none scale-[0.9] origin-left shrink-0">
+                              已更新
+                            </span>
+                          )}
+                        </div>
                       </button>
                       <div className="text-xs text-slate-400 mt-0.5 font-medium">
                         {fund.code}

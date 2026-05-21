@@ -1296,7 +1296,23 @@ const alignFundSharesToDisplayedAmount = (fund, targetAmount) => {
     bootstrapSharesFromAmount: false,
   });
 };
-// ============================================================================
+const isTradingHours = () => {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) return false;
+
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const timeNum = hours * 100 + minutes;
+
+  // A-share trading hours (with small buffers):
+  // Morning: 9:30 - 11:35
+  // Afternoon: 13:00 - 15:10
+  const isMorning = timeNum >= 930 && timeNum <= 1135;
+  const isAfternoon = timeNum >= 1300 && timeNum <= 1510;
+
+  return isMorning || isAfternoon;
+};
 
 export default function FundTrackerApp() {
   
@@ -1971,6 +1987,18 @@ export default function FundTrackerApp() {
 
     hasAutoRefreshedRef.current = true;
     handleRefresh();
+  }, [funds.length, handleRefresh]);
+
+  useEffect(() => {
+    if (funds.length === 0) return undefined;
+
+    const timer = setInterval(() => {
+      if (isTradingHours()) {
+        handleRefresh();
+      }
+    }, 60000);
+
+    return () => clearInterval(timer);
   }, [funds.length, handleRefresh]);
 
   const toggleGroup = (sector) => {
