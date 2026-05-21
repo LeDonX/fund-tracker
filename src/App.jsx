@@ -1318,7 +1318,25 @@ export default function FundTrackerApp() {
         const txsData = await txsRes.json();
         
         if (fundsData?.success && Array.isArray(fundsData.funds)) {
-          setFunds(normalizeStoredFunds(fundsData.funds));
+          const loadedFunds = normalizeStoredFunds(fundsData.funds);
+          setFunds(loadedFunds);
+
+          // 动态提取云端持仓的分组并合并到本地 sectors 列表中，防止自定义分组丢失
+          const uniqueSectors = [...new Set(loadedFunds.map(f => f.sector).filter(Boolean))];
+          setSectors(current => {
+            const merged = [...current];
+            uniqueSectors.forEach(sec => {
+              if (!merged.includes(sec)) {
+                const ungroupedIdx = merged.indexOf(UNGROUPED_SECTOR);
+                if (ungroupedIdx !== -1) {
+                  merged.splice(ungroupedIdx, 0, sec);
+                } else {
+                  merged.push(sec);
+                }
+              }
+            });
+            return merged;
+          });
         }
         if (txsData?.success && Array.isArray(txsData.transactions)) {
           setTransactions(normalizeStoredTransactionStore(txsData.transactions).entries);
@@ -2003,11 +2021,14 @@ export default function FundTrackerApp() {
     };
   }, [handleSectorSortEnd]);
 
-  const handleCreateGroup = (e) => {
+  const handleCreateGroup = async (e) => {
     e.preventDefault();
 
     const normalizedName = String(groupForm.name || '').trim();
     if (!normalizedName) return;
+
+    let nextSectors = [...sectors];
+    let nextFunds = [...funds];
 
     if (groupForm.mode === 'edit') {
       const originalName = String(groupForm.originalName || '').trim();
@@ -2017,16 +2038,41 @@ export default function FundTrackerApp() {
         return;
       }
 
-      setSectors((current) => current.map((sector) => (sector === originalName ? normalizedName : sector)));
-      setFunds((current) => current.map((fund) => (
+      nextSectors = sectors.map((sector) => (sector === originalName ? normalizedName : sector));
+      nextFunds = funds.map((fund) => (
         fund.sector === originalName
           ? { ...fund, sector: normalizedName }
           : fund
-      )));
+      ));
     } else if (!sectors.includes(normalizedName)) {
-      setSectors((current) => [...current, normalizedName]);
+      nextSectors = [...sectors, normalizedName];
     }
 
+    if (isAuthenticated && groupForm.mode === 'edit') {
+      try {
+        const response = await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            funds: nextFunds,
+            transactions: transactions
+          })
+        });
+        if (!response.ok) {
+          const errData = await response.json();
+          alert(`同步分组修改至云端失败: ${errData.error || '未知错误'}`);
+          return;
+        }
+      } catch (err) {
+        alert(`同步分组修改至云端失败，请检查网络: ${err.message}`);
+        return;
+      }
+    }
+
+    setSectors(nextSectors);
+    if (groupForm.mode === 'edit') {
+      setFunds(nextFunds);
+    }
     setGroupForm({ mode: 'create', originalName: '', name: '' });
     closeModal('group');
   };
@@ -2050,7 +2096,7 @@ export default function FundTrackerApp() {
     closeModal('group');
   };
 
-  const handleDeleteGroup = (sector) => {
+  const handleDeleteGroup = async (sector) => {
     if (!sector || sector === UNGROUPED_SECTOR) {
       return;
     }
@@ -2060,15 +2106,38 @@ export default function FundTrackerApp() {
       return;
     }
 
-    setSectors((current) => {
-      const next = current.filter((item) => item !== sector);
-      return next.includes(UNGROUPED_SECTOR) ? next : [UNGROUPED_SECTOR, ...next];
-    });
-    setFunds((current) => current.map((fund) => (
+    const nextSectors = sectors.filter((item) => item !== sector);
+    const updatedSectors = nextSectors.includes(UNGROUPED_SECTOR) ? nextSectors : [UNGROUPED_SECTOR, ...nextSectors];
+
+    const nextFunds = funds.map((fund) => (
       fund.sector === sector
         ? { ...fund, sector: UNGROUPED_SECTOR }
         : fund
-    )));
+    ));
+
+    if (isAuthenticated) {
+      try {
+        const response = await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            funds: nextFunds,
+            transactions: transactions
+          })
+        });
+        if (!response.ok) {
+          const errData = await response.json();
+          alert(`同步删除分组至云端失败: ${errData.error || '未知错误'}`);
+          return;
+        }
+      } catch (err) {
+        alert(`同步删除分组至云端失败，请检查网络: ${err.message}`);
+        return;
+      }
+    }
+
+    setSectors(updatedSectors);
+    setFunds(nextFunds);
     setCollapsedGroups((current) => {
       const next = new Set(current);
       next.delete(sector);
@@ -2562,27 +2631,58 @@ export default function FundTrackerApp() {
     }
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (!importState.payload) {
       return;
     }
 
+    let nextFunds = [];
+    let nextSectors = [];
+    let nextDetailCache = [];
+    let nextTransactions = [];
+
     if (importState.mode === 'replace-all') {
-      setFunds(importState.payload.funds);
-      setSectors(importState.payload.sectors);
-      setDetailCacheEntries(importState.payload.detailCacheEntries);
-      setTransactions(sortTransactionsByDateDesc(importState.payload.transactions));
+      nextFunds = importState.payload.funds;
+      nextSectors = importState.payload.sectors;
+      nextDetailCache = importState.payload.detailCacheEntries;
+      nextTransactions = sortTransactionsByDateDesc(importState.payload.transactions);
     } else {
-      setFunds((currentFunds) => mergeImportedFunds(currentFunds, importState.payload.funds));
-      setSectors((currentSectors) => mergeStringArrays(currentSectors, importState.payload.sectors));
-      setDetailCacheEntries((currentEntries) => mergeDetailCacheEntries(currentEntries, importState.payload.detailCacheEntries));
-      setTransactions((currentTransactions) => sortTransactionsByDateDesc(mergeTransactionsById(currentTransactions, importState.payload.transactions)));
+      nextFunds = mergeImportedFunds(funds, importState.payload.funds);
+      nextSectors = mergeStringArrays(sectors, importState.payload.sectors);
+      nextDetailCache = mergeDetailCacheEntries(detailCacheEntries, importState.payload.detailCacheEntries);
+      nextTransactions = sortTransactionsByDateDesc(mergeTransactionsById(transactions, importState.payload.transactions));
     }
+
+    if (isAuthenticated) {
+      try {
+        const response = await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            funds: nextFunds,
+            transactions: nextTransactions
+          })
+        });
+        if (!response.ok) {
+          const errData = await response.json();
+          alert(`同步至云端失败: ${errData.error || '未知错误'}`);
+          return;
+        }
+      } catch (err) {
+        alert(`同步至云端失败，请检查网络: ${err.message}`);
+        return;
+      }
+    }
+
+    setFunds(nextFunds);
+    setSectors(nextSectors);
+    setDetailCacheEntries(nextDetailCache);
+    setTransactions(nextTransactions);
 
     setSelectedFund(null);
     setDetailView({ isOpen: false, code: '' });
     handleCloseImportModal();
-    alert(importState.mode === 'replace-all' ? '导入成功，当前数据已完成替换。' : '导入成功，已按追加模式合并数据。');
+    alert(importState.mode === 'replace-all' ? '导入成功，当前数据已完成替换并同步至云端。' : '导入成功，已按追加模式合并数据并同步至云端。');
   };
 
   const handleOpenSettings = (fund) => {
