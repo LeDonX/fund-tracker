@@ -1369,7 +1369,7 @@ export default function FundTrackerApp() {
         
         if (res.ok) {
           const authData = await res.json();
-          if (authData?.success && authData?.user) {
+          if (authData?.authenticated && authData?.user) {
             const loggedInEmail = authData.user.email;
             setUser(authData.user);
             setIsAuthenticated(true);
