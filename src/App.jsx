@@ -2370,7 +2370,8 @@ export default function FundTrackerApp() {
             holdingStartDate: newFund.holdingStartDate,
             bootstrapSharesFromAmount: newFund.bootstrapSharesFromAmount,
             shares: newFund.shares,
-            costAmount: newFund.costAmount
+            costAmount: newFund.costAmount,
+            amount: newFund.amount
           })
         });
         if (!response.ok) {
@@ -2482,7 +2483,8 @@ export default function FundTrackerApp() {
             holdingStartDate: updatedFund.holdingStartDate,
             bootstrapSharesFromAmount: updatedFund.bootstrapSharesFromAmount,
             shares: updatedFund.shares,
-            costAmount: updatedFund.costAmount
+            costAmount: updatedFund.costAmount,
+            amount: updatedFund.amount
           })
         });
         if (!fundRes.ok) {
@@ -2750,7 +2752,8 @@ export default function FundTrackerApp() {
               holdingStartDate: updatedTarget.holdingStartDate,
               bootstrapSharesFromAmount: updatedTarget.bootstrapSharesFromAmount,
               shares: updatedTarget.shares,
-              costAmount: updatedTarget.costAmount
+              costAmount: updatedTarget.costAmount,
+              amount: updatedTarget.amount
             })
           });
           if (!response.ok) {

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS user_funds (
     bootstrap_shares_from_amount INTEGER DEFAULT 0,
     shares REAL DEFAULT 0,
     cost_amount REAL DEFAULT 0,
+    amount REAL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(user_id, code)

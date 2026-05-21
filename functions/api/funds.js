@@ -38,8 +38,15 @@ export async function onRequestGet(context) {
       return apiResponse({ error: "数据库未绑定" }, 500);
     }
 
+    // Auto-migrate: ensure amount column exists (safe to run multiple times)
+    try {
+      await env.DB.prepare("ALTER TABLE user_funds ADD COLUMN amount REAL DEFAULT 0").run();
+    } catch (e) {
+      // Column already exists — ignore "duplicate column" errors
+    }
+
     const rows = await env.DB.prepare(
-      "SELECT id, code, name, sector, quote_source, holding_start_date, bootstrap_shares_from_amount, shares, cost_amount, created_at FROM user_funds WHERE user_id = ?"
+      "SELECT id, code, name, sector, quote_source, holding_start_date, bootstrap_shares_from_amount, shares, cost_amount, amount, created_at FROM user_funds WHERE user_id = ?"
     ).bind(user.id).all();
 
     // Map DB fields to frontend format (camelCase)
@@ -53,6 +60,7 @@ export async function onRequestGet(context) {
       bootstrapSharesFromAmount: Boolean(row.bootstrap_shares_from_amount),
       shares: Number(row.shares || 0),
       costAmount: Number(row.cost_amount || 0),
+      amount: Number(row.amount || 0),
       createdAt: row.created_at
     }));
 
@@ -89,10 +97,11 @@ export async function onRequestPost(context) {
     const bootstrapShares = payload.bootstrapSharesFromAmount ? 1 : 0;
     const shares = Number(payload.shares || 0);
     const costAmount = Number(payload.costAmount || 0);
+    const amount = Number(payload.amount || 0);
 
     await env.DB.prepare(`
-      INSERT INTO user_funds (id, user_id, code, name, sector, quote_source, holding_start_date, bootstrap_shares_from_amount, shares, cost_amount)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO user_funds (id, user_id, code, name, sector, quote_source, holding_start_date, bootstrap_shares_from_amount, shares, cost_amount, amount)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id, code) DO UPDATE SET
         name = excluded.name,
         sector = excluded.sector,
@@ -100,8 +109,9 @@ export async function onRequestPost(context) {
         holding_start_date = excluded.holding_start_date,
         bootstrap_shares_from_amount = excluded.bootstrap_shares_from_amount,
         shares = excluded.shares,
-        cost_amount = excluded.cost_amount
-    `).bind(id, user.id, code, name, sector, quoteSource, holdingStartDate, bootstrapShares, shares, costAmount).run();
+        cost_amount = excluded.cost_amount,
+        amount = excluded.amount
+    `).bind(id, user.id, code, name, sector, quoteSource, holdingStartDate, bootstrapShares, shares, costAmount, amount).run();
 
     return apiResponse({ success: true, message: "同步基金成功", id });
   } catch (error) {

@@ -38,14 +38,21 @@ export async function onRequestPost(context) {
       return apiResponse({ error: "数据库未绑定" }, 500);
     }
 
+    // Auto-migrate: ensure amount column exists (safe to run multiple times)
+    try {
+      await env.DB.prepare("ALTER TABLE user_funds ADD COLUMN amount REAL DEFAULT 0").run();
+    } catch (e) {
+      // Column already exists — ignore "duplicate column" errors
+    }
+
     const { funds, transactions } = await request.json();
     const statements = [];
 
     // 1. Prepare batch statements for funds
     if (Array.isArray(funds)) {
       const fundStmt = env.DB.prepare(`
-        INSERT INTO user_funds (id, user_id, code, name, sector, quote_source, holding_start_date, bootstrap_shares_from_amount, shares, cost_amount)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO user_funds (id, user_id, code, name, sector, quote_source, holding_start_date, bootstrap_shares_from_amount, shares, cost_amount, amount)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id, code) DO UPDATE SET
           name = excluded.name,
           sector = excluded.sector,
@@ -53,7 +60,8 @@ export async function onRequestPost(context) {
           holding_start_date = excluded.holding_start_date,
           bootstrap_shares_from_amount = excluded.bootstrap_shares_from_amount,
           shares = excluded.shares,
-          cost_amount = excluded.cost_amount
+          cost_amount = excluded.cost_amount,
+          amount = excluded.amount
       `);
 
       for (const fund of funds) {
@@ -67,8 +75,9 @@ export async function onRequestPost(context) {
         const bootstrapShares = fund.bootstrapSharesFromAmount ? 1 : 0;
         const shares = Number(fund.shares || 0);
         const costAmount = Number(fund.costAmount || 0);
+        const amount = Number(fund.amount || 0);
 
-        statements.push(fundStmt.bind(id, user.id, code, name, sector, quoteSource, holdingStartDate, bootstrapShares, shares, costAmount));
+        statements.push(fundStmt.bind(id, user.id, code, name, sector, quoteSource, holdingStartDate, bootstrapShares, shares, costAmount, amount));
       }
     }
 
