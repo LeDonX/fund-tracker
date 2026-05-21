@@ -1,4 +1,4 @@
-const DETAIL_CACHE_VERSION = 1;
+const DETAIL_CACHE_VERSION = 2;
 const DETAIL_CACHE_STORAGE_KEY = 'fundTrackerDetailCacheV1';
 const DETAIL_CACHE_TTL_MS = 1000 * 60 * 60 * 6;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -88,7 +88,7 @@ export const normalizeStoredDetailCacheStore = (storedValue) => {
 
   const rawEntries = storedValue.version === DETAIL_CACHE_VERSION && storedValue.entries && typeof storedValue.entries === 'object'
     ? storedValue.entries
-    : (storedValue.entries && typeof storedValue.entries === 'object' ? storedValue.entries : storedValue);
+    : {};
 
   const entries = Object.fromEntries(
     Object.entries(rawEntries)
@@ -110,6 +110,8 @@ export const normalizeStoredDetailCacheStore = (storedValue) => {
           officialHistory: normalizeOfficialHistory(entry.officialHistory),
           remoteThemes: normalizeRemoteThemes(entry.remoteThemes),
           holdings: Array.isArray(entry.holdings) ? entry.holdings : [],
+          industries: Array.isArray(entry.industries) ? entry.industries : [],
+          grandTotal: Array.isArray(entry.grandTotal) ? entry.grandTotal : [],
         }];
       })
       .filter(Boolean),
@@ -126,7 +128,7 @@ export const buildStoredDetailCachePayload = (entries) => ({
   entries,
 });
 
-export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThemes, holdings }) => ({
+export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThemes, holdings, industries, grandTotal }) => ({
   code: String(code || '').trim(),
   fetchedAt: Date.now(),
   quote: {
@@ -138,6 +140,8 @@ export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThem
   officialHistory: normalizeOfficialHistory(officialHistory),
   remoteThemes: normalizeRemoteThemes(remoteThemes),
   holdings: Array.isArray(holdings) ? holdings : [],
+  industries: Array.isArray(industries) ? industries : [],
+  grandTotal: Array.isArray(grandTotal) ? grandTotal : [],
 });
 
 export const isDetailCacheStale = (entry, now = Date.now()) => {
@@ -286,6 +290,7 @@ export const buildFundDetailModel = ({
   displayedFund,
   totalPortfolioAmount,
   detailEntry,
+  firstTransactionDate,
 }) => {
   if (!sourceFund || !displayedFund) {
     return null;
@@ -326,6 +331,16 @@ export const buildFundDetailModel = ({
     : (sourceFund?.sector ? [sourceFund.sector] : []);
   const holdingDays = getHoldingDays(sourceFund);
 
+  // Compute holding start date strictly based on the earliest valid date of addedDate, holdingStartDate, or firstTransactionDate
+  const addedDate = sourceFund.addedDate || '';
+  const hsDate = sourceFund.holdingStartDate || '';
+  const ftDate = firstTransactionDate || '';
+  const dateCandidates = [addedDate, hsDate, ftDate].filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d));
+  let calculatedHoldingStartDate = '';
+  if (dateCandidates.length > 0) {
+    calculatedHoldingStartDate = dateCandidates.sort((a, b) => a.localeCompare(b))[0];
+  }
+
   return {
     code,
     name: sourceFund.name || displayedFund.name || '未命名基金',
@@ -338,20 +353,24 @@ export const buildFundDetailModel = ({
     unitCost,
     totalCostAmount,
     dailyProfit: Number.isFinite(displayedFund.dailyProfit) ? roundAmount(Number.parseFloat(displayedFund.dailyProfit)) : null,
+    dailyRate: Number.isFinite(displayedFund.dailyRate) ? roundAmount(Number.parseFloat(displayedFund.dailyRate)) : null,
     yesterdayProfit,
     estimatedNetValue: quoteValues.estimatedNetValue,
     latestNetValue,
     relatedThemes,
     isRelatedThemesFallback: !(detailEntry?.remoteThemes?.length > 0),
     holdingDays,
-    holdingStartDate: sourceFund.holdingStartDate || '',
+    holdingStartDate: calculatedHoldingStartDate,
     performance: officialPerformance,
+    officialHistory,
     officialLatestDate: latestOfficialPoint?.date || sourceFund.officialNetValueDate || '',
     officialPreviousDate: previousOfficialPoint?.date || sourceFund.officialPreviousNetValueDate || '',
     quoteUpdateTime: quoteValues.updateTime,
     quoteNetValueDate: quoteValues.netValueDate,
     cacheFetchedAt: detailEntry?.fetchedAt || 0,
     holdings: detailEntry?.holdings || [],
+    industries: detailEntry?.industries || [],
+    grandTotal: detailEntry?.grandTotal || [],
   };
 };
 

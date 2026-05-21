@@ -10,38 +10,41 @@ import {
 describe('fundDetails', () => {
   it('应创建空缓存结构', () => {
     expect(createEmptyDetailCacheStore()).toEqual({
-      version: 1,
+      version: 2,
       entries: {},
     });
   });
 
   it('应将无效存储值标准化为空缓存', () => {
     expect(normalizeStoredDetailCacheStore(null)).toEqual({
-      version: 1,
+      version: 2,
       entries: {},
     });
   });
 
   it('应标准化旧格式 entries 并清洗无效字段', () => {
     const normalized = normalizeStoredDetailCacheStore({
-      '000001': {
-        fetchedAt: 123,
-        quote: {
-          estimatedNetValue: '1.2345',
-          lastNetValue: '1.2000',
-          updateTime: '14:30',
-          netValueDate: '2026-05-14',
+      version: 2,
+      entries: {
+        '000001': {
+          fetchedAt: 123,
+          quote: {
+            estimatedNetValue: '1.2345',
+            lastNetValue: '1.2000',
+            updateTime: '14:30',
+            netValueDate: '2026-05-14',
+          },
+          officialHistory: [
+            { date: '2026-05-13', netValue: '1.21', dailyRate: '1.2' },
+            { date: '2026-05-14', netValue: '1.22', dailyRate: '0.8' },
+            { date: '', netValue: '0' },
+          ],
+          remoteThemes: [' 科技 ', '', '科技'],
         },
-        officialHistory: [
-          { date: '2026-05-13', netValue: '1.21', dailyRate: '1.2' },
-          { date: '2026-05-14', netValue: '1.22', dailyRate: '0.8' },
-          { date: '', netValue: '0' },
-        ],
-        remoteThemes: [' 科技 ', '', '科技'],
       },
     });
 
-    expect(normalized.version).toBe(1);
+    expect(normalized.version).toBe(2);
     expect(normalized.entries['000001']).toMatchObject({
       code: '000001',
       fetchedAt: 123,
@@ -88,7 +91,7 @@ describe('fundDetails', () => {
     });
 
     expect(payload).toEqual({
-      version: 1,
+      version: 2,
       entries: {
         '000001': { code: '000001', fetchedAt: 1 },
       },

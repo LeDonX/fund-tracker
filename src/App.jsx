@@ -6,6 +6,7 @@ import {
   Upload, 
   ArrowRightLeft, 
   TrendingUp,
+  TrendingDown,
   Settings,
   FolderPlus,
   Clock,
@@ -20,6 +21,7 @@ import ImportModal from './components/modals/ImportModal';
 import ExportModal from './components/modals/ExportModal';
 import GroupModal from './components/modals/GroupModal';
 import SyncTradeModal from './components/modals/SyncTradeModal';
+import SyncModal from './components/modals/SyncModal';
 import FundTable from './components/FundTable';
 import AddFundModal from './components/forms/AddFundModal';
 import EditFundModal from './components/forms/EditFundModal';
@@ -214,6 +216,24 @@ const normalizeStoredFund = (fund, index) => {
     officialPreviousNetValueDate: typeof fund.officialPreviousNetValueDate === 'string' ? fund.officialPreviousNetValueDate : '',
     holdingStartDate: typeof fund.holdingStartDate === 'string' ? fund.holdingStartDate : '',
     bootstrapSharesFromAmount: Boolean(fund.bootstrapSharesFromAmount),
+    addedDate: typeof fund.addedDate === 'string' && fund.addedDate ? fund.addedDate : (() => {
+      const numericId = Number(fund.id);
+      if (Number.isFinite(numericId) && numericId > 1000000000000) {
+        const d = new Date(numericId);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      }
+      if (typeof fund.createdAt === 'string' && fund.createdAt) {
+        const parts = fund.createdAt.split(' ');
+        if (parts[0] && /^\d{4}-\d{2}-\d{2}$/.test(parts[0])) {
+          return parts[0];
+        }
+        const tParts = fund.createdAt.split('T');
+        if (tParts[0] && /^\d{4}-\d{2}-\d{2}$/.test(tParts[0])) {
+          return tParts[0];
+        }
+      }
+      return getTodayDateKey();
+    })(),
   };
 };
 
@@ -1023,6 +1043,8 @@ const loadPingzhongData = (fundCode) => {
     const originalStockCodes = window.stockCodesNew;
     const originalStockNames = window.stockNames;
     const originalStockPercent = window.stockPercent;
+    const originalTrend = window.Data_netWorthTrend;
+    const originalGrandTotal = window.Data_grandTotal;
 
     const cleanup = () => {
       window.clearTimeout(timeoutId);
@@ -1048,13 +1070,28 @@ const loadPingzhongData = (fundCode) => {
         const stockCodes = window.stockCodesNew || [];
         const stockNames = window.stockNames || [];
         const stockPercent = window.stockPercent || [];
+        const grandTotal = window.Data_grandTotal || [];
+
+        let netWorthTrend = [];
+        if (Array.isArray(window.Data_netWorthTrend)) {
+          netWorthTrend = window.Data_netWorthTrend.map(p => {
+            const d = new Date(p.x);
+            return {
+              date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+              netValue: p.y,
+              dailyRate: p.equityReturn,
+            };
+          }).reverse();
+        }
 
         window.stockCodesNew = originalStockCodes;
         window.stockNames = originalStockNames;
         window.stockPercent = originalStockPercent;
+        window.Data_netWorthTrend = originalTrend;
+        window.Data_grandTotal = originalGrandTotal;
 
         cleanup();
-        resolve({ stockCodes, stockNames, stockPercent });
+        resolve({ stockCodes, stockNames, stockPercent, netWorthTrend, grandTotal });
       } catch (err) {
         cleanup();
         resolve(null);
@@ -1073,15 +1110,33 @@ const loadPingzhongData = (fundCode) => {
 
 const fetchFundDetailRemoteData = async (fundCode) => {
   const normalizedCode = String(fundCode || '').trim();
-  const [quoteResult, historyResult, holdingsResult] = await Promise.allSettled([
+
+  const fetchIndustry = async () => {
+    try {
+      const res = await fetch(`/api/fund-industry?code=${normalizedCode}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn("无法从 Pages 接口获取真实行业分布", e);
+    }
+    return [];
+  };
+
+  const [quoteResult, historyResult, holdingsResult, industryResult] = await Promise.allSettled([
     enqueueTiantianFundQuote(normalizedCode),
     enqueueEastmoneyOfficialHistoryRange(normalizedCode),
     loadPingzhongData(normalizedCode),
+    fetchIndustry(),
   ]);
 
   const quote = quoteResult.status === 'fulfilled' ? quoteResult.value : null;
-  const officialHistory = historyResult.status === 'fulfilled' ? historyResult.value.history : [];
   const holdingsData = holdingsResult.status === 'fulfilled' ? holdingsResult.value : null;
+  const industries = industryResult.status === 'fulfilled' ? industryResult.value : [];
+  
+  const officialHistory = (holdingsData && holdingsData.netWorthTrend && holdingsData.netWorthTrend.length > 0)
+    ? holdingsData.netWorthTrend
+    : (historyResult.status === 'fulfilled' ? historyResult.value.history : []);
 
   if (!quote && officialHistory.length === 0) {
     const quoteError = quoteResult.status === 'rejected' ? quoteResult.reason?.message : '';
@@ -1109,6 +1164,8 @@ const fetchFundDetailRemoteData = async (fundCode) => {
     officialHistory,
     remoteThemes: [],
     holdings,
+    industries,
+    grandTotal: holdingsData?.grandTotal || [],
   });
 };
 
@@ -1243,26 +1300,148 @@ const alignFundSharesToDisplayedAmount = (fund, targetAmount) => {
 
 export default function FundTrackerApp() {
   
-  // Auth Guard
-  useEffect(() => {
-    // Skip auth guard during local dev on port 5173
-    if (window.location.port === '5173') {
-      return;
-    }
-    fetch('/api/auth/me?_t=' + Date.now(), {
-      cache: 'no-store',
-      headers: {
-        'Pragma': 'no-cache',
-        'Cache-Control': 'no-cache'
-      }
-    })
-      .then(res => {
-        if (res.status === 401) {
-          window.location.href = '/login.html';
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, success, error
+  const [localDataStats, setLocalDataStats] = useState({ fundsCount: 0, txsCount: 0 });
+
+  async function loadCloudData() {
+    try {
+      const [fundsRes, txsRes] = await Promise.all([
+        fetch('/api/funds?_t=' + Date.now()),
+        fetch('/api/transactions?_t=' + Date.now())
+      ]);
+      
+      if (fundsRes.ok && txsRes.ok) {
+        const fundsData = await fundsRes.json();
+        const txsData = await txsRes.json();
+        
+        if (fundsData?.success && Array.isArray(fundsData.funds)) {
+          setFunds(normalizeStoredFunds(fundsData.funds));
         }
-      })
-      .catch(() => {});
+        if (txsData?.success && Array.isArray(txsData.transactions)) {
+          setTransactions(normalizeStoredTransactionStore(txsData.transactions).entries);
+        }
+      }
+    } catch (err) {
+      console.error('加载云端数据失败:', err);
+    }
+  }
+
+  // Session detection & cloud fetch & sync logic
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const res = await fetch('/api/auth/me?_t=' + Date.now(), {
+          cache: 'no-store',
+          headers: {
+            'Pragma': 'no-cache',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        if (res.status === 401) {
+          // If port is not 5173, redirect to login page
+          if (window.location.port !== '5173') {
+            window.location.href = '/login.html';
+          }
+          return;
+        }
+        
+        if (res.ok) {
+          const authData = await res.json();
+          if (authData?.success && authData?.user) {
+            const loggedInEmail = authData.user.email;
+            setUser(authData.user);
+            setIsAuthenticated(true);
+            
+            // Check if local data needs syncing
+            const localFunds = readStoredJson('fundTrackerData', []);
+            const localTxs = loadTransactions();
+            const syncedUser = localStorage.getItem('fundTrackerSyncedUser');
+            
+            if (syncedUser !== loggedInEmail && (localFunds.length > 0 || localTxs.length > 0)) {
+              // Open the premium sync modal!
+              setLocalDataStats({ fundsCount: localFunds.length, txsCount: localTxs.length });
+              setShowSyncModal(true);
+            } else {
+              // Already synced or no local data, directly load from D1
+              await loadCloudData();
+              localStorage.setItem('fundTrackerSyncedUser', loggedInEmail);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Session check failed:', err);
+      }
+    }
+    
+    checkSession();
   }, []);
+
+  const handleMergeToCloud = async () => {
+    setSyncStatus('syncing');
+    try {
+      const localFunds = readStoredJson('fundTrackerData', []);
+      const localTxs = loadTransactions();
+      
+      const response = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          funds: localFunds,
+          transactions: localTxs
+        })
+      });
+      
+      if (response.ok) {
+        setSyncStatus('success');
+        if (user?.email) {
+          localStorage.setItem('fundTrackerSyncedUser', user.email);
+        }
+        // Backup local storage before clearing
+        localStorage.setItem('fundTrackerData_backup_' + Date.now(), JSON.stringify(localFunds));
+        localStorage.setItem('fundTrackerTransactions_backup_' + Date.now(), JSON.stringify(localTxs));
+        
+        // Fetch fresh merged data from D1 and set to state
+        await loadCloudData();
+        
+        setTimeout(() => {
+          setShowSyncModal(false);
+          setSyncStatus('idle');
+        }, 1500);
+      } else {
+        const errData = await response.json();
+        alert(`同步失败: ${errData.error || '未知错误'}`);
+        setSyncStatus('error');
+      }
+    } catch (err) {
+      console.error('Sync failed:', err);
+      alert(`网络错误，同步失败: ${err.message}`);
+      setSyncStatus('error');
+    }
+  };
+
+  const handleOverwriteWithCloud = async () => {
+    setSyncStatus('syncing');
+    try {
+      if (user?.email) {
+        localStorage.setItem('fundTrackerSyncedUser', user.email);
+      }
+      // Overwrite state directly from D1
+      await loadCloudData();
+      setSyncStatus('success');
+      setTimeout(() => {
+        setShowSyncModal(false);
+        setSyncStatus('idle');
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to overwrite with cloud:', err);
+      alert('从云端拉取数据失败，请检查网络');
+      setSyncStatus('idle');
+    }
+  };
 
   const handleLogout = async () => {
     // If running in local Vite development mode, bypass backend call and redirect
@@ -1273,6 +1452,8 @@ export default function FundTrackerApp() {
     try {
       const res = await fetch('/api/auth/me', { method: 'POST' });
       if (res.ok) {
+        // Clear synced user flag on logout
+        localStorage.removeItem('fundTrackerSyncedUser');
         window.location.href = '/login.html';
       } else {
         alert('退出登录失败，请重试');
@@ -1336,6 +1517,15 @@ export default function FundTrackerApp() {
   useEffect(() => {
     localStorage.setItem(DATA_SOURCE_STORAGE_KEY, JSON.stringify(selectedDataSource));
   }, [selectedDataSource]);
+
+  const [showTabProfit, setShowTabProfit] = useState(() => {
+    const stored = localStorage.getItem('fundTrackerShowTabProfit');
+    return stored !== null ? JSON.parse(stored) : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('fundTrackerShowTabProfit', JSON.stringify(showTabProfit));
+  }, [showTabProfit]);
 
   const [modals, setModals] = useState({
     group: false, fund: false, sync: false, import: false, export: false, history: false, settings: false
@@ -1581,6 +1771,41 @@ export default function FundTrackerApp() {
     };
   }, [displayedFunds, sectors]);
 
+  // 监听当日盈亏状态和隐私设置，实时同步更新网页标题和 Favicon 页签图标
+  useEffect(() => {
+    const baseTitle = '智能基金追踪';
+
+    // 1. 动态更新网页标题 (Title) - 仅当开启时显示涨跌金额，否则为默认标题
+    if (showTabProfit && totalDailyProfit !== null && totalDailyProfit !== undefined && Number.isFinite(totalDailyProfit)) {
+      const sign = totalDailyProfit > 0 ? '+' : '';
+      document.title = `${sign}${totalDailyProfit.toFixed(2)}元 | ${baseTitle}`;
+    } else {
+      document.title = baseTitle;
+    }
+
+    // 2. 动态更新页签图标 (Favicon) - 始终保持红涨绿跌动态趋势，不受隐私开关影响
+    const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+    link.type = 'image/svg+xml';
+    link.rel = 'icon';
+
+    let svgContent = '';
+    if (totalDailyProfit > 0) {
+      // 盈利：红色上涨趋势箭头
+      svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`;
+    } else if (totalDailyProfit < 0) {
+      // 亏损：绿色下跌趋势箭头
+      svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>`;
+    } else {
+      // 平盘或加载中：灰色上涨趋势箭头
+      svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`;
+    }
+
+    link.href = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
+    if (!document.querySelector("link[rel~='icon']")) {
+      document.getElementsByTagName('head')[0].appendChild(link);
+    }
+  }, [totalDailyProfit, showTabProfit]);
+
   const activeDetailSourceFund = useMemo(() => {
     if (!detailView.code) return null;
     return funds.find((fund) => String(fund.code || '').trim() === detailView.code) ?? null;
@@ -1599,13 +1824,19 @@ export default function FundTrackerApp() {
   const activeDetailModel = useMemo(() => {
     if (!activeDetailSourceFund || !activeDetailDisplayedFund) return null;
 
+    const fundTransactions = transactions.filter(t => t.fundCode === activeDetailSourceFund.code);
+    const firstTransactionDate = fundTransactions.length > 0 
+      ? [...fundTransactions].sort((a, b) => (a.tradeDate || '').localeCompare(b.tradeDate || ''))[0]?.tradeDate 
+      : null;
+
     return buildFundDetailModel({
       sourceFund: activeDetailSourceFund,
       displayedFund: activeDetailDisplayedFund,
       totalPortfolioAmount: totalAmount,
       detailEntry: activeDetailEntry,
+      firstTransactionDate,
     });
-  }, [activeDetailDisplayedFund, activeDetailEntry, activeDetailSourceFund, totalAmount]);
+  }, [activeDetailDisplayedFund, activeDetailEntry, activeDetailSourceFund, totalAmount, transactions]);
 
   const orderedGroups = useMemo(() => {
     const customGroups = sectors
@@ -1680,9 +1911,9 @@ export default function FundTrackerApp() {
   const handleOpenFundDetail = useCallback((fund) => {
     const normalizedCode = String(fund?.code || fund?.sourceFund?.code || '').trim();
     if (!normalizedCode) return;
-
-    setDetailView({ isOpen: true, code: normalizedCode });
-    void refreshFundDetail(normalizedCode);
+    setSelectedFund(fund);
+    setDetailView({ isOpen: true, code: fund.code });
+    refreshFundDetail(fund.code, { force: true });
   }, [refreshFundDetail]);
 
   const handleCloseFundDetail = useCallback(() => {
@@ -2017,6 +2248,7 @@ export default function FundTrackerApp() {
       weeklyProfit: roundAmount(toNumber(fundForm.weeklyProfit)),
       monthlyProfit: roundAmount(toNumber(fundForm.monthlyProfit)),
       holdingStartDate: holdingStartDate,
+      addedDate: getTodayDateKey(),
     };
 
     let newFund = buildFundSnapshot(baseFund);
@@ -2053,6 +2285,34 @@ export default function FundTrackerApp() {
       };
     } else {
       newFund = buildFundSnapshot(newFund);
+    }
+
+    if (isAuthenticated) {
+      try {
+        const response = await fetch('/api/funds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: newFund.id,
+            code: newFund.code,
+            name: newFund.name,
+            sector: newFund.sector,
+            quoteSource: newFund.quoteSource,
+            holdingStartDate: newFund.holdingStartDate,
+            bootstrapSharesFromAmount: newFund.bootstrapSharesFromAmount,
+            shares: newFund.shares,
+            costAmount: newFund.costAmount
+          })
+        });
+        if (!response.ok) {
+          const errData = await response.json();
+          alert(`新增基金同步至云端失败: ${errData.error || '未知错误'}`);
+          return;
+        }
+      } catch (err) {
+        alert(`新增基金同步至云端失败，请检查网络: ${err.message}`);
+        return;
+      }
     }
 
     setFunds(prev => [...prev, newFund]);
@@ -2124,12 +2384,54 @@ export default function FundTrackerApp() {
       tradeImpact,
     });
 
+    const updatedFund = applyTradeToFund(targetFund, tradePayload, quote, finalTradeDate);
+
+    if (isAuthenticated) {
+      try {
+        if (transactionRecord) {
+          const txRes = await fetch('/api/transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(transactionRecord)
+          });
+          if (!txRes.ok) {
+            const errData = await txRes.json();
+            alert(`交易记录同步至云端失败: ${errData.error || '未知错误'}`);
+            return;
+          }
+        }
+
+        const fundRes = await fetch('/api/funds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: updatedFund.id,
+            code: updatedFund.code,
+            name: updatedFund.name,
+            sector: updatedFund.sector,
+            quoteSource: updatedFund.quoteSource,
+            holdingStartDate: updatedFund.holdingStartDate,
+            bootstrapSharesFromAmount: updatedFund.bootstrapSharesFromAmount,
+            shares: updatedFund.shares,
+            costAmount: updatedFund.costAmount
+          })
+        });
+        if (!fundRes.ok) {
+          const errData = await fundRes.json();
+          alert(`持仓配置同步至云端失败: ${errData.error || '未知错误'}`);
+          return;
+        }
+      } catch (err) {
+        alert(`同步交易失败，请检查网络: ${err.message}`);
+        return;
+      }
+    }
+
     setFunds((currentFunds) => currentFunds.map((fund) => {
       if (fund.id !== targetFund.id) {
         return fund;
       }
-
-      return applyTradeToFund(fund, tradePayload, quote, finalTradeDate);
+      return updatedFund;
     }));
 
     if (transactionRecord) {
@@ -2334,6 +2636,34 @@ export default function FundTrackerApp() {
 
     const updatedTarget = nextFunds.find((fund) => fund.id === editForm.id);
     if (updatedTarget) {
+      if (isAuthenticated) {
+        try {
+          const response = await fetch('/api/funds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: updatedTarget.id,
+              code: updatedTarget.code,
+              name: updatedTarget.name,
+              sector: updatedTarget.sector,
+              quoteSource: updatedTarget.quoteSource,
+              holdingStartDate: updatedTarget.holdingStartDate,
+              bootstrapSharesFromAmount: updatedTarget.bootstrapSharesFromAmount,
+              shares: updatedTarget.shares,
+              costAmount: updatedTarget.costAmount
+            })
+          });
+          if (!response.ok) {
+            const errData = await response.json();
+            alert(`更新配置同步至云端失败: ${errData.error || '未知错误'}`);
+            return;
+          }
+        } catch (err) {
+          alert(`更新配置同步至云端失败，请检查网络: ${err.message}`);
+          return;
+        }
+      }
+
       setFunds((currentFunds) => currentFunds.map((fund) => (
         fund.id === editForm.id ? updatedTarget : fund
       )));
@@ -2341,10 +2671,27 @@ export default function FundTrackerApp() {
     closeModal('settings');
   };
 
-  const handleDeleteFund = () => {
+  const handleDeleteFund = async () => {
     if (detailView.code && String(editForm.code || '').trim() === detailView.code) {
       handleCloseFundDetail();
     }
+
+    if (isAuthenticated) {
+      try {
+        const response = await fetch(`/api/funds?code=${editForm.code}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) {
+          const errData = await response.json();
+          alert(`删除自选同步至云端失败: ${errData.error || '未知错误'}`);
+          return;
+        }
+      } catch (err) {
+        alert(`删除自选同步至云端失败，请检查网络: ${err.message}`);
+        return;
+      }
+    }
+
     setFunds((currentFunds) => currentFunds.filter((fund) => fund.id !== editForm.id));
     closeModal('settings');
   };
@@ -2361,7 +2708,13 @@ export default function FundTrackerApp() {
 
           <div className="relative z-10">
             <h1 className="text-2xl font-black text-white flex items-center gap-2 tracking-tight">
-              <TrendingUp className="text-emerald-400 w-8 h-8 filter drop-shadow-[0_2px_8px_rgba(52,211,153,0.3)] animate-pulse" />
+              {totalDailyProfit > 0 ? (
+                <TrendingUp className="text-rose-400 w-8 h-8 filter drop-shadow-[0_2px_8px_rgba(251,113,133,0.3)] animate-pulse" />
+              ) : totalDailyProfit < 0 ? (
+                <TrendingDown className="text-emerald-400 w-8 h-8 filter drop-shadow-[0_2px_8px_rgba(52,211,153,0.3)] animate-pulse" />
+              ) : (
+                <TrendingUp className="text-slate-400 w-8 h-8 filter drop-shadow-[0_2px_8px_rgba(148,163,184,0.3)] animate-pulse" />
+              )}
               <span>智能基金追踪</span> 
               <span className="text-xs font-bold text-slate-300 ml-2 bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700">PRO V1.5.0</span>
             </h1>
@@ -2376,23 +2729,16 @@ export default function FundTrackerApp() {
           </div>
           
           <div className="flex flex-wrap gap-8 lg:gap-10 mt-6 lg:mt-0 relative z-10 w-full lg:w-auto justify-between lg:justify-end">
-            <div className="flex flex-col items-end">
-              <span className="text-slate-400 text-xs mb-1 font-medium tracking-wide uppercase">总资产金额 (元)</span>
-              <span className="text-2xl lg:text-3xl font-extrabold text-white font-mono tracking-tight">
+            <div className="flex flex-col items-end flex-shrink-0">
+              <span className="text-slate-400 text-xs mb-1 font-medium tracking-wide uppercase whitespace-nowrap">总资产金额 (元)</span>
+              <span className="text-2xl lg:text-3xl font-extrabold text-white font-mono tracking-tight whitespace-nowrap">
                 {formatCurrencyAmount(totalAmount)}{hasIncompleteAmount && <span className="ml-1 text-amber-400/70 text-base font-medium cursor-help" title="部分基金数据加载中，此处为已更新基金资产之和">*</span>}
               </span>
             </div>
             <div className="hidden lg:block w-px bg-slate-700/60 h-12 self-center"></div>
-            <div className="flex flex-col items-end">
-              <span className="text-slate-400 text-xs mb-1 font-medium tracking-wide uppercase">累计总收益</span>
-              <span className="text-xl lg:text-2xl font-bold font-mono">
-                <FormatNumber value={totalProfit} isCurrency={true} />{hasIncompleteProfit && <span className="ml-1 text-amber-400/70 text-sm font-medium cursor-help" title="部分基金数据加载中，此处为已更新基金收益之和">*</span>}
-              </span>
-            </div>
-            <div className="hidden lg:block w-px bg-slate-700/60 h-12 self-center"></div>
-            <div className="flex flex-col items-end">
-              <span className="text-slate-400 text-xs mb-1 font-medium tracking-wide uppercase">{dailySummaryLabel}</span>
-              <span className="text-3xl lg:text-4xl font-black font-mono filter drop-shadow-sm">
+            <div className="flex flex-col items-end flex-shrink-0">
+              <span className="text-slate-400 text-xs mb-1 font-medium tracking-wide uppercase whitespace-nowrap">{dailySummaryLabel}</span>
+              <span className="text-3xl lg:text-4xl font-black font-mono filter drop-shadow-sm whitespace-nowrap">
                 <FormatNumber value={totalDailyProfit} isCurrency={true} />{hasIncompleteDaily && <span className="ml-1 text-amber-400/70 text-lg font-medium cursor-help" title="部分基金数据加载中，此处为已更新基金收益之和">*</span>}
               </span>
             </div>
@@ -2427,6 +2773,15 @@ export default function FundTrackerApp() {
               </select>
               <span className="text-slate-400 font-medium">{valuationSourceHint || '按所选数据源展示'}</span>
             </div>
+            <label className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-500 gap-2 shadow-inner cursor-pointer hover:bg-slate-100/70 transition-all select-none">
+              <input
+                type="checkbox"
+                checked={showTabProfit}
+                onChange={(e) => setShowTabProfit(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span className="font-bold text-slate-600">显示页签金额</span>
+            </label>
             <button type="button" onClick={handleOpenImportModal} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 text-xs border border-slate-200 hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0 shadow-sm hover:shadow-md">
               <Upload className="w-4 h-4" /> 导入
             </button>
@@ -2581,6 +2936,16 @@ export default function FundTrackerApp() {
         setEditForm={setEditForm}
         sectors={sectors}
         toNumber={toNumber}
+      />
+
+      <SyncModal
+        isOpen={showSyncModal}
+        onClose={handleLogout}
+        onMerge={handleMergeToCloud}
+        onOverwrite={handleOverwriteWithCloud}
+        syncStatus={syncStatus}
+        localFundsCount={localDataStats.fundsCount}
+        localTxsCount={localDataStats.txsCount}
       />
     </div>
   </div>

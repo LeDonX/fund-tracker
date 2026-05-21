@@ -1,0 +1,20 @@
+# Cloudflare Wrangler Configuration File for Fund Tracker Pro
+# This configuration is used for deploying to Cloudflare Pages with Cloudflare D1 Database binding.
+
+name = "fund-tracker"
+pages_build_output_dir = "dist"
+
+# Compatibility date for Cloudflare Workers runtime features
+compatibility_date = "2024-03-01"
+
+# D1 Database Bindings
+# Bind a D1 database so that functions under /functions/api can access it using env.DB
+[[d1_databases]]
+binding = "DB"                                   # Must match the binding name used in code (env.DB)
+database_name = "fund-tracker"          # Change to your Cloudflare D1 database name
+database_id = "a7d058ff-99aa-4e63-a4db-33737b38b906"              # Change to your Cloudflare D1 database ID (UUID)
+
+# Local Development Settings
+[vars]
+# You can define global environment variables here, like a custom JWT secret for local dev:
+# JWT_SECRET = "your-custom-jwt-secret-key-goes-here"
