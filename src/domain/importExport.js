@@ -8,6 +8,7 @@ export const buildExportBundle = ({
   sectors,
   detailCache,
   transactions,
+  dailyProfits,
 }) => ({
   version: EXPORT_BUNDLE_VERSION,
   exportedAt: Date.now(),
@@ -19,6 +20,7 @@ export const buildExportBundle = ({
       ? detailCache
       : { version: 1, entries: {} },
     transactions: toArray(transactions),
+    dailyProfits: toArray(dailyProfits),
   },
 });
 
@@ -47,6 +49,10 @@ export const validateImportBundle = (payload) => {
     return { ok: false, error: '导入文件中的 transactions 必须是数组。' };
   }
 
+  if (payload.data.dailyProfits !== undefined && !Array.isArray(payload.data.dailyProfits)) {
+    return { ok: false, error: '导入文件中的 dailyProfits 必须是数组。' };
+  }
+
   return { ok: true, error: '' };
 };
 
@@ -54,6 +60,7 @@ export const buildImportPreview = (payload) => {
   const funds = toArray(payload?.data?.funds);
   const sectors = toArray(payload?.data?.sectors);
   const transactions = toArray(payload?.data?.transactions);
+  const dailyProfits = toArray(payload?.data?.dailyProfits);
   const detailCacheEntries = payload?.data?.detailCache?.entries;
 
   return {
@@ -62,6 +69,7 @@ export const buildImportPreview = (payload) => {
     fundsCount: funds.length,
     sectorsCount: sectors.length,
     transactionsCount: transactions.length,
+    dailyProfitsCount: dailyProfits.length,
     detailCacheCount: detailCacheEntries && typeof detailCacheEntries === 'object'
       ? Object.keys(detailCacheEntries).length
       : 0,
@@ -109,6 +117,29 @@ export const mergeTransactionsById = (currentTransactions, incomingTransactions)
       existingIds.add(normalizedId);
     }
     merged.push(transaction);
+  });
+
+  return merged;
+};
+
+export const mergeDailyProfitsByDateAndCode = (currentProfits, incomingProfits) => {
+  const merged = [...toArray(currentProfits)];
+  const existingKeys = new Set(
+    merged.map((dp) => `${String(dp?.fundCode || '').trim()}_${String(dp?.date || '').trim()}`)
+  );
+
+  toArray(incomingProfits).forEach((dp) => {
+    const code = String(dp?.fundCode || '').trim();
+    const date = String(dp?.date || '').trim();
+    const key = `${code}_${date}`;
+    if (code && date && existingKeys.has(key)) {
+      return;
+    }
+
+    if (code && date) {
+      existingKeys.add(key);
+    }
+    merged.push(dp);
   });
 
   return merged;

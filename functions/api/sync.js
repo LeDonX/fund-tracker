@@ -45,7 +45,7 @@ export async function onRequestPost(context) {
       // Column already exists — ignore "duplicate column" errors
     }
 
-    const { funds, transactions } = await request.json();
+    const { funds, transactions, dailyProfits } = await request.json();
     const statements = [];
 
     // 1. Prepare batch statements for funds
@@ -122,12 +122,32 @@ export async function onRequestPost(context) {
       }
     }
 
-    // 3. Execute batch atomically
+    // 3. Prepare batch statements for daily profits
+    if (Array.isArray(dailyProfits)) {
+      const dpStmt = env.DB.prepare(`
+        INSERT INTO user_fund_daily_profits (id, user_id, fund_code, date, daily_profit)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, fund_code, date) DO UPDATE SET
+          daily_profit = excluded.daily_profit
+      `);
+
+      for (const dp of dailyProfits) {
+        if (!dp.fundCode || !dp.date || dp.dailyProfit === undefined) continue;
+        const id = dp.id ? String(dp.id) : `dp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const fundCode = String(dp.fundCode).trim();
+        const date = String(dp.date).trim();
+        const dailyProfit = Number(dp.dailyProfit);
+
+        statements.push(dpStmt.bind(id, user.id, fundCode, date, dailyProfit));
+      }
+    }
+
+    // 4. Execute batch atomically
     if (statements.length > 0) {
       await env.DB.batch(statements);
     }
 
-    return apiResponse({ success: true, message: `成功同步 ${funds?.length || 0} 个自选基金和 ${transactions?.length || 0} 条交易记录` });
+    return apiResponse({ success: true, message: `成功同步 ${funds?.length || 0} 个自选基金、${transactions?.length || 0} 条交易记录和 ${dailyProfits?.length || 0} 条收益历史` });
   } catch (error) {
     return apiResponse({ error: `批量同步数据失败: ${error.message}` }, 500);
   }

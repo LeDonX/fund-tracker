@@ -143,6 +143,16 @@ export async function onRequestDelete(context) {
       "DELETE FROM user_funds WHERE user_id = ? AND code = ?"
     ).bind(user.id, code).run();
 
+    // Also delete any associated daily profit history
+    try {
+      await env.DB.prepare(
+        "DELETE FROM user_fund_daily_profits WHERE user_id = ? AND fund_code = ?"
+      ).bind(user.id, code).run();
+    } catch (err) {
+      // Ignore if table does not exist yet (handles case before user runs migration)
+      console.warn("清除收益记录失败(可能表尚未创建):", err.message);
+    }
+
     return apiResponse({ success: true, message: "删除自选基金成功" });
   } catch (error) {
     return apiResponse({ error: `删除自选基金失败: ${error.message}` }, 500);

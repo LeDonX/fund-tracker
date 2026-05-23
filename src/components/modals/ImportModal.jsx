@@ -58,6 +58,7 @@ export default function ImportModal({
                 <div className="rounded-lg bg-slate-50 px-3 py-2">分组数量：<span className="font-medium text-slate-800">{importState.preview.sectorsCount}</span></div>
                 <div className="rounded-lg bg-slate-50 px-3 py-2">交易流水：<span className="font-medium text-slate-800">{importState.preview.transactionsCount}</span></div>
                 <div className="rounded-lg bg-slate-50 px-3 py-2">详情缓存：<span className="font-medium text-slate-800">{importState.preview.detailCacheCount}</span></div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2 col-span-2">收益历史：<span className="font-medium text-slate-800">{importState.preview.dailyProfitsCount ?? 0} 条</span></div>
               </div>
               <p className="mt-3 text-xs text-slate-400">
                 包来源：{importState.preview.app || '未知'}{Number.isFinite(importState.preview.version) ? ` · 版本 ${importState.preview.version}` : ''}

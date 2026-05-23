@@ -9,10 +9,52 @@ export default function SyncTradeModal({
   syncForm,
   onChange,
 }) {
+  const amountRef = React.useRef(null);
+
   const selectedType = syncForm.type || '买入';
   const confirmTime = syncForm.confirmTime || 'before15';
   const amountVal = Number.parseFloat(syncForm.amount) || 0;
   const feeVal = Number.parseFloat(syncForm.fee) || 0;
+
+  React.useEffect(() => {
+    if (isOpen && syncForm.code) {
+      const timer = setTimeout(() => {
+        amountRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, syncForm.code]);
+
+  React.useEffect(() => {
+    if (selectedType === '买入' && syncForm.feeRate && syncForm.amount) {
+      const rateCleaned = String(syncForm.feeRate).replace(/%/g, '').trim();
+      const rateVal = Number.parseFloat(rateCleaned);
+      const amountVal = Number.parseFloat(syncForm.amount);
+      if (Number.isFinite(rateVal) && Number.isFinite(amountVal) && amountVal > 0) {
+        const rateFactor = rateVal / 100;
+        const calculatedFee = amountVal - (amountVal / (1 + rateFactor));
+        
+        onChange(prev => {
+          const currentFeeVal = Number.parseFloat(prev.fee);
+          const diff = Math.abs((currentFeeVal || 0) - calculatedFee);
+          if (!prev.fee || diff < 0.5) {
+            return {
+              ...prev,
+              fee: calculatedFee.toFixed(2),
+            };
+          }
+          return prev;
+        });
+      }
+    } else if (selectedType === '卖出') {
+      onChange(prev => {
+        if (prev.fee === undefined || prev.fee === '') {
+          return { ...prev, fee: '0' };
+        }
+        return prev;
+      });
+    }
+  }, [syncForm.amount, selectedType, syncForm.feeRate, onChange]);
 
   const handleTypeChange = (type) => {
     onChange({
@@ -36,16 +78,7 @@ export default function SyncTradeModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="同步与登记交易" maxWidth="max-w-md">
-      {/* 财务折算提示 */}
-      <div className="bg-slate-50 text-slate-700 p-4 rounded-2xl border border-slate-150 flex items-start gap-2.5 mb-4 text-xs font-medium leading-relaxed shadow-sm">
-        <AlertCircle className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <p className="font-extrabold text-slate-800 font-sans">交易智能核算说明：</p>
-          <p>
-            登记此交易后，系统将使用该时刻的参考净值将交易金额折算为份额，并同步修正您当前的<strong>持有份额</strong>与<strong>持仓成本本金</strong>。
-          </p>
-        </div>
-      </div>
+
 
       <form onSubmit={onSubmit} className="space-y-4">
         {/* 1. 目标基金代码 */}
@@ -92,6 +125,7 @@ export default function SyncTradeModal({
             <label htmlFor="sync-amount" className="block text-xs font-bold text-slate-600 mb-1.5">发生金额 (元)</label>
             <input
               id="sync-amount"
+              ref={amountRef}
               type="number"
               min="0.01"
               step="0.01"
@@ -103,7 +137,14 @@ export default function SyncTradeModal({
             />
           </div>
           <div>
-            <label htmlFor="sync-fee" className="block text-xs font-bold text-slate-600 mb-1.5">交易手续费 (元)</label>
+            <label htmlFor="sync-fee" className="block text-xs font-bold text-slate-600 mb-1.5 flex items-center justify-between">
+              <span>交易手续费 (元)</span>
+              {selectedType === '买入' && syncForm.feeRate && (
+                <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
+                  折算费率: {syncForm.feeRate}
+                </span>
+              )}
+            </label>
             <input
               id="sync-fee"
               type="number"
@@ -155,18 +196,7 @@ export default function SyncTradeModal({
           </div>
         </div>
 
-        {/* 6. 财务规则动态面板 */}
-        {isAmountValid && (
-          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-150 text-[11px] leading-relaxed text-slate-500 flex gap-2">
-            <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-            <span>
-              {selectedType === '买入' 
-                ? `买入操作：持仓本金增加 ¥${amountVal.toFixed(2)}。在扣除手续费 ¥${feeVal.toFixed(2)} 后，剩余 ¥${(amountVal - feeVal).toFixed(2)} 将折算为份额追加进您的持仓。`
-                : `卖出操作：卖出资产价值 ¥${amountVal.toFixed(2)}，持仓份额和持仓成本将按比例同步扣减。实际返还您的现金额为 ¥${(amountVal - feeVal).toFixed(2)}（已扣除手续费 ¥${feeVal.toFixed(2)}）。`
-              }
-            </span>
-          </div>
-        )}
+
 
         {/* 底部按钮栏 */}
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">

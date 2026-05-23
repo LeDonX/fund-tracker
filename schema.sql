@@ -57,3 +57,17 @@ CREATE TABLE IF NOT EXISTS fund_industry_cache (
     data_json TEXT NOT NULL,
     last_scraped_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 5. Daily Profits Table (Daily performance logs per fund per user)
+CREATE TABLE IF NOT EXISTS user_fund_daily_profits (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    fund_code TEXT NOT NULL,
+    date TEXT NOT NULL, -- Format: YYYY-MM-DD
+    daily_profit REAL NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, fund_code, date)
+);
+CREATE INDEX IF NOT EXISTS idx_user_fund_daily_profits_lookup ON user_fund_daily_profits(user_id, fund_code, date);
+

@@ -10,6 +10,7 @@ export default function ExportModal({
   sectorsCount,
   transactionsCount,
   detailCacheCount,
+  dailyProfitsCount,
 }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="导出基金数据">
@@ -20,6 +21,7 @@ export default function ExportModal({
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">分组：<span className="font-medium text-slate-800">{sectorsCount}</span></div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">交易：<span className="font-medium text-slate-800">{transactionsCount}</span></div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">详情缓存：<span className="font-medium text-slate-800">{detailCacheCount}</span></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 col-span-2">收益历史：<span className="font-medium text-slate-800">{dailyProfitsCount} 条</span></div>
         </div>
       </div>
       <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 mt-6">

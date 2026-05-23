@@ -10,7 +10,9 @@ import {
   Settings,
   FolderPlus,
   Clock,
-  LogOut
+  LogOut,
+  ChevronDown,
+  Camera
 } from 'lucide-react';
 import Sortable from 'sortablejs';
 import FormatNumber from './components/common/FormatNumber';
@@ -22,6 +24,7 @@ import ExportModal from './components/modals/ExportModal';
 import GroupModal from './components/modals/GroupModal';
 import SyncTradeModal from './components/modals/SyncTradeModal';
 import SyncModal from './components/modals/SyncModal';
+import OcrSyncModal from './components/modals/OcrSyncModal';
 import FundTable from './components/FundTable';
 import AddFundModal from './components/forms/AddFundModal';
 import EditFundModal from './components/forms/EditFundModal';
@@ -52,6 +55,7 @@ import {
   mergeStringArrays,
   mergeTransactionsById,
   validateImportBundle,
+  mergeDailyProfitsByDateAndCode,
 } from './domain/importExport';
 
 // --- 初始分组数据 ---
@@ -801,7 +805,8 @@ const loadTiantianFundQuote = (fundCode) => {
 
       const fallbackScript = document.createElement('script');
       fallbackScript.id = scriptId;
-      fallbackScript.src = `https://fundgz.1234567.com.cn/js/${normalizedCode}.js?rt=${Date.now()}`;
+      // 备用加载东方财富主域名 (已关停该接口并返回 HTML，仅做极端情况保留)
+      fallbackScript.src = `https://fundgz.eastmoney.com/js/${normalizedCode}.js?rt=${Date.now()}`;
       fallbackScript.async = true;
 
       fallbackScript.onload = () => {
@@ -825,8 +830,8 @@ const loadTiantianFundQuote = (fundCode) => {
 
     const script = document.createElement('script');
     script.id = scriptId;
-    // 优先加载东方财富主域名
-    script.src = `https://fundgz.eastmoney.com/js/${normalizedCode}.js?rt=${Date.now()}`;
+    // 优先加载天天基金域名 (更稳定且正常返回 JS 格式的 JSONP 数据)
+    script.src = `https://fundgz.1234567.com.cn/js/${normalizedCode}.js?rt=${Date.now()}`;
     script.async = true;
 
     script.onload = () => {
@@ -1045,10 +1050,14 @@ const loadPingzhongData = (fundCode) => {
     const originalStockPercent = window.stockPercent;
     const originalTrend = window.Data_netWorthTrend;
     const originalGrandTotal = window.Data_grandTotal;
+    const originalFundRate = window.fund_Rate;
+    const originalFundSourceRate = window.fund_sourceRate;
 
     const cleanup = () => {
       window.clearTimeout(timeoutId);
       document.getElementById(scriptId)?.remove();
+      window.fund_Rate = originalFundRate;
+      window.fund_sourceRate = originalFundSourceRate;
     };
 
     const timeoutId = window.setTimeout(() => {
@@ -1084,6 +1093,9 @@ const loadPingzhongData = (fundCode) => {
           }).reverse();
         }
 
+        const fundRate = window.fund_Rate || "";
+        const fundSourceRate = window.fund_sourceRate || "";
+
         window.stockCodesNew = originalStockCodes;
         window.stockNames = originalStockNames;
         window.stockPercent = originalStockPercent;
@@ -1091,7 +1103,7 @@ const loadPingzhongData = (fundCode) => {
         window.Data_grandTotal = originalGrandTotal;
 
         cleanup();
-        resolve({ stockCodes, stockNames, stockPercent, netWorthTrend, grandTotal });
+        resolve({ stockCodes, stockNames, stockPercent, netWorthTrend, grandTotal, fundRate, fundSourceRate });
       } catch (err) {
         cleanup();
         resolve(null);
@@ -1166,6 +1178,8 @@ const fetchFundDetailRemoteData = async (fundCode) => {
     holdings,
     industries,
     grandTotal: holdingsData?.grandTotal || [],
+    fundRate: holdingsData?.fundRate || '',
+    fundSourceRate: holdingsData?.fundSourceRate || '',
   });
 };
 
@@ -1324,9 +1338,13 @@ export default function FundTrackerApp() {
 
   async function loadCloudData() {
     try {
-      const [fundsRes, txsRes] = await Promise.all([
+      const [fundsRes, txsRes, profitsRes] = await Promise.all([
         fetch('/api/funds?_t=' + Date.now()),
-        fetch('/api/transactions?_t=' + Date.now())
+        fetch('/api/transactions?_t=' + Date.now()),
+        fetch('/api/daily-profits?_t=' + Date.now()).catch(e => {
+          console.warn("每日收益拉取异常(可能表尚未创建):", e.message);
+          return { ok: false };
+        })
       ]);
       
       if (fundsRes.ok && txsRes.ok) {
@@ -1356,6 +1374,12 @@ export default function FundTrackerApp() {
         }
         if (txsData?.success && Array.isArray(txsData.transactions)) {
           setTransactions(normalizeStoredTransactionStore(txsData.transactions).entries);
+        }
+        if (profitsRes && profitsRes.ok) {
+          const profitsData = await profitsRes.json();
+          if (profitsData?.success && Array.isArray(profitsData.dailyProfits)) {
+            setDailyProfits(profitsData.dailyProfits);
+          }
         }
       }
     } catch (err) {
@@ -1419,13 +1443,15 @@ export default function FundTrackerApp() {
     try {
       const localFunds = readStoredJson('fundTrackerData', []);
       const localTxs = loadTransactions();
+      const localProfits = readStoredJson('fundTrackerDailyProfits', []);
       
       const response = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           funds: localFunds,
-          transactions: localTxs
+          transactions: localTxs,
+          dailyProfits: localProfits
         })
       });
       
@@ -1437,6 +1463,7 @@ export default function FundTrackerApp() {
         // Backup local storage before clearing
         localStorage.setItem('fundTrackerData_backup_' + Date.now(), JSON.stringify(localFunds));
         localStorage.setItem('fundTrackerTransactions_backup_' + Date.now(), JSON.stringify(localTxs));
+        localStorage.setItem('fundTrackerDailyProfits_backup_' + Date.now(), JSON.stringify(localProfits));
         
         // Fetch fresh merged data from D1 and set to state
         await loadCloudData();
@@ -1506,6 +1533,9 @@ export default function FundTrackerApp() {
     return normalizeStoredDetailCacheStore(readStoredJson(DETAIL_CACHE_STORAGE_KEY, {})).entries;
   });
   const [transactions, setTransactions] = useState(() => loadTransactions());
+  const [dailyProfits, setDailyProfits] = useState(() => {
+    return readStoredJson('fundTrackerDailyProfits', []);
+  });
 
   // 2. 初始化分组
   const [sectors, setSectors] = useState(() => {
@@ -1524,6 +1554,10 @@ export default function FundTrackerApp() {
   useEffect(() => {
     saveTransactions(transactions);
   }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem('fundTrackerDailyProfits', JSON.stringify(dailyProfits));
+  }, [dailyProfits]);
 
   // 4. 监听变化：只要分组变了，立刻存入本地缓存
   useEffect(() => {
@@ -1562,7 +1596,7 @@ export default function FundTrackerApp() {
   }, [showTabProfit]);
 
   const [modals, setModals] = useState({
-    group: false, fund: false, sync: false, import: false, export: false, history: false, settings: false
+    group: false, fund: false, sync: false, import: false, export: false, history: false, settings: false, ocr: false
   });
 
   const openModal = (type) => setModals(prev => ({ ...prev, [type]: true }));
@@ -1688,11 +1722,81 @@ export default function FundTrackerApp() {
   };
 
   const displayedFunds = useMemo(() => {
-    return funds.map((fund) => ({
-      ...buildDisplayedFund(fund, selectedDataSource),
-      sourceFund: fund,
-    }));
-  }, [funds, selectedDataSource]);
+    const todayStr = getTodayDateKey();
+    const currentMonthPrefix = todayStr.slice(0, 7);
+
+    // Get Monday of current week
+    const refDate = new Date(todayStr + 'T00:00:00');
+    const day = refDate.getDay();
+    const diff = refDate.getDate() - day + (day === 0 ? -6 : 1);
+    const mondayDate = new Date(refDate.setDate(diff));
+    const year = mondayDate.getFullYear();
+    const month = `${mondayDate.getMonth() + 1}`.padStart(2, '0');
+    const dayOfMonth = `${mondayDate.getDate()}`.padStart(2, '0');
+    const currentMondayStr = `${year}-${month}-${dayOfMonth}`;
+
+    return funds.map((fund) => {
+      const baseDisp = buildDisplayedFund(fund, selectedDataSource);
+
+      // Aggregate weekly profits
+      const weeklyLogs = dailyProfits.filter(dp => dp.fundCode === fund.code && dp.date >= currentMondayStr);
+      const computedWeeklyProfit = weeklyLogs.length > 0
+        ? weeklyLogs.reduce((sum, dp) => sum + dp.dailyProfit, 0)
+        : toNumber(fund.weeklyProfit);
+
+      // Aggregate monthly profits
+      const monthlyLogs = dailyProfits.filter(dp => dp.fundCode === fund.code && dp.date.startsWith(currentMonthPrefix));
+      const computedMonthlyProfit = monthlyLogs.length > 0
+        ? monthlyLogs.reduce((sum, dp) => sum + dp.dailyProfit, 0)
+        : toNumber(fund.monthlyProfit);
+
+      return {
+        ...baseDisp,
+        weeklyProfit: roundAmount(computedWeeklyProfit),
+        monthlyProfit: roundAmount(computedMonthlyProfit),
+        sourceFund: fund,
+      };
+    });
+  }, [funds, selectedDataSource, dailyProfits]);
+
+  // 自动记录每日收益到历史表中
+  useEffect(() => {
+    if (displayedFunds.length === 0) return;
+
+    let changed = false;
+    const nextDailyProfits = [...dailyProfits];
+
+    displayedFunds.forEach((fund) => {
+      const date = fund.netValueDate;
+      const profit = fund.dailyProfit;
+      const code = fund.code;
+
+      if (code && date && /^\d{4}-\d{2}-\d{2}$/.test(date) && typeof profit === 'number' && !Number.isNaN(profit)) {
+        const existingIdx = nextDailyProfits.findIndex((dp) => dp.fundCode === code && dp.date === date);
+        if (existingIdx !== -1) {
+          if (nextDailyProfits[existingIdx].dailyProfit !== profit) {
+            nextDailyProfits[existingIdx] = {
+              ...nextDailyProfits[existingIdx],
+              dailyProfit: profit,
+            };
+            changed = true;
+          }
+        } else {
+          nextDailyProfits.push({
+            id: `dp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            fundCode: code,
+            date: date,
+            dailyProfit: profit,
+          });
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      setDailyProfits(nextDailyProfits);
+    }
+  }, [displayedFunds]);
 
   const latestOfficialDate = useMemo(() => {
     return funds.reduce((latestDate, fund) => {
@@ -2422,6 +2526,58 @@ export default function FundTrackerApp() {
     }
   };
 
+  const handleOpenSyncTrade = async (fund) => {
+    const cacheEntry = detailCacheEntries[fund.code];
+    let fundRateStr = cacheEntry?.fundRate || '';
+
+    setSyncForm({
+      code: fund.code,
+      type: '买入',
+      fee: '',
+      tradeDate: getTodayDateKey(),
+      confirmTime: 'before15',
+      amount: '',
+      feeRate: fundRateStr,
+    });
+    openModal('sync');
+
+    if (!fundRateStr) {
+      try {
+        const holdingsData = await loadPingzhongData(fund.code);
+        if (holdingsData && holdingsData.fundRate) {
+          fundRateStr = holdingsData.fundRate;
+          
+          setDetailCacheEntries(currentEntries => {
+            const entry = currentEntries[fund.code];
+            if (entry) {
+              return {
+                ...currentEntries,
+                [fund.code]: {
+                  ...entry,
+                  fundRate: fundRateStr,
+                  fundSourceRate: holdingsData.fundSourceRate || '',
+                }
+              };
+            }
+            return currentEntries;
+          });
+
+          setSyncForm(prev => {
+            if (prev.code === fund.code) {
+              return {
+                ...prev,
+                feeRate: fundRateStr,
+              };
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.warn('后台获取申购费率失败:', err);
+      }
+    }
+  };
+
   const handleSyncTrade = async (e) => {
     e.preventDefault();
 
@@ -2548,6 +2704,161 @@ export default function FundTrackerApp() {
     });
   };
 
+  const handleBatchOcrSync = async (validRows) => {
+    setIsRefreshing(true);
+    setRefreshButtonLabel('正在导入 OCR 交易...');
+    
+    // Sort rows chronologically (earliest first) to compute correct cost compounding!
+    const sortedRows = [...validRows].sort((a, b) => a.tradeDate.localeCompare(b.tradeDate));
+    
+    let workingFunds = [...funds];
+    let newTransactions = [];
+    let newFundsCreated = [];
+
+    try {
+      for (const row of sortedRows) {
+        let quote = null;
+        try {
+          quote = await enqueueTiantianFundQuote(row.code);
+        } catch (error) {
+          console.warn(`OCR 导入时获取估值失败: ${row.code}`, error);
+        }
+
+        // Find existing fund in working copy (could be newly added in previous iteration)
+        let targetFundIndex = workingFunds.findIndex(f => String(f.code || '').trim() === row.code);
+        let targetFund = null;
+        
+        if (targetFundIndex === -1) {
+          // Create new fund holding snapshot
+          const lastNetValueVal = quote?.lastNetValue || 0;
+          const estimatedNetValueVal = quote?.estimatedNetValue || 0;
+          const refNetValueVal = estimatedNetValueVal > 0 ? estimatedNetValueVal : (lastNetValueVal > 0 ? lastNetValueVal : 0);
+          
+          const baseFund = {
+            id: Date.now() + Math.floor(Math.random() * 100000),
+            name: String(quote?.name || row.name || '').trim() || '未命名基金',
+            code: row.code,
+            sector: UNGROUPED_SECTOR,
+            shares: 0,
+            costAmount: 0,
+            amount: 0,
+            currentNetValue: refNetValueVal,
+            lastNetValue: lastNetValueVal,
+            lastValuationTime: quote?.updateTime || '',
+            netValueDate: quote?.netValueDate || '',
+            bootstrapSharesFromAmount: false,
+            quoteSource: quote ? getQuoteSourceFromQuote(quote) : 'auto',
+            dailyRate: quote?.dailyRate || 0,
+            weeklyProfit: 0,
+            monthlyProfit: 0,
+            holdingStartDate: '',
+            addedDate: getTodayDateKey(),
+          };
+          
+          targetFund = buildFundSnapshot(baseFund);
+          workingFunds.push(targetFund);
+          targetFundIndex = workingFunds.length - 1;
+          newFundsCreated.push(targetFund);
+        } else {
+          targetFund = workingFunds[targetFundIndex];
+        }
+
+        const tradeReferenceFund = quote ? reconcileFundWithQuote(targetFund, quote) : { ...targetFund, quoteSource: inferStoredQuoteSource(targetFund) };
+        const lastNetValue = toNumber(tradeReferenceFund.lastNetValue);
+        const referenceNetValue = lastNetValue > 0 ? lastNetValue : getDisplayedReferenceNetValue(tradeReferenceFund);
+
+        if (referenceNetValue <= 0) {
+          console.warn(`基金 ${row.code} 没有可用参考净值，跳过此交易。`);
+          continue;
+        }
+
+        // Determine confirmTime (before15 or after15)
+        const timePart = row.tradeDate.split(' ')[1] || '10:00:00';
+        const hour = parseInt(timePart.split(':')[0]) || 10;
+        const confirmTime = hour >= 15 ? 'after15' : 'before15';
+        
+        const baseTradeDate = row.tradeDate.split(' ')[0] || getTodayDateKey();
+        const finalTradeDate = confirmTime === 'before15' ? baseTradeDate : addOneDay(baseTradeDate);
+
+        const tradePayload = {
+          type: row.type,
+          volumeType: 'amount',
+          amount: row.amount,
+          fee: row.fee || 0,
+        };
+
+        const currentShares = Math.max(0, toNumber(tradeReferenceFund.shares) || deriveSharesFromDisplayedAmount(tradeReferenceFund) || 0);
+        const tradeImpact = buildTradeImpact({
+          fund: tradeReferenceFund,
+          trade: tradePayload,
+          referenceNetValue,
+          currentShares,
+          currentCostAmount: Math.max(0, toNumber(tradeReferenceFund.costAmount)),
+          tradeDate: finalTradeDate,
+        });
+
+        if (!tradeImpact) {
+          console.warn(`交易无效，跳过此记录: ${row.code}`);
+          continue;
+        }
+
+        const transactionRecord = buildTransactionRecord({
+          fund: tradeReferenceFund,
+          tradeImpact,
+          source: 'ocr-screenshot',
+          note: `OCR导入:原名(${row.name})`
+        });
+
+        const updatedFund = applyTradeToFund(targetFund, tradePayload, quote, finalTradeDate);
+        workingFunds[targetFundIndex] = updatedFund;
+
+        if (transactionRecord) {
+          newTransactions.push(transactionRecord);
+        }
+      }
+
+      // Persist to D1 Cloud DB if authenticated
+      if (isAuthenticated) {
+        try {
+          const response = await fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              funds: workingFunds,
+              transactions: [...transactions, ...newTransactions]
+            })
+          });
+          if (!response.ok) {
+            const errData = await response.json();
+            alert(`云端数据批量同步失败: ${errData.error || '未知错误'}`);
+            return;
+          }
+        } catch (err) {
+          alert(`云端数据批量同步失败，请检查网络: ${err.message}`);
+          return;
+        }
+      }
+
+      setFunds(workingFunds);
+      if (newTransactions.length > 0) {
+        setTransactions(currentTxs => sortTransactionsByDateDesc([...currentTxs, ...newTransactions]));
+      }
+
+      closeModal('ocr');
+      alert(`导入成功！成功同步并登记了 ${newTransactions.length} 笔交易记录，新增了 ${newFundsCreated.length} 只持有基金！`);
+      
+      // Auto refresh to recalculate holding returns
+      handleRefresh();
+
+    } catch (e) {
+      console.error(e);
+      alert(`批量导入过程中出错: ${e.message}`);
+    } finally {
+      setIsRefreshing(false);
+      setRefreshButtonLabel('刷新估值');
+    }
+  };
+
   const handleOpenHistory = (fund) => {
     setSelectedFund(fund);
     openModal('history');
@@ -2564,6 +2875,7 @@ export default function FundTrackerApp() {
       sectors,
       detailCache: buildStoredDetailCachePayload(detailCacheEntries),
       transactions,
+      dailyProfits,
     });
 
     const blob = new Blob([JSON.stringify(exportBundle, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -2635,6 +2947,7 @@ export default function FundTrackerApp() {
         fundsCount: normalizedFunds.length,
         sectorsCount: normalizedSectors.length,
         transactionsCount: normalizedTransactions.length,
+        dailyProfitsCount: (parsedPayload.data.dailyProfits ?? []).length,
         detailCacheCount: Object.keys(normalizedDetailCacheEntries).length,
       };
 
@@ -2647,6 +2960,7 @@ export default function FundTrackerApp() {
           sectors: normalizedSectors,
           detailCacheEntries: normalizedDetailCacheEntries,
           transactions: normalizedTransactions,
+          dailyProfits: parsedPayload.data.dailyProfits ?? [],
         },
         isParsing: false,
       }));
@@ -2670,17 +2984,20 @@ export default function FundTrackerApp() {
     let nextSectors = [];
     let nextDetailCache = [];
     let nextTransactions = [];
+    let nextDailyProfits = [];
 
     if (importState.mode === 'replace-all') {
       nextFunds = importState.payload.funds;
       nextSectors = importState.payload.sectors;
       nextDetailCache = importState.payload.detailCacheEntries;
       nextTransactions = sortTransactionsByDateDesc(importState.payload.transactions);
+      nextDailyProfits = importState.payload.dailyProfits;
     } else {
       nextFunds = mergeImportedFunds(funds, importState.payload.funds);
       nextSectors = mergeStringArrays(sectors, importState.payload.sectors);
       nextDetailCache = mergeDetailCacheEntries(detailCacheEntries, importState.payload.detailCacheEntries);
       nextTransactions = sortTransactionsByDateDesc(mergeTransactionsById(transactions, importState.payload.transactions));
+      nextDailyProfits = mergeDailyProfitsByDateAndCode(dailyProfits, importState.payload.dailyProfits);
     }
 
     if (isAuthenticated) {
@@ -2690,7 +3007,8 @@ export default function FundTrackerApp() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             funds: nextFunds,
-            transactions: nextTransactions
+            transactions: nextTransactions,
+            dailyProfits: nextDailyProfits
           })
         });
         if (!response.ok) {
@@ -2708,6 +3026,7 @@ export default function FundTrackerApp() {
     setSectors(nextSectors);
     setDetailCacheEntries(nextDetailCache);
     setTransactions(nextTransactions);
+    setDailyProfits(nextDailyProfits);
 
     setSelectedFund(null);
     setDetailView({ isOpen: false, code: '' });
@@ -2824,6 +3143,7 @@ export default function FundTrackerApp() {
     }
 
     setFunds((currentFunds) => currentFunds.filter((fund) => fund.id !== editForm.id));
+    setDailyProfits((currentProfits) => currentProfits.filter((dp) => dp.fundCode !== editForm.code));
     closeModal('settings');
   };
 
@@ -2877,55 +3197,83 @@ export default function FundTrackerApp() {
         </header>
 
         {/* --- 工具栏 --- */}
-        <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200/50">
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all duration-200 text-sm shadow-sm hover:shadow-md hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0">
+        <div className="flex-shrink-0 flex items-center justify-between gap-4 bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-200/50">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-all duration-200 text-sm shadow-sm hover:shadow-md hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0">
               <Plus className="w-4 h-4" /> 新增持仓
             </button>
-            <button type="button" onClick={handleOpenCreateGroup} className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-5 py-2.5 rounded-xl font-bold transition-all duration-200 text-sm border border-indigo-200 shadow-sm hover:shadow-md hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0">
+            <button type="button" onClick={handleOpenCreateGroup} className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-bold transition-all duration-200 text-sm border border-indigo-200 shadow-sm hover:shadow-md hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0">
               <FolderPlus className="w-4 h-4" /> 创建分组
             </button>
-            <button type="button" onClick={() => openModal('sync')} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold transition-all duration-200 text-sm border border-slate-200 shadow-sm hover:shadow-md hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0">
+            <button type="button" onClick={() => openModal('sync')} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold transition-all duration-200 text-sm border border-slate-200 shadow-sm hover:shadow-md hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0">
               <ArrowRightLeft className="w-4 h-4" /> 同步交易
+            </button>
+            <button type="button" onClick={() => openModal('ocr')} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold transition-all duration-200 text-sm border border-slate-200 shadow-sm hover:shadow-md hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0">
+              <Camera className="w-4 h-4 text-slate-500" /> 截图识别同步
+            </button>
+            <button type="button" onClick={handleRefresh} disabled={funds.length === 0} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-4 py-2 rounded-xl font-bold transition-all duration-200 text-sm border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0 shadow-sm hover:shadow-md">
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+              <span>{refreshButtonLabel}</span>
             </button>
           </div>
           
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-500 gap-3 shadow-inner">
-              <span className="font-bold text-slate-600">数据源</span>
-              <select
-                value={selectedDataSource}
-                onChange={(e) => setSelectedDataSource(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-              >
-                <option value="auto">智能双阶段 (推荐)</option>
-                <option value="tiantian">实时估值优先</option>
-                <option value="eastmoney">收盘净值优先</option>
-              </select>
-              <span className="text-slate-400 font-medium">{valuationSourceHint || '按所选数据源展示'}</span>
+          <div className="relative group">
+            <button type="button" className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold transition-all duration-200 text-sm border border-slate-200 shadow-sm hover:shadow-md cursor-pointer">
+              <Settings className="w-4 h-4 text-slate-500 group-hover:rotate-45 transition-transform duration-300" />
+              <span>工具与设置</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:rotate-180 transition-transform duration-200" />
+            </button>
+            
+            {/* Hover Panel */}
+            <div className="absolute right-0 top-full pt-2 z-30 hidden group-hover:block group-focus-within:block w-72">
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-4 flex flex-col gap-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase border-b border-slate-100 pb-2">
+                  工具与参数配置
+                </div>
+                
+                {/* 数据源 */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-slate-600">数据源</span>
+                  <select
+                    value={selectedDataSource}
+                    onChange={(e) => setSelectedDataSource(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-inner hover:border-slate-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                  >
+                    <option value="auto">智能双阶段 (推荐)</option>
+                    <option value="tiantian">实时估值优先</option>
+                    <option value="eastmoney">收盘净值优先</option>
+                  </select>
+                  <span className="text-[10px] text-slate-400 font-medium leading-relaxed bg-slate-50 p-1.5 rounded-md border border-slate-100">{valuationSourceHint || '自动识别净值更新状态'}</span>
+                </div>
+
+                {/* 显示页签金额 */}
+                <label className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-xs text-slate-600 gap-2 cursor-pointer hover:bg-slate-100/70 transition-all select-none">
+                  <span className="font-bold text-slate-600">显示页签金额</span>
+                  <input
+                    type="checkbox"
+                    checked={showTabProfit}
+                    onChange={(e) => setShowTabProfit(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </label>
+
+                <div className="border-t border-slate-100 my-0.5"></div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={handleOpenImportModal} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-600 py-2 rounded-lg font-semibold transition-all duration-150 text-xs border border-slate-200 shadow-sm">
+                    <Upload className="w-3.5 h-3.5 text-slate-500" /> 导入配置
+                  </button>
+                  <button type="button" onClick={() => openModal('export')} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-600 py-2 rounded-lg font-semibold transition-all duration-150 text-xs border border-slate-200 shadow-sm">
+                    <Download className="w-3.5 h-3.5 text-slate-500" /> 导出数据
+                  </button>
+                </div>
+
+                <button type="button" onClick={handleLogout} className="flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-600 py-2 rounded-lg font-bold transition-all duration-150 text-xs border border-rose-200/60 shadow-sm w-full mt-1">
+                  <LogOut className="w-3.5 h-3.5" /> 退出系统登录
+                </button>
+              </div>
             </div>
-            <label className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-500 gap-2 shadow-inner cursor-pointer hover:bg-slate-100/70 transition-all select-none">
-              <input
-                type="checkbox"
-                checked={showTabProfit}
-                onChange={(e) => setShowTabProfit(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-              />
-              <span className="font-bold text-slate-600">显示页签金额</span>
-            </label>
-            <button type="button" onClick={handleOpenImportModal} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 text-xs border border-slate-200 hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0 shadow-sm hover:shadow-md">
-              <Upload className="w-4 h-4" /> 导入
-            </button>
-            <button type="button" onClick={() => openModal('export')} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 text-xs border border-slate-200 hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0 shadow-sm hover:shadow-md">
-              <Download className="w-4 h-4" /> 导出
-            </button>
-            <button type="button" onClick={handleRefresh} disabled={funds.length === 0} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 px-4 py-2.5 rounded-xl font-bold transition-all duration-200 text-xs border border-slate-200 ml-0 lg:ml-2 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0 shadow-sm hover:shadow-md">
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
-              {refreshButtonLabel}
-            </button>
-            <button type="button" onClick={handleLogout} className="flex items-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 text-xs border border-rose-200 ml-0 lg:ml-2 hover:scale-[1.01] hover:-translate-y-[1px] active:scale-[0.99] active:translate-y-0 shadow-sm hover:shadow-md">
-              <LogOut className="w-4 h-4" /> 退出
-            </button>
           </div>
         </div>
 
@@ -2948,6 +3296,7 @@ export default function FundTrackerApp() {
           sectors={sectors}
           dailyRateColumnLabel={dailyRateColumnLabel}
           dailyProfitColumnLabel={dailyProfitColumnLabel}
+          handleOpenSyncTrade={handleOpenSyncTrade}
         />
 
       <FundDetailPanel
@@ -3027,6 +3376,13 @@ export default function FundTrackerApp() {
         onChange={setSyncForm}
       />
 
+      <OcrSyncModal
+        isOpen={modals.ocr}
+        onClose={() => closeModal('ocr')}
+        funds={funds}
+        onConfirmImport={handleBatchOcrSync}
+      />
+
       <ImportModal
         isOpen={modals.import}
         onClose={handleCloseImportModal}
@@ -3045,6 +3401,7 @@ export default function FundTrackerApp() {
         sectorsCount={sectors.length}
         transactionsCount={transactions.length}
         detailCacheCount={Object.keys(detailCacheEntries).length}
+        dailyProfitsCount={dailyProfits.length}
       />
 
       <HistoryModal

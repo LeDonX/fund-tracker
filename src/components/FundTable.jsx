@@ -9,6 +9,11 @@ import {
   Settings,
   Trash2,
   Wallet,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ArrowRightLeft,
+  Info,
 } from 'lucide-react';
 import FormatNumber from './common/FormatNumber';
 
@@ -30,10 +35,136 @@ export default function FundTable({
   sectors,
   dailyRateColumnLabel,
   dailyProfitColumnLabel,
+  handleOpenSyncTrade,
 }) {
   const hasCustomGroups = sectors.some((sector) => sector !== ungroupedSector);
   const [openGroupMenu, setOpenGroupMenu] = useState('');
   const groupMenuRef = useRef(null);
+
+  const [sortField, setSortField] = useState(null); // 'name' | 'amount' | 'dailyRate' | 'dailyProfit' | 'totalRate' | 'totalProfit' | 'weeklyProfit' | 'monthlyProfit'
+  const [sortDirection, setSortDirection] = useState('desc'); // 'asc' | 'desc'
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'name' ? 'asc' : 'desc');
+    }
+  };
+
+  const getSortedFunds = (fundsList) => {
+    if (!sortField) return fundsList;
+
+    return [...fundsList].sort((a, b) => {
+      let valA, valB;
+
+      switch (sortField) {
+        case 'name':
+          valA = a.name || '';
+          valB = b.name || '';
+          return sortDirection === 'asc'
+            ? valA.localeCompare(valB, 'zh-CN')
+            : valB.localeCompare(valA, 'zh-CN');
+
+        case 'amount':
+          valA = toNumber(a.amount) || 0;
+          valB = toNumber(b.amount) || 0;
+          break;
+
+        case 'dailyRate':
+          valA = toNumber(a.dailyRate) || 0;
+          valB = toNumber(b.dailyRate) || 0;
+          break;
+
+        case 'dailyProfit':
+          valA = toNumber(a.dailyProfit) || 0;
+          valB = toNumber(b.dailyProfit) || 0;
+          break;
+
+        case 'totalRate':
+          valA = toNumber(a.totalRate) || 0;
+          valB = toNumber(b.totalRate) || 0;
+          break;
+
+        case 'totalProfit':
+          valA = toNumber(a.totalProfit) || 0;
+          valB = toNumber(b.totalProfit) || 0;
+          break;
+
+        case 'weeklyProfit':
+          valA = toNumber(a.weeklyProfit) || 0;
+          valB = toNumber(b.weeklyProfit) || 0;
+          break;
+
+        case 'monthlyProfit':
+          valA = toNumber(a.monthlyProfit) || 0;
+          valB = toNumber(b.monthlyProfit) || 0;
+          break;
+
+        default:
+          return 0;
+      }
+
+      if (valA === valB) {
+        const nameA = a.name || '';
+        const nameB = b.name || '';
+        return nameA.localeCompare(nameB, 'zh-CN');
+      }
+
+      return sortDirection === 'asc' ? valA - valB : valB - valA;
+    });
+  };
+
+  const renderSortableHeader = (field, label, alignment = 'right') => {
+    const isSorted = sortField === field;
+    const isAsc = sortDirection === 'asc';
+
+    let thClass = "p-4 font-semibold text-slate-600 cursor-pointer select-none transition-all duration-200 group ";
+    if (alignment === 'right') {
+      thClass += "text-right";
+    } else if (alignment === 'center') {
+      thClass += "text-center";
+    } else {
+      thClass += "text-left";
+    }
+
+    if (field === 'dailyProfit') {
+      thClass += " bg-blue-50/40 hover:bg-blue-50 text-blue-900";
+    } else {
+      thClass += " bg-slate-50/40 hover:bg-slate-100/70 text-slate-700";
+    }
+
+    return (
+      <th
+        className={thClass}
+        onClick={() => handleSort(field)}
+        title={`点击按 ${label} 排序`}
+      >
+        <div className={`flex items-center gap-1.5 ${alignment === 'right' ? 'justify-end' : alignment === 'center' ? 'justify-center' : 'justify-start'}`}>
+          {alignment === 'right' && (
+            <div className="shrink-0 flex items-center justify-center">
+              {isSorted ? (
+                isAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 animate-in fade-in zoom-in-75 duration-200" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 animate-in fade-in zoom-in-75 duration-200" />
+              ) : (
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-all duration-200 transform scale-90 group-hover:scale-100" />
+              )}
+            </div>
+          )}
+          <span className="font-semibold tracking-tight text-xs">{label}</span>
+          {alignment !== 'right' && (
+            <div className="shrink-0 flex items-center justify-center">
+              {isSorted ? (
+                isAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 animate-in fade-in zoom-in-75 duration-200" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 animate-in fade-in zoom-in-75 duration-200" />
+              ) : (
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-all duration-200 transform scale-90 group-hover:scale-100" />
+              )}
+            </div>
+          )}
+        </div>
+      </th>
+    );
+  };
 
   useEffect(() => {
     if (!openGroupMenu) {
@@ -56,17 +187,28 @@ export default function FundTable({
   return (
     <div className="flex-1 bg-white rounded-3xl shadow-md border border-slate-200/60 flex flex-col min-h-[300px] overflow-hidden">
       <div className="flex-1 overflow-auto relative custom-scrollbar">
-        <table ref={groupTableRef} className="w-full text-left border-collapse min-w-[900px]">
+        <table ref={groupTableRef} className="w-full text-left border-collapse min-w-[900px] table-fixed">
+          <colgroup>
+            <col className="w-[22%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[10%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[14%]" />
+          </colgroup>
           <thead className="sticky top-0 z-10 backdrop-blur-md bg-slate-50/80">
             <tr className="text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200 shadow-sm">
-              <th className="p-4 font-semibold text-slate-600 bg-slate-50/40">基金名称 (代码)</th>
-              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">持有金额</th>
-              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">{dailyRateColumnLabel}</th>
-              <th className="p-4 font-semibold text-slate-600 text-right bg-blue-50/40">{dailyProfitColumnLabel}</th>
-              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">持有收益率</th>
-              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">持有总收益</th>
-              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">本周收益</th>
-              <th className="p-4 font-semibold text-slate-600 text-right bg-slate-50/40">本月收益</th>
+              {renderSortableHeader('name', '基金名称 (代码)', 'left')}
+              {renderSortableHeader('amount', '持有金额')}
+              {renderSortableHeader('dailyRate', dailyRateColumnLabel)}
+              {renderSortableHeader('dailyProfit', dailyProfitColumnLabel)}
+              {renderSortableHeader('totalRate', '持有收益率')}
+              {renderSortableHeader('totalProfit', '持有总收益')}
+              {renderSortableHeader('weeklyProfit', '本周收益')}
+              {renderSortableHeader('monthlyProfit', '本月收益')}
               <th className="p-4 font-semibold text-slate-600 text-center bg-slate-50/40">操作</th>
             </tr>
           </thead>
@@ -167,10 +309,10 @@ export default function FundTable({
                   </tr>
                 )}
 
-                {!isCollapsed && data.funds.map((fund) => (
+                {!isCollapsed && getSortedFunds(data.funds).map((fund) => (
                   <tr 
                     key={fund.id} 
-                    className="border-b border-slate-100 hover:bg-slate-50/80 hover:shadow-[inset_4px_0_0_#2563eb] hover:translate-x-[1px] transition-all duration-200 ease-out bg-white" 
+                    className="border-b border-slate-100 hover:bg-slate-50/80 hover:shadow-[inset_4px_0_0_#2563eb] transition-all duration-200 ease-out bg-white" 
                     data-testid={`fund-row-${fund.code}`}
                   >
                     <td className="p-4">
@@ -210,37 +352,49 @@ export default function FundTable({
                       <FormatNumber value={fund.totalProfit} isCurrency={true} />
                     </td>
                     <td className="p-4 text-right">
-                      <FormatNumber value={fund.weeklyProfit} />
+                      <FormatNumber value={fund.weeklyProfit} isCurrency={true} />
                     </td>
                     <td className="p-4 text-right">
-                      <FormatNumber value={fund.monthlyProfit} />
+                      <FormatNumber value={fund.monthlyProfit} isCurrency={true} />
                     </td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                    <td className="px-2 py-1.5 text-center">
+                      <div className="grid grid-cols-2 gap-x-1.5 gap-y-1 justify-items-center">
                         <button
                           type="button"
                           onClick={() => handleOpenFundDetail(fund)}
-                          className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:scale-[1.03] active:scale-[0.97]"
-                          title="详情"
+                          className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] font-bold text-slate-600 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
+                          title="查看基金详情"
                           data-testid={`detail-entry-${fund.code}`}
                         >
-                          详情
+                          <Info className="w-3 h-3 text-slate-400" />
+                          <span>详情</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSyncTrade(fund)}
+                          className="rounded-md border border-indigo-100 bg-indigo-50/40 px-1.5 py-px text-[10px] font-bold text-indigo-600 transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
+                          title="同步交易 (快速加仓/减仓)"
+                        >
+                          <ArrowRightLeft className="w-3 h-3 text-indigo-400" />
+                          <span>同步</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleOpenHistory(fund)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 hover:scale-[1.08] active:scale-[0.92] rounded-lg transition-all"
-                          title="交易记录"
+                          className="rounded-md border border-purple-100 bg-purple-50/40 px-1.5 py-px text-[10px] font-bold text-purple-600 transition-all hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
+                          title="交易流水记录"
                         >
-                          <History className="w-4 h-4" />
+                          <History className="w-3 h-3 text-purple-400" />
+                          <span>流水</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleOpenSettings(fund)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 hover:scale-[1.08] active:scale-[0.92] rounded-lg transition-all"
-                          title="设置"
+                          className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] font-bold text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
+                          title="持仓设置"
                         >
-                          <Settings className="w-4 h-4" />
+                          <Settings className="w-3 h-3 text-slate-400" />
+                          <span>设置</span>
                         </button>
                       </div>
                     </td>

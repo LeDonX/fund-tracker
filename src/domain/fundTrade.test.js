@@ -4,6 +4,7 @@ import {
   buildTransactionRecord,
   filterTransactionsByFundCode,
   sortTransactionsByDateDesc,
+  parseOcrText,
 } from './fundTrade';
 
 describe('fundTrade', () => {
@@ -270,6 +271,103 @@ describe('fundTrade', () => {
       fee: 0.12,    // 0.123 rounded to 2 decimals
       nextCostAmount: 110.13, // 100 + 10.13 = 110.13
       costDelta: 10.13,
+    });
+  });
+
+  describe('parseOcrText', () => {
+    it('应完美解析多行交错排版的支付宝基金买入记录', () => {
+      const ocrOutput = `
+买入 基金 | 招商上证科创板芯片设计主题指数C 2,000.00元
+2026-05-15 14:35:19
+买入 基金 | 鹏华创新未来混合(LOF)C 3,000.00元
+2026-05-15 14:34:25
+      `;
+      const results = parseOcrText(ocrOutput);
+      expect(results).toHaveLength(2);
+      expect(results[0]).toMatchObject({
+        type: '买入',
+        name: '招商上证科创板芯片设计主题指数C',
+        amount: 2000.00,
+        tradeDate: '2026-05-15 14:35:19',
+      });
+      expect(results[1]).toMatchObject({
+        type: '买入',
+        name: '鹏华创新未来混合(LOF)C',
+        amount: 3000.00,
+        tradeDate: '2026-05-15 14:34:25',
+      });
+    });
+
+    it('应完美解析包含卖出操作和各种中文符号的记录', () => {
+      const ocrOutput = `
+卖出 基金 | 易方达蓝筹精选混合 1,234.56元
+2026/05/14 15:00:00
+      `;
+      const results = parseOcrText(ocrOutput);
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        type: '卖出',
+        name: '易方达蓝筹精选混合',
+        amount: 1234.56,
+        tradeDate: '2026-05-14 15:00:00',
+      });
+    });
+
+    it('应容忍常见的 OCR 识别错误并正确解析', () => {
+      // 常见错漏：字母 o 代替数字 0，全角标点，未加空格等
+      const ocrOutput = `
+买入 基金|英大策略优选混合C 4,ooo.oo元
+2026年05月13日 14:56:36
+      `;
+      const results = parseOcrText(ocrOutput);
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        type: '买入',
+        name: '英大策略优选混合C',
+        amount: 4000.00,
+        tradeDate: '2026-05-13 14:56:36',
+      });
+    });
+
+    it('应支持单行合并解析的场景', () => {
+      const ocrOutput = `买入 基金 | 鹏华国证半导体芯片ETF联接C 3,000.00元 2026-05-14 14:22:08`;
+      const results = parseOcrText(ocrOutput);
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        type: '买入',
+        name: '鹏华国证半导体芯片ETF联接C',
+        amount: 3000.00,
+        tradeDate: '2026-05-14 14:22:08',
+      });
+    });
+
+    it('如果没有找到时间锚点，应触发兜底提取策略', () => {
+      const ocrOutput = `买入 基金 | 方正富邦核心优势混合C 3,000.00元`;
+      const results = parseOcrText(ocrOutput);
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        type: '买入',
+        name: '方正富邦核心优势混合C',
+        amount: 3000.00,
+      });
+      expect(results[0].tradeDate).toContain('00:00:00'); // 包含今日日期和零点兜底
+    });
+
+    it('应完美合并跨行换行截断的基金名称', () => {
+      const ocrOutput = `
+招商 上 证 科 创 板 芯片 设
+计 主 题 指数 C
+买入 2,000.00元
+2026-05-24 10:00:00
+      `;
+      const results = parseOcrText(ocrOutput);
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        type: '买入',
+        name: '招商上证科创板芯片设计主题指数C',
+        amount: 2000.00,
+        tradeDate: '2026-05-24 10:00:00',
+      });
     });
   });
 });

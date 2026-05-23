@@ -112,6 +112,8 @@ export const normalizeStoredDetailCacheStore = (storedValue) => {
           holdings: Array.isArray(entry.holdings) ? entry.holdings : [],
           industries: Array.isArray(entry.industries) ? entry.industries : [],
           grandTotal: Array.isArray(entry.grandTotal) ? entry.grandTotal : [],
+          fundRate: typeof entry.fundRate === 'string' ? entry.fundRate : '',
+          fundSourceRate: typeof entry.fundSourceRate === 'string' ? entry.fundSourceRate : '',
         }];
       })
       .filter(Boolean),
@@ -128,7 +130,7 @@ export const buildStoredDetailCachePayload = (entries) => ({
   entries,
 });
 
-export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThemes, holdings, industries, grandTotal }) => ({
+export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThemes, holdings, industries, grandTotal, fundRate, fundSourceRate }) => ({
   code: String(code || '').trim(),
   fetchedAt: Date.now(),
   quote: {
@@ -142,6 +144,8 @@ export const buildDetailCacheEntry = ({ code, quote, officialHistory, remoteThem
   holdings: Array.isArray(holdings) ? holdings : [],
   industries: Array.isArray(industries) ? industries : [],
   grandTotal: Array.isArray(grandTotal) ? grandTotal : [],
+  fundRate: typeof fundRate === 'string' ? fundRate : '',
+  fundSourceRate: typeof fundSourceRate === 'string' ? fundSourceRate : '',
 });
 
 export const isDetailCacheStale = (entry, now = Date.now()) => {

@@ -7,6 +7,7 @@ import {
   mergeStringArrays,
   mergeTransactionsById,
   validateImportBundle,
+  mergeDailyProfitsByDateAndCode,
 } from './importExport';
 
 describe('importExport', () => {
@@ -16,6 +17,7 @@ describe('importExport', () => {
       sectors: ['科技'],
       detailCache: { version: 1, entries: { '000001': { code: '000001' } } },
       transactions: [{ id: 'tx-1' }],
+      dailyProfits: [{ fundCode: '000001', date: '2026-05-22', dailyProfit: 10 }],
     });
 
     expect(bundle.app).toBe('fund-tracker');
@@ -23,6 +25,7 @@ describe('importExport', () => {
     expect(bundle.data.funds).toHaveLength(1);
     expect(bundle.data.sectors).toEqual(['科技']);
     expect(bundle.data.transactions).toHaveLength(1);
+    expect(bundle.data.dailyProfits).toHaveLength(1);
   });
 
   it('应校验导入包格式', () => {
@@ -39,6 +42,7 @@ describe('importExport', () => {
         funds: [{ code: '000001' }, { code: '000002' }],
         sectors: ['科技', '消费'],
         transactions: [{ id: '1' }],
+        dailyProfits: [{ fundCode: '000001', date: '2026-05-22', dailyProfit: 10 }],
         detailCache: { entries: { '000001': {}, '000002': {} } },
       },
     });
@@ -50,6 +54,7 @@ describe('importExport', () => {
       sectorsCount: 2,
       transactionsCount: 1,
       detailCacheCount: 2,
+      dailyProfitsCount: 1,
     });
   });
 
@@ -85,6 +90,21 @@ describe('importExport', () => {
     expect(merged).toEqual([
       { id: 'tx-1', amount: 1 },
       { id: 'tx-2', amount: 3 },
+    ]);
+  });
+
+  it('应按 code 和 date 合并每日收益并避免重复', () => {
+    const merged = mergeDailyProfitsByDateAndCode(
+      [{ fundCode: '000001', date: '2026-05-22', dailyProfit: 10 }],
+      [
+        { fundCode: '000001', date: '2026-05-22', dailyProfit: 15 },
+        { fundCode: '000001', date: '2026-05-23', dailyProfit: 20 },
+      ],
+    );
+
+    expect(merged).toEqual([
+      { fundCode: '000001', date: '2026-05-22', dailyProfit: 10 },
+      { fundCode: '000001', date: '2026-05-23', dailyProfit: 20 },
     ]);
   });
 });
