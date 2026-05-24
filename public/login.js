@@ -256,6 +256,16 @@ async function handleAuthSubmit(event) {
   // Set Loading State
   submitBtn.classList.add('loading');
   
+  // If running in local Vite development mode (port 5173), bypass backend call and auto-login
+  if (window.location.port === '5173') {
+    showToast('本地开发模式：自动验证成功！正在进入控制台...', 'success');
+    localStorage.setItem('fundTrackerSyncedUser', email);
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 1000);
+    return;
+  }
+  
   const endpoint = currentMode === 'login' ? '/api/auth/login' : '/api/auth/register';
   
   try {

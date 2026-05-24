@@ -213,32 +213,37 @@ export default function FundDetailPanel({
   if (!isOpen || !detailModel) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 overflow-hidden" data-testid="fund-detail-overlay">
-      <div className="w-full max-w-[1400px] h-full max-h-[90vh] flex flex-col rounded-[24px] bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-8 overflow-hidden transition-opacity duration-300 ease-out" data-testid="fund-detail-overlay" onClick={onClose}>
+      <div 
+        className="w-full max-w-[1400px] h-[88vh] md:h-full max-h-[90vh] md:max-h-[90vh] flex flex-col rounded-t-3xl md:rounded-[24px] bg-white shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300 ease-out md:zoom-in-95"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* iOS style Bottom Sheet Drag Handle */}
+        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-3 md:hidden shrink-0" />
         
         {/* Header */}
-        <div className="shrink-0 h-16 border-b border-slate-200/80 bg-slate-50/80 px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="rounded-md bg-blue-100 text-blue-800 px-2.5 py-1 text-xs font-bold tracking-wide">{detailModel.code}</span>
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">{detailModel.name}</h2>
-            {isLoading && <span className="text-xs text-slate-400 animate-pulse ml-2">刷新中...</span>}
+        <div className="shrink-0 h-14 md:h-16 border-b border-slate-200/80 bg-slate-50/80 px-4 md:px-6 flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-4 min-w-0">
+            <span className="rounded-md bg-blue-100 text-blue-800 px-2 py-0.5 md:px-2.5 md:py-1 text-[10px] md:text-xs font-bold tracking-wide shrink-0">{detailModel.code}</span>
+            <h2 className="text-base md:text-xl font-black text-slate-800 tracking-tight truncate max-w-[150px] xs:max-w-none" title={detailModel.name}>{detailModel.name}</h2>
+            {isLoading && <span className="text-[10px] text-slate-400 animate-pulse shrink-0">刷新中...</span>}
           </div>
-          <button onClick={onClose} className="rounded-full hover:bg-slate-200 p-2 text-slate-400 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <button onClick={onClose} className="rounded-full hover:bg-slate-200 p-2 text-slate-400 transition-colors shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
 
         {/* Dashboard Body */}
-        <div className="flex-1 overflow-hidden bg-white p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="flex-1 overflow-y-auto md:overflow-hidden bg-white p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
           
           {/* 左侧：核心指标区 (3/12) */}
-          <div className="col-span-1 md:col-span-3 flex flex-col gap-4 h-full overflow-hidden">
+          <div className="col-span-1 md:col-span-3 flex flex-col gap-4 h-auto md:h-full shrink-0 md:overflow-hidden">
             <div className="flex items-center justify-between shrink-0">
               <h3 className="text-sm font-black tracking-widest text-slate-800 uppercase">核心指标</h3>
               <span className="text-[10px] text-slate-400 font-medium px-2 py-0.5 bg-slate-100 rounded-full">{detailModel.valuationSource}</span>
             </div>
             
-            <div className="flex-1 overflow-hidden grid grid-cols-2 gap-3 content-start">
+            <div className="grid grid-cols-2 gap-3 content-start shrink-0 md:flex-1 md:overflow-y-auto custom-scrollbar">
               <DashboardMetric label="当日涨幅" valNode={<FormatNumber value={detailModel.dailyRate} isPercent={true} />} />
               <DashboardMetric label="近1年涨幅" valNode={<FormatNumber value={detailModel.performance.oneYear} isPercent={true} />} />
               
@@ -261,15 +266,15 @@ export default function FundDetailPanel({
           </div>
 
           {/* 中侧：图表区 (6/12) */}
-          <div className="col-span-1 md:col-span-6 flex flex-col gap-4 h-full overflow-hidden border-x border-slate-100 md:px-6">
-            <div className="flex items-center gap-6 shrink-0 border-b border-slate-200">
+          <div className="col-span-1 md:col-span-6 flex flex-col gap-4 h-[340px] md:h-full shrink-0 border-y md:border-y-0 md:border-x border-slate-100 py-4 md:py-0 md:px-6 md:overflow-hidden">
+            <div className="flex items-center gap-4 shrink-0 border-b border-slate-200 overflow-x-auto whitespace-nowrap pb-1 scrollbar-none">
               {['performance', 'myprofit', 'theme'].map((tab) => {
                 const labels = { performance: '业绩走势图', myprofit: '我的收益涨势图', theme: '业绩对比图' };
                 return (
                   <button
                     key={tab}
                     onClick={() => setChartTab(tab)}
-                    className={`pb-3 text-sm font-bold transition-all relative ${chartTab === tab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`pb-2 text-xs md:text-sm font-bold transition-all relative shrink-0 ${chartTab === tab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     {labels[tab]}
                     {chartTab === tab && <span className="absolute bottom-0 left-0 w-full h-[3px] bg-blue-600 rounded-t-full"></span>}
@@ -279,14 +284,14 @@ export default function FundDetailPanel({
             </div>
 
             {chartTab === 'performance' && (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto whitespace-nowrap py-0.5 scrollbar-none">
                 {['1M', '3M', '6M', '1Y', '3Y'].map((period) => {
                   const pLabels = { '1M': '近1月', '3M': '近3月', '6M': '近6月', '1Y': '近1年', '3Y': '近3年' };
                   return (
                     <button
                       key={period}
                       onClick={() => setPerfPeriod(period)}
-                      className={`px-3 py-1 text-[11px] font-bold rounded-full transition-colors ${perfPeriod === period ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                      className={`px-2.5 py-0.5 text-[10px] md:text-[11px] font-bold rounded-full transition-colors shrink-0 ${perfPeriod === period ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                     >
                       {pLabels[period]}
                     </button>
@@ -295,7 +300,7 @@ export default function FundDetailPanel({
               </div>
             )}
 
-            <div className="flex-1 bg-white rounded-2xl border border-slate-100/50 shadow-inner overflow-hidden">
+            <div className="flex-1 h-[200px] md:h-auto bg-white rounded-2xl border border-slate-100/50 shadow-inner overflow-hidden">
               {chartTab === 'performance' && <ChartRenderer option={perfOption} />}
               {chartTab === 'myprofit' && <ChartRenderer option={myProfitOption} />}
               {chartTab === 'theme' && <ChartRenderer option={themeOption} />}
@@ -303,12 +308,12 @@ export default function FundDetailPanel({
           </div>
 
           {/* 右侧：结构区 (3/12) */}
-          <div className="col-span-1 md:col-span-3 flex flex-col gap-6 h-full overflow-hidden">
+          <div className="col-span-1 md:col-span-3 flex flex-col gap-6 h-auto md:h-full shrink-0 md:overflow-hidden">
             
             {/* 持仓情况 */}
-            <div className="h-1/2 flex flex-col gap-3 overflow-hidden">
+            <div className="h-[260px] md:h-1/2 flex flex-col gap-3 shrink-0 md:overflow-hidden">
               <h3 className="text-sm font-black tracking-widest text-slate-800 uppercase shrink-0">持仓情况</h3>
-              <div className="flex-1 overflow-hidden flex flex-col border border-slate-200/60 rounded-xl">
+              <div className="flex-1 overflow-hidden flex flex-col border border-slate-200/60 rounded-xl bg-white">
                 <div className="grid grid-cols-3 bg-slate-50 border-b border-slate-200/60 p-2 text-[10px] font-bold text-slate-400 tracking-wider">
                   <div className="pl-1">股票名称</div>
                   <div className="text-right">占比</div>
@@ -330,19 +335,19 @@ export default function FundDetailPanel({
                       );
                     })
                   ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-slate-400">暂无持仓公开数据</div>
+                    <div className="h-full flex items-center justify-center text-xs text-slate-400 py-8">暂无持仓公开数据</div>
                   )}
                 </div>
               </div>
             </div>
 
             {/* 行业分布 */}
-            <div className="h-1/2 flex flex-col gap-3 overflow-hidden">
+            <div className="h-[220px] md:h-1/2 flex flex-col gap-3 shrink-0 md:overflow-hidden pb-4 md:pb-0">
               <div className="flex items-center justify-between shrink-0">
                 <h3 className="text-sm font-black tracking-widest text-slate-800 uppercase">行业分布</h3>
                 <span className="text-[9px] text-blue-600 font-bold border border-blue-200 bg-blue-50 px-1.5 rounded uppercase">官方数据</span>
               </div>
-              <div className="flex-1 border border-slate-200/60 rounded-xl overflow-hidden bg-slate-50/30 flex flex-col justify-center px-4 py-2 gap-3">
+              <div className="flex-1 border border-slate-200/60 rounded-xl overflow-y-auto custom-scrollbar md:overflow-hidden bg-slate-50/30 flex flex-col justify-center px-4 py-3 gap-3">
                 {industryData.length > 0 ? (
                   industryData.slice(0, 5).map((item, idx) => (
                     <div key={idx} className="flex items-center gap-3">
@@ -354,7 +359,7 @@ export default function FundDetailPanel({
                     </div>
                   ))
                 ) : (
-                  <div className="h-full flex items-center justify-center text-xs text-slate-400">暂无行业公开配置数据</div>
+                  <div className="h-full flex items-center justify-center text-xs text-slate-400 py-8">暂无行业公开配置数据</div>
                 )}
               </div>
             </div>

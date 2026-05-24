@@ -8,6 +8,8 @@ export default function SyncTradeModal({
   onSubmit,
   syncForm,
   onChange,
+  sectors = [],
+  funds = [],
 }) {
   const amountRef = React.useRef(null);
 
@@ -15,6 +17,8 @@ export default function SyncTradeModal({
   const confirmTime = syncForm.confirmTime || 'before15';
   const amountVal = Number.parseFloat(syncForm.amount) || 0;
   const feeVal = Number.parseFloat(syncForm.fee) || 0;
+
+  const isNewFund = syncForm.code && /^\d{6}$/.test(syncForm.code) && !funds.some(f => String(f.code || '').trim() === String(syncForm.code).trim());
 
   React.useEffect(() => {
     if (isOpen && syncForm.code) {
@@ -95,6 +99,23 @@ export default function SyncTradeModal({
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-slate-800 bg-white"
           />
         </div>
+
+        {/* 1.5. 新基金建仓分组选择 */}
+        {isNewFund && sectors.length > 0 && (
+          <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+            <label htmlFor="sync-sector" className="block text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1.5">归属分组 (新持仓自动建仓)</label>
+            <select
+              id="sync-sector"
+              value={syncForm.sector || '未分组'}
+              onChange={(e) => onChange({ ...syncForm, sector: e.target.value })}
+              className="w-full px-4 py-2.5 border border-indigo-200 bg-indigo-50/20 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold text-slate-700 bg-white cursor-pointer shadow-sm focus:border-blue-500"
+            >
+              {sectors.map((sec) => (
+                <option key={sec} value={sec}>{sec}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* 2. 交易方向 Toggle */}
         <div>

@@ -185,9 +185,231 @@ export default function FundTable({
   }, [openGroupMenu]);
 
   return (
-    <div className="flex-1 bg-white rounded-3xl shadow-md border border-slate-200/60 flex flex-col min-h-[300px] overflow-hidden">
-      <div className="flex-1 overflow-auto relative custom-scrollbar">
-        <table ref={groupTableRef} className="w-full text-left border-collapse min-w-[900px] table-fixed">
+    <div className="flex-1 bg-white rounded-2xl md:rounded-3xl shadow-md border border-slate-200/60 flex flex-col min-h-[300px] overflow-hidden">
+      {/* 移动端排序栏 */}
+      <div className="flex md:hidden items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200/80 shrink-0">
+        <span className="text-xs font-bold text-slate-500">持仓排序</span>
+        <div className="flex items-center gap-2">
+          <select
+            value={sortField || ''}
+            onChange={(e) => {
+              const field = e.target.value;
+              if (!field) {
+                setSortField(null);
+              } else {
+                setSortField(field);
+                setSortDirection('desc');
+              }
+            }}
+            className="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1 outline-none text-slate-700 font-semibold cursor-pointer shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+          >
+            <option value="">默认 (分组排序)</option>
+            <option value="name">基金名称</option>
+            <option value="amount">持有金额</option>
+            <option value="dailyRate">当日涨幅</option>
+            <option value="dailyProfit">当日收益</option>
+            <option value="totalRate">持有收益率</option>
+            <option value="totalProfit">持有总收益</option>
+            <option value="weeklyProfit">本周收益</option>
+            <option value="monthlyProfit">本月收益</option>
+          </select>
+          {sortField && (
+            <button
+              type="button"
+              onClick={() => setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc')}
+              className="inline-flex items-center justify-center p-1 bg-white border border-slate-200 rounded-lg text-slate-600 shadow-sm hover:bg-slate-50 active:scale-95 transition-all w-7 h-7"
+            >
+              {sortDirection === 'desc' ? <ArrowDown className="w-3.5 h-3.5" /> : <ArrowUp className="w-3.5 h-3.5" />}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto relative custom-scrollbar pb-24 md:pb-0">
+        {/* --- 移动端卡片视图 --- */}
+        <div className="md:hidden flex flex-col divide-y divide-slate-100">
+          {orderedGroups.map(({ sector, data }) => {
+            const isCollapsed = collapsedGroups.has(sector);
+            const canManageGroup = sector !== ungroupedSector;
+            const isMenuOpen = openGroupMenu === sector;
+
+            return (
+              <div key={sector} className="flex flex-col">
+                {/* 分组头部 */}
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between w-full p-3 gap-2 border-l-4 border-indigo-600 bg-slate-50/80 border-b border-slate-200 select-none">
+                  <button
+                    type="button"
+                    className="group/btn flex items-center gap-2 text-left flex-1"
+                    onClick={() => toggleGroup(sector)}
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                    <Wallet className="w-4.5 h-4.5 text-indigo-500/80" />
+                    <span className="font-bold text-slate-700 text-sm tracking-tight truncate max-w-[120px]">{sector}</span>
+                    <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-full shrink-0">
+                      {data.funds.length} 支
+                    </span>
+                  </button>
+                  
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] pl-6 xs:pl-0 shrink-0">
+                    <span className="text-slate-500 font-medium">
+                      金额: <span className="font-bold text-slate-800">{formatCurrencyAmount(data.sectorAmount)}</span>
+                    </span>
+                    <span className="text-slate-300">|</span>
+                    <span className="text-slate-500 font-medium flex items-center">
+                      盈亏:&nbsp;
+                      <span className="font-bold">
+                        <FormatNumber value={data.sectorDailyProfit} isCurrency={true} />
+                      </span>
+                    </span>
+                    {canManageGroup && (
+                      <div className="relative ml-1" ref={isMenuOpen ? groupMenuRef : null} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenGroupMenu((current) => (current === sector ? '' : sector))}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition-all border border-slate-200 bg-white shadow-sm"
+                        >
+                          <Ellipsis className="w-3.5 h-3.5" />
+                        </button>
+                        {isMenuOpen && (
+                          <div className="absolute right-0 top-7 z-20 min-w-[110px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenGroupMenu('');
+                                handleEditGroup(sector);
+                              }}
+                              className="flex w-full items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-slate-400" /> 编辑
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenGroupMenu('');
+                                handleDeleteGroup(sector);
+                              }}
+                              className="flex w-full items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> 删除
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 基金卡片列表 */}
+                {!isCollapsed && data.funds.length === 0 && (
+                  <div className="p-6 text-center text-xs text-slate-400 bg-white">
+                    该分组下暂无持仓
+                  </div>
+                )}
+
+                {!isCollapsed && getSortedFunds(data.funds).map((fund) => (
+                  <div key={fund.id} className="p-4 border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50 transition-colors bg-white flex flex-col">
+                    {/* Header row */}
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenFundDetail(fund)}
+                          className="text-left font-semibold text-slate-800 hover:text-blue-700 text-[14.5px] block truncate w-full"
+                        >
+                          <span>{fund.name}</span>
+                        </button>
+                        <span className="text-[10px] text-slate-400 font-semibold font-mono">{fund.code}</span>
+                      </div>
+                      
+                      {fund.valuationSource === 'official' && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 select-none shrink-0 scale-90 origin-right">
+                          已更新
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Metrics grid */}
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-2.5 bg-slate-50/60 p-2.5 rounded-xl border border-slate-200/30">
+                      <div className="flex flex-col">
+                        <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">持有金额</span>
+                        <span className="text-xs font-black text-slate-700 font-mono mt-0.5">{formatCurrencyAmount(fund.amount)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">{dailyProfitColumnLabel}</span>
+                        <span className="text-xs font-black font-mono mt-0.5">
+                          <FormatNumber value={fund.dailyProfit} isCurrency={true} />
+                          <span className="text-[9.5px] ml-1 font-semibold text-slate-400">
+                            (<FormatNumber value={fund.dailyRate} isPercent={true} />)
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">持有总收益</span>
+                        <span className="text-xs font-black font-mono mt-0.5">
+                          <FormatNumber value={fund.totalProfit} isCurrency={true} />
+                          <span className="text-[9.5px] ml-1 font-semibold text-slate-400">
+                            (<FormatNumber value={fund.totalRate} isPercent={true} />)
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">本周/本月收益</span>
+                        <span className="text-xs font-black font-mono mt-0.5 flex flex-wrap gap-1 items-center">
+                          <FormatNumber value={fund.weeklyProfit} isCurrency={true} />
+                          <span className="text-slate-300">/</span>
+                          <FormatNumber value={fund.monthlyProfit} isCurrency={true} />
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions row */}
+                    <div className="grid grid-cols-4 gap-1.5 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenFundDetail(fund)}
+                        className="flex items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white py-1.5 text-xs font-bold text-slate-600 transition-all hover:bg-slate-50 active:scale-[0.97] shadow-sm"
+                      >
+                        <Info className="w-3.5 h-3.5 text-slate-400" />
+                        <span>详情</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSyncTrade(fund)}
+                        className="flex items-center justify-center gap-0.5 rounded-lg border border-indigo-100 bg-indigo-50/50 py-1.5 text-xs font-bold text-indigo-600 transition-all hover:bg-indigo-100/50 active:scale-[0.97] shadow-sm"
+                      >
+                        <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>同步</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenHistory(fund)}
+                        className="flex items-center justify-center gap-0.5 rounded-lg border border-purple-100 bg-purple-50/50 py-1.5 text-xs font-bold text-purple-600 transition-all hover:bg-purple-100/50 active:scale-[0.97] shadow-sm"
+                      >
+                        <History className="w-3.5 h-3.5 text-purple-400" />
+                        <span>流水</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSettings(fund)}
+                        className="flex items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white py-1.5 text-xs font-bold text-slate-500 transition-all hover:bg-slate-50 active:scale-[0.97] shadow-sm"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-slate-400" />
+                        <span>设置</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* --- 桌面端表格视图 --- */}
+        <table ref={groupTableRef} className="hidden md:table w-full text-left border-collapse min-w-[900px] table-fixed">
           <colgroup>
             <col className="w-[22%]" />
             <col className="w-[9%]" />
@@ -384,7 +606,7 @@ export default function FundTable({
                           className="rounded-md border border-purple-100 bg-purple-50/40 px-1.5 py-px text-[10px] font-bold text-purple-600 transition-all hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
                           title="交易流水记录"
                         >
-                          <History className="w-3 h-3 text-purple-400" />
+                          <History className="w-3.5 h-3.5 text-purple-400" />
                           <span>流水</span>
                         </button>
                         <button
@@ -393,7 +615,7 @@ export default function FundTable({
                           className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] font-bold text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
                           title="持仓设置"
                         >
-                          <Settings className="w-3 h-3 text-slate-400" />
+                          <Settings className="w-3.5 h-3.5 text-slate-400" />
                           <span>设置</span>
                         </button>
                       </div>

@@ -103,6 +103,9 @@ export default function OcrSyncModal({
   };
 
   const performSearch = async (keyword) => {
+    if (window.location.port === '5173') {
+      return await searchFundClientSide(keyword);
+    }
     try {
       const res = await fetch(`/api/search?key=${encodeURIComponent(keyword)}`);
       if (res.ok) {
