@@ -17,6 +17,37 @@ const formatDayCount = (value) => {
   return `${value} 天`;
 };
 
+const getTencentSymbol = (code) => {
+  const cleanCode = String(code || '').trim().toUpperCase();
+  if (!cleanCode) return '';
+
+  // Check if it is a US stock (has letters)
+  if (/[A-Z]/.test(cleanCode)) {
+    return `us${cleanCode}`;
+  }
+
+  // Check if it is a Hong Kong stock
+  if (cleanCode.length === 5) {
+    return `hk${cleanCode}`;
+  }
+  if (cleanCode.length < 5) {
+    return `hk${cleanCode.padStart(5, '0')}`;
+  }
+
+  // A-share codes (6 digits)
+  if (cleanCode.startsWith('6')) {
+    return `sh${cleanCode}`;
+  }
+  if (cleanCode.startsWith('0') || cleanCode.startsWith('3')) {
+    return `sz${cleanCode}`;
+  }
+  if (cleanCode.startsWith('4') || cleanCode.startsWith('8') || cleanCode.startsWith('9')) {
+    return `bj${cleanCode}`;
+  }
+
+  return `sh${cleanCode}`; // fallback
+};
+
 function ChartRenderer({ option }) {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
@@ -69,6 +100,71 @@ export default function FundDetailPanel({
 }) {
   const [chartTab, setChartTab] = useState('performance'); // performance, myprofit, theme
   const [perfPeriod, setPerfPeriod] = useState('1Y'); // 1M, 3M, 6M, 1Y, 3Y
+  const [stockQuotes, setStockQuotes] = useState({});
+
+  useEffect(() => {
+    if (!isOpen || !detailModel?.holdings || detailModel.holdings.length === 0) {
+      setStockQuotes({});
+      return undefined;
+    }
+
+    const symbols = detailModel.holdings
+      .map((h) => getTencentSymbol(h.code))
+      .filter(Boolean);
+
+    if (symbols.length === 0) {
+      setStockQuotes({});
+      return undefined;
+    }
+
+    let active = true;
+
+    const fetchQuotes = async () => {
+      try {
+        const res = await fetch(`/api/stock-quotes?symbols=${symbols.join(',')}`);
+        if (res.ok && active) {
+          const data = await res.json();
+          if (data.success && data.quotes) {
+            setStockQuotes(data.quotes);
+          }
+        }
+      } catch (err) {
+        console.warn('获取重仓股行情失败:', err);
+      }
+    };
+
+    fetchQuotes();
+
+    const intervalId = setInterval(() => {
+      fetchQuotes();
+    }, 20000); // 20s high-frequency updates
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [isOpen, detailModel?.holdings]);
+
+  const estimatedHoldingsRate = useMemo(() => {
+    if (!detailModel?.holdings || detailModel.holdings.length === 0 || Object.keys(stockQuotes).length === 0) {
+      return null;
+    }
+
+    let weightedSum = 0;
+    let weightSum = 0;
+
+    for (const h of detailModel.holdings) {
+      const sym = getTencentSymbol(h.code);
+      const quote = stockQuotes[sym];
+      if (quote && typeof quote.changePercent === 'number') {
+        weightedSum += quote.changePercent * (h.percent || 0);
+        weightSum += (h.percent || 0);
+      }
+    }
+
+    if (weightSum <= 0) return null;
+    return weightedSum / weightSum;
+  }, [detailModel?.holdings, stockQuotes]);
 
   const filteredHistory = useMemo(() => {
     if (!detailModel?.officialHistory) return [];
@@ -225,7 +321,7 @@ export default function FundDetailPanel({
         <div className="shrink-0 h-14 md:h-16 border-b border-slate-200/80 bg-slate-50/80 px-4 md:px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
             <span className="rounded-md bg-blue-100 text-blue-800 px-2 py-0.5 md:px-2.5 md:py-1 text-[10px] md:text-xs font-bold tracking-wide shrink-0">{detailModel.code}</span>
-            <h2 className="text-base md:text-xl font-black text-slate-800 tracking-tight truncate max-w-[150px] xs:max-w-none" title={detailModel.name}>{detailModel.name}</h2>
+            <h2 className="text-base md:text-xl font-black text-slate-800 tracking-tight truncate max-w-[280px] sm:max-w-[480px] md:max-w-[700px] lg:max-w-[900px] xl:max-w-none" title={detailModel.name}>{detailModel.name}</h2>
             {isLoading && <span className="text-[10px] text-slate-400 animate-pulse shrink-0">刷新中...</span>}
           </div>
           <button onClick={onClose} className="rounded-full hover:bg-slate-200 p-2 text-slate-400 transition-colors shrink-0">
@@ -244,8 +340,9 @@ export default function FundDetailPanel({
             </div>
             
             <div className="grid grid-cols-2 gap-3 content-start shrink-0 md:flex-1 md:overflow-y-auto custom-scrollbar">
-              <DashboardMetric label="当日涨幅" valNode={<FormatNumber value={detailModel.dailyRate} isPercent={true} />} />
-              <DashboardMetric label="近1年涨幅" valNode={<FormatNumber value={detailModel.performance.oneYear} isPercent={true} />} />
+              <DashboardMetric label="估算涨幅 (大盘)" valNode={<FormatNumber value={detailModel.dailyRate} isPercent={true} />} />
+              <DashboardMetric label="实时持仓估算" valNode={<FormatNumber value={estimatedHoldingsRate} isPercent={true} />} />
+              <DashboardMetric label="近1年涨幅" valNode={<FormatNumber value={detailModel.performance.oneYear} isPercent={true} />} colSpan={2} />
               
               <DashboardMetric label="持有金额" value={formatCurrencyAmount(detailModel.holdingAmount)} colSpan={2} />
               
@@ -330,7 +427,20 @@ export default function FundDetailPanel({
                             <div className="text-[9px] text-slate-400 font-normal leading-none mt-0.5">{cleanCode}</div>
                           </div>
                           <div className="text-right font-mono font-medium text-slate-500">{formatPlainNumber(h.percent, '%')}</div>
-                          <div className="text-right font-mono text-slate-300">--</div>
+                          <div className="text-right font-mono font-bold">
+                            {(() => {
+                              const sym = getTencentSymbol(h.code);
+                              const q = stockQuotes[sym];
+                              if (q && typeof q.changePercent === 'number') {
+                                return (
+                                  <span className={q.changePercent > 0 ? 'text-rose-500' : q.changePercent < 0 ? 'text-emerald-500' : 'text-slate-400'}>
+                                    {q.changePercent > 0 ? '+' : ''}{q.changePercent.toFixed(2)}%
+                                  </span>
+                                );
+                              }
+                              return <span className="text-slate-300">--</span>;
+                            })()}
+                          </div>
                         </div>
                       );
                     })

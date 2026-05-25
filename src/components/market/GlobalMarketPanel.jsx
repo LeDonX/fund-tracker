@@ -4,7 +4,7 @@ import { Globe, RefreshCw, AlertCircle, TrendingUp, TrendingDown, Clock, Compass
 
 // Light-weight pure SVG sparkline component for grid cards
 function Sparkline({ data, isPositive }) {
-  if (!data || data.length === 0) return null;
+  if (!data || data.length <= 1) return null;
   
   const values = data.map(d => d.value);
   const min = Math.min(...values);
@@ -1792,7 +1792,7 @@ export default function GlobalMarketPanel() {
               className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 marketTab === 'overview'
                   ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
-                  : 'text-slate-500 hover:text-slate-805'
+                  : 'text-slate-500 hover:text-slate-805 border border-transparent'
               }`}
             >
               <Globe className="w-3.5 h-3.5" />
@@ -1803,7 +1803,7 @@ export default function GlobalMarketPanel() {
               className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer relative ${
                 marketTab === 'predictor'
                   ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
-                  : 'text-slate-500 hover:text-slate-805'
+                  : 'text-slate-500 hover:text-slate-805 border border-transparent'
               }`}
             >
               <Compass className="w-3.5 h-3.5 animate-spin-slow" />
@@ -1820,7 +1820,7 @@ export default function GlobalMarketPanel() {
               className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer relative ${
                 marketTab === 'advisor'
                   ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
-                  : 'text-slate-500 hover:text-slate-805'
+                  : 'text-slate-500 hover:text-slate-805 border border-transparent'
               }`}
             >
               <Cpu className="w-3.5 h-3.5" />
@@ -1848,7 +1848,7 @@ export default function GlobalMarketPanel() {
         </div>
 
         {/* Card Grid Container */}
-        <div className="flex-1 md:overflow-y-auto custom-scrollbar pr-0 md:pr-1">
+        <div className="flex-1 md:overflow-y-auto custom-scrollbar p-2.5 -m-2.5">
           {loading ? (
             /* Loading skeletons */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

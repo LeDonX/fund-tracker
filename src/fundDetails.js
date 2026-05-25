@@ -276,10 +276,10 @@ const getTotalCostAmount = (sourceFund, displayedFund, holdingAmount) => {
   return null;
 };
 
-const getHoldingDays = (sourceFund) => {
-  if (!sourceFund?.holdingStartDate) return null;
+const getHoldingDays = (startDateStr) => {
+  if (!startDateStr) return null;
 
-  const startDate = parseDate(sourceFund.holdingStartDate);
+  const startDate = parseDate(startDateStr);
   if (!startDate) return null;
 
   const today = startOfDay(new Date());
@@ -333,7 +333,6 @@ export const buildFundDetailModel = ({
   const relatedThemes = detailEntry?.remoteThemes?.length > 0
     ? detailEntry.remoteThemes
     : (sourceFund?.sector ? [sourceFund.sector] : []);
-  const holdingDays = getHoldingDays(sourceFund);
 
   // Compute holding start date strictly based on the earliest valid date of addedDate, holdingStartDate, or firstTransactionDate
   const addedDate = sourceFund.addedDate || '';
@@ -344,6 +343,8 @@ export const buildFundDetailModel = ({
   if (dateCandidates.length > 0) {
     calculatedHoldingStartDate = dateCandidates.sort((a, b) => a.localeCompare(b))[0];
   }
+
+  const holdingDays = getHoldingDays(calculatedHoldingStartDate);
 
   return {
     code,

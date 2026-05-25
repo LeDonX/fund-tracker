@@ -651,18 +651,99 @@ const fetchQuoteMapForFunds = async (fundsToUpdate) => {
   return quoteMap;
 };
 
-const mergeFundsWithSources = (fundsToMerge, quoteMap, officialMap) => {
+const adjustQDIIValuation = (fund, quote, marketData) => {
+  if (!quote || !marketData || !marketData.success || !Array.isArray(marketData.indices)) {
+    return quote;
+  }
+
+  const name = quote.name || fund.name || '';
+  const code = quote.code || fund.code || '';
+
+  // Identify global indices tracking funds
+  const isNasdaq = /纳斯达克|纳指|NASDAQ/i.test(name);
+  const isSP500 = /标普500|S&P\s*500|标普信息科技|标普生物科技|标普消费/i.test(name);
+  const isHSRate = /恒生科技|HSTECH/i.test(name);
+  const isHSI = /恒生指数|恒指|Hang\s*Seng/i.test(name);
+  const isDAX = /德国|DAX/i.test(name);
+  const isNikkei = /日经225|日经|Nikkei/i.test(name);
+
+  if (!isNasdaq && !isSP500 && !isHSRate && !isHSI && !isDAX && !isNikkei) {
+    return quote;
+  }
+
+  const indices = marketData.indices;
+  const nqFutures = indices.find(idx => idx.symbol === 'NQ=F');
+  const esFutures = indices.find(idx => idx.symbol === 'ES=F');
+  const fxUsdCnh = indices.find(idx => idx.symbol === 'USDCNH=X');
+  const hsTech = indices.find(idx => idx.symbol === '^HSTECH');
+  const hsIndex = indices.find(idx => idx.symbol === '^HSI');
+  const daxIndex = indices.find(idx => idx.symbol === '^GDAXI');
+  const nikkeiIndex = indices.find(idx => idx.symbol === '^N225');
+
+  let baseRate = 0;
+  let hasMatch = false;
+
+  if (isNasdaq && nqFutures) {
+    baseRate = nqFutures.changePercent || 0;
+    hasMatch = true;
+  } else if (isSP500 && esFutures) {
+    baseRate = esFutures.changePercent || 0;
+    hasMatch = true;
+  } else if (isHSRate && hsTech) {
+    baseRate = hsTech.changePercent || 0;
+    hasMatch = true;
+  } else if (isHSI && hsIndex) {
+    baseRate = hsIndex.changePercent || 0;
+    hasMatch = true;
+  } else if (isDAX && daxIndex) {
+    baseRate = daxIndex.changePercent || 0;
+    hasMatch = true;
+  } else if (isNikkei && nikkeiIndex) {
+    baseRate = nikkeiIndex.changePercent || 0;
+    hasMatch = true;
+  }
+
+  if (!hasMatch) {
+    return quote;
+  }
+
+  // Forex adjustment for US assets
+  let fxRate = 0;
+  if ((isNasdaq || isSP500) && fxUsdCnh) {
+    fxRate = fxUsdCnh.changePercent || 0;
+  }
+
+  const adjustedRate = Number((baseRate + fxRate).toFixed(2));
+
+  // Compute the adjusted estimated net value based on last close
+  const lastNetValue = quote.lastNetValue || fund.lastNetValue || 1.0;
+  const estimatedNetValue = Number((lastNetValue * (1 + adjustedRate / 100)).toFixed(4));
+
+  return {
+    ...quote,
+    dailyRate: adjustedRate,
+    estimatedNetValue,
+    quoteSource: 'estimate',
+    updateTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+    netValueDate: new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')
+  };
+};
+
+const mergeFundsWithSources = (fundsToMerge, quoteMap, officialMap, marketData) => {
   if (!fundsToMerge || fundsToMerge.length === 0) {
     return fundsToMerge;
   }
 
   return fundsToMerge.map((fund) => {
     const code = String(fund.code || '').trim();
-    const quote = quoteMap.get(code);
+    let quote = quoteMap.get(code);
     const officialSnapshot = officialMap.get(code);
     let nextFund = fund;
 
     if (quote) {
+      if (marketData) {
+        quote = adjustQDIIValuation(nextFund, quote, marketData);
+      }
       nextFund = reconcileFundWithQuote(nextFund, quote);
     } else if (fund.shares === undefined) {
       nextFund = {
@@ -1141,6 +1222,87 @@ const loadPingzhongData = (fundCode) => {
   });
 };
 
+const loadHoldingsFromF10 = (fundCode) => {
+  return new Promise((resolve) => {
+    const normalizedCode = String(fundCode || '').trim();
+    const scriptId = `f10_holdings_${normalizedCode}_${Date.now()}`;
+    let settled = false;
+    const previousApidata = window.apidata;
+
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      document.getElementById(scriptId)?.remove();
+      window.apidata = previousApidata;
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve([]);
+    }, 4000);
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = `https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=${normalizedCode}&topline=10&rt=${Date.now()}`;
+    script.async = true;
+    script.onload = () => {
+      if (settled) return;
+      settled = true;
+
+      try {
+        const content = window.apidata?.content || '';
+        const holdings = [];
+        const trRegex = /<tr>([\s\S]*?)<\/tr>/g;
+        let trMatch;
+        while ((trMatch = trRegex.exec(content)) !== null) {
+          const rowHtml = trMatch[1];
+          if (rowHtml.includes('序号') || rowHtml.includes('股票代码')) continue; // Skip header
+
+          const cells = [];
+          const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/g;
+          let tdMatch;
+          while ((tdMatch = tdRegex.exec(rowHtml)) !== null) {
+            cells.push(tdMatch[1].trim());
+          }
+
+          if (cells.length >= 7) {
+            const codeLinkMatch = cells[1].match(/>([^<]+)<\/a>/);
+            const rawCode = codeLinkMatch ? codeLinkMatch[1].trim() : cells[1];
+
+            const nameLinkMatch = cells[2].match(/>([^<]+)<\/a>/);
+            const rawName = nameLinkMatch ? nameLinkMatch[1].trim() : cells[2];
+
+            const percentMatch = cells[6].match(/(\d+(?:\.\d+)?)%/);
+            const percent = percentMatch ? parseFloat(percentMatch[1]) : 0;
+
+            if (rawCode && rawName) {
+              holdings.push({
+                code: rawCode,
+                name: rawName,
+                percent: percent,
+              });
+            }
+          }
+        }
+        cleanup();
+        resolve(holdings);
+      } catch (err) {
+        cleanup();
+        resolve([]);
+      }
+    };
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve([]);
+    };
+
+    document.body.appendChild(script);
+  });
+};
+
 const fetchFundDetailRemoteData = async (fundCode) => {
   const normalizedCode = String(fundCode || '').trim();
 
@@ -1156,16 +1318,36 @@ const fetchFundDetailRemoteData = async (fundCode) => {
     return [];
   };
 
-  const [quoteResult, historyResult, holdingsResult, industryResult] = await Promise.allSettled([
+  const fetchMarket = async () => {
+    try {
+      const res = await fetch('/api/market');
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn("无法从 Pages 接口获取大盘指数", e);
+    }
+    return null;
+  };
+
+  const [quoteResult, historyResult, holdingsResult, industryResult, f10HoldingsResult, marketResult] = await Promise.allSettled([
     enqueueTiantianFundQuote(normalizedCode),
     enqueueEastmoneyOfficialHistoryRange(normalizedCode),
     loadPingzhongData(normalizedCode),
     fetchIndustry(),
+    loadHoldingsFromF10(normalizedCode),
+    fetchMarket(),
   ]);
 
-  const quote = quoteResult.status === 'fulfilled' ? quoteResult.value : null;
+  let quote = quoteResult.status === 'fulfilled' ? quoteResult.value : null;
   const holdingsData = holdingsResult.status === 'fulfilled' ? holdingsResult.value : null;
   const industries = industryResult.status === 'fulfilled' ? industryResult.value : [];
+  const f10Holdings = f10HoldingsResult.status === 'fulfilled' ? f10HoldingsResult.value : [];
+  const marketData = marketResult.status === 'fulfilled' ? marketResult.value : null;
+  
+  if (quote && marketData) {
+    quote = adjustQDIIValuation({ code: normalizedCode }, quote, marketData);
+  }
   
   const officialHistory = (holdingsData && holdingsData.netWorthTrend && holdingsData.netWorthTrend.length > 0)
     ? holdingsData.netWorthTrend
@@ -1177,8 +1359,10 @@ const fetchFundDetailRemoteData = async (fundCode) => {
     throw new Error(historyError || quoteError || '基金详情获取失败');
   }
 
-  const holdings = [];
-  if (holdingsData && Array.isArray(holdingsData.stockCodes)) {
+  let holdings = [];
+  if (f10Holdings && f10Holdings.length > 0) {
+    holdings = f10Holdings;
+  } else if (holdingsData && Array.isArray(holdingsData.stockCodes)) {
     const len = holdingsData.stockCodes.length;
     for (let i = 0; i < len; i++) {
       if (holdingsData.stockCodes[i]) {
@@ -2529,13 +2713,14 @@ export default function FundTrackerApp() {
     setIsRefreshing(true);
 
     try {
-      const [quoteMap, officialMap] = await Promise.all([
+      const [quoteMap, officialMap, marketData] = await Promise.all([
         fetchQuoteMapForFunds(funds),
         fetchOfficialMapForFunds(funds),
+        fetch('/api/market').then(res => res.ok ? res.json() : null).catch(() => null)
       ]);
 
       if (quoteMap.size > 0 || officialMap.size > 0) {
-        setFunds((currentFunds) => mergeFundsWithSources(currentFunds, quoteMap, officialMap));
+        setFunds((currentFunds) => mergeFundsWithSources(currentFunds, quoteMap, officialMap, marketData));
 
         const now = new Date();
         setLastUpdateTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`);
@@ -4312,141 +4497,174 @@ export default function FundTrackerApp() {
           )}
         </div>
 
-        {/* --- 桌面端 Header --- */}
-        <header className="hidden md:flex flex-shrink-0 items-center justify-between bg-slate-900 px-6 py-3.5 rounded-2xl shadow-md border border-slate-800 text-white relative overflow-hidden">
-          {/* Subtle micro-lighting effect */}
-          <div className="absolute top-0 right-0 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-          {/* 左侧：品牌与 Tab 切换器 */}
-          <div className="flex items-center gap-6 relative z-10">
-            <div className="flex items-center gap-2">
-              {totalDailyProfit > 0 ? (
-                <TrendingUp className="text-rose-400 w-5 h-5 filter drop-shadow-[0_2px_8px_rgba(251,113,133,0.3)] animate-pulse" />
-              ) : totalDailyProfit < 0 ? (
-                <TrendingDown className="text-emerald-400 w-5 h-5 filter drop-shadow-[0_2px_8px_rgba(52,211,153,0.3)] animate-pulse" />
-              ) : (
-                <TrendingUp className="text-slate-400 w-5 h-5" />
-              )}
-              <h1 className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
-                <span>智能基金追踪</span>
-                <span className="text-[9px] font-bold text-slate-450 bg-slate-800 px-1.5 py-0.2 rounded border border-slate-700 select-none">PRO V1.5.0</span>
-              </h1>
+        {/* --- 桌面端顶部区域：包含极简状态账户条与主 Header --- */}
+        <div className="hidden md:flex flex-col gap-2.5 shrink-0">
+          {/* 顶部极简状态账户条 */}
+          <div className="flex justify-between items-center px-1 text-[11px] text-slate-500 select-none">
+            {/* 左侧：极简系统状态 */}
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500/80 animate-pulse"></span>
+              <span className="font-medium text-[10px]">系统运行正常</span>
             </div>
-
-            <div className="w-px bg-slate-800 h-4"></div>
-
-            {/* 毛玻璃 Tab 切换器 */}
-            <div className="inline-flex items-center bg-slate-850 p-0.5 rounded-lg border border-slate-800 select-none">
-              <button
-                type="button"
-                onClick={() => setActiveTab('portfolio')}
-                className={`flex items-center gap-1 px-3 py-1 rounded font-bold text-[11px] tracking-tight transition-all duration-150 ${activeTab === 'portfolio' ? 'bg-slate-800 text-white border border-slate-700/50 shadow-xs' : 'text-slate-400 hover:text-white'}`}
-              >
-                <Wallet className="w-3 h-3" />
-                <span>我的持仓</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('search')}
-                className={`flex items-center gap-1 px-3 py-1 rounded font-bold text-[11px] tracking-tight transition-all duration-150 ${activeTab === 'search' ? 'bg-slate-800 text-white border border-slate-700/50 shadow-xs' : 'text-slate-400 hover:text-white'}`}
-              >
-                <Search className="w-3 h-3" />
-                <span>查找基金</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('market')}
-                className={`flex items-center gap-1 px-3 py-1 rounded font-bold text-[11px] tracking-tight transition-all duration-150 ${activeTab === 'market' ? 'bg-slate-800 text-white border border-slate-700/50 shadow-xs' : 'text-slate-400 hover:text-white'}`}
-              >
-                <Globe className="w-3 h-3" />
-                <span>全球股市</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 右侧：登录信息 (普通网站的右上角设计) */}
-          <div className="flex items-center gap-3.5 relative z-10">
-            {/* 上次更新时间缩略标识 */}
-            <span className="text-[10px] text-slate-400 font-mono bg-slate-850 border border-slate-800 px-2 py-0.5 rounded select-none" title="上次刷新时间">
-              更新于: {lastUpdateTime ? `${lastUpdateTime.slice(-8)}` : '刚刚'}
-            </span>
-
-            <div className="w-px bg-slate-850 h-4"></div>
-
-            <div className="flex items-center gap-2">
-              <div className="w-6.5 h-6.5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-350 border border-slate-755 select-none">
-                {(user?.email || 'Guest')[0].toUpperCase()}
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="text-[11.5px] font-semibold text-slate-200 truncate max-w-[130px]" title={user?.email || '免登录本地账户'}>
+            
+            {/* 右侧：登录信息与账户操作 */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                {!isAuthenticated ? (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200/50">
+                    LOCAL 本地
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-250/50">
+                    CLOUD 云端
+                  </span>
+                )}
+                <span className="font-bold text-slate-600 max-w-[150px] truncate" title={user?.email || '免登录本地账户'}>
                   {user?.email || '本地临时账户'}
                 </span>
-                <span className="text-[8.5px] font-bold mt-0.2 tracking-wide uppercase select-none">
-                  {!isAuthenticated ? (
-                    <span className="text-amber-450 bg-amber-500/10 px-1 py-0.1 rounded border border-amber-500/20">LOCAL 本地</span>
-                  ) : (
-                    <span className="text-emerald-400 bg-emerald-500/10 px-1 py-0.1 rounded border border-emerald-500/20">CLOUD 云端</span>
-                  )}
+              </div>
+              <span className="text-slate-350">|</span>
+              <span className="text-[10px] text-slate-400 font-semibold" title="上次数据更新时间">
+                数据更新: {lastUpdateTime ? lastUpdateTime.slice(-8) : '刚刚'}
+              </span>
+              <span className="text-slate-350">|</span>
+              <button 
+                type="button" 
+                onClick={handleLogout} 
+                className="text-slate-400 hover:text-rose-500 font-black transition-colors cursor-pointer text-[10.5px]"
+              >
+                退出登录
+              </button>
+            </div>
+          </div>
+
+          {/* 主 Header 卡片 */}
+          <header className="flex flex-shrink-0 items-center justify-between bg-slate-900 px-6 py-3.5 rounded-2xl shadow-md border border-slate-800 text-white relative overflow-hidden">
+            {/* Subtle micro-lighting effect */}
+            <div className="absolute top-0 right-0 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            {/* 左侧：品牌与 Tab 切换器 */}
+            <div className="flex items-center gap-6 relative z-10">
+              <div className="flex items-center gap-2">
+                {totalDailyProfit > 0 ? (
+                  <TrendingUp className="text-rose-400 w-5 h-5 filter drop-shadow-[0_2px_8px_rgba(251,113,133,0.3)] animate-pulse" />
+                ) : totalDailyProfit < 0 ? (
+                  <TrendingDown className="text-emerald-400 w-5 h-5 filter drop-shadow-[0_2px_8px_rgba(52,211,153,0.3)] animate-pulse" />
+                ) : (
+                  <TrendingUp className="text-slate-400 w-5 h-5" />
+                )}
+                <h1 className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
+                  <span>智能基金追踪</span>
+                  <span className="text-[9px] font-bold text-slate-450 bg-slate-800 px-1.5 py-0.2 rounded border border-slate-700 select-none">PRO V1.5.0</span>
+                </h1>
+              </div>
+
+              <div className="w-px bg-slate-800 h-4"></div>
+
+              {/* 毛玻璃 Tab 切换器 */}
+              <div className="inline-flex items-center bg-slate-850 p-0.5 rounded-lg border border-slate-800 select-none">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('portfolio')}
+                  className={`flex items-center gap-1 px-3 py-1 rounded font-bold text-[11px] tracking-tight transition-all duration-150 ${activeTab === 'portfolio' ? 'bg-slate-800 text-white border border-slate-700/50 shadow-xs' : 'text-slate-400 hover:text-white border border-transparent'}`}
+                >
+                  <Wallet className="w-3 h-3" />
+                  <span>我的持仓</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('search')}
+                  className={`flex items-center gap-1 px-3 py-1 rounded font-bold text-[11px] tracking-tight transition-all duration-150 ${activeTab === 'search' ? 'bg-slate-800 text-white border border-slate-700/50 shadow-xs' : 'text-slate-400 hover:text-white border border-transparent'}`}
+                >
+                  <Search className="w-3 h-3" />
+                  <span>查找基金</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('market')}
+                  className={`flex items-center gap-1 px-3 py-1 rounded font-bold text-[11px] tracking-tight transition-all duration-150 ${activeTab === 'market' ? 'bg-slate-800 text-white border border-slate-700/50 shadow-xs' : 'text-slate-400 hover:text-white border border-transparent'}`}
+                >
+                  <Globe className="w-3 h-3" />
+                  <span>全球股市</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 右侧：总资产和当日盈亏 */}
+            <div className="flex items-center gap-6 relative z-10 select-none">
+              <div className="flex items-baseline gap-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">总资产</span>
+                <span className="text-base font-black text-white font-mono tracking-tight">
+                  {formatCurrencyAmount(totalAmount)}
+                  {hasIncompleteAmount && <span className="ml-0.5 text-amber-500 text-xs font-bold cursor-help" title="数据加载中">*</span>}
+                </span>
+              </div>
+              <div className="w-px bg-slate-800 h-4"></div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{dailySummaryLabel.replace(' (元)', '')}</span>
+                <span className="text-sm font-extrabold font-mono tracking-tight">
+                  <FormatNumber value={totalDailyProfit} isCurrency={true} />
+                  {hasIncompleteDaily && <span className="ml-0.5 text-amber-500 text-xs font-bold cursor-help" title="数据加载中">*</span>}
                 </span>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        </div>
 
         {activeTab === 'portfolio' ? (
           <>
-            {/* --- 资产概要与工具栏 --- */}
+            {/* --- 资产概要与工具栏 (Streamlined Operations Toolbar) --- */}
             <div className="hidden md:flex flex-shrink-0 items-center justify-between py-1 px-1">
-              {/* 左侧：资产与盈亏摘要 */}
-              <div className="flex items-center gap-6">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">总资产</span>
-                  <span className="text-lg font-black text-slate-700 font-mono">
-                    {formatCurrencyAmount(totalAmount)}
-                    {hasIncompleteAmount && <span className="ml-0.5 text-amber-500 text-xs font-bold cursor-help" title="数据加载中">*</span>}
+              {/* 左侧：表区统计信息 */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xs font-bold text-slate-800 tracking-tight">自选基金持仓</h2>
+                  <span className="px-2 py-0.5 text-[10px] font-black bg-slate-200/70 text-slate-700 rounded-full border border-slate-300/30 select-none">
+                    {funds.length} 支
                   </span>
                 </div>
-                <div className="w-px bg-slate-200 h-4"></div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">{dailySummaryLabel.replace(' (元)', '')}</span>
-                  <span className="text-sm font-extrabold font-mono">
-                    <FormatNumber value={totalDailyProfit} isCurrency={true} />
-                    {hasIncompleteDaily && <span className="ml-0.5 text-amber-500 text-xs font-bold cursor-help" title="数据加载中">*</span>}
-                  </span>
-                </div>
+                {lastUpdateTime && (
+                  <>
+                    <div className="w-px bg-slate-200 h-3"></div>
+                    <div className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold select-none">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span>实时就绪</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* 右侧：紧凑型操作按钮组 */}
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs shadow-xs shrink-0">
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs shadow-xs shrink-0 cursor-pointer">
                   <Plus className="w-3.5 h-3.5" />
                   <span>新增持仓</span>
                 </button>
-                <button type="button" onClick={handleOpenCreateGroup} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 shrink-0">
+                <button type="button" onClick={handleOpenCreateGroup} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 shrink-0 cursor-pointer">
                   <FolderPlus className="w-3.5 h-3.5 text-slate-500" />
                   <span>分组</span>
                 </button>
-                <button type="button" onClick={() => openModal('sync')} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 shrink-0">
+                <button type="button" onClick={() => openModal('sync')} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 shrink-0 cursor-pointer">
                   <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
                   <span>同步交易</span>
                 </button>
-                <button type="button" onClick={() => openModal('ocr')} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 shrink-0">
+                <button type="button" onClick={() => openModal('ocr')} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 shrink-0 cursor-pointer">
                   <Camera className="w-3.5 h-3.5 text-slate-500" />
                   <span>截图</span>
                 </button>
-                <button type="button" onClick={handleRefresh} disabled={funds.length === 0} className="flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-600 px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
-                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+                <button type="button" onClick={handleRefresh} disabled={funds.length === 0} className="flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-600 px-2.5 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 cursor-pointer">
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
                   <span>{refreshButtonLabel.replace('刷新数据', '刷新')}</span>
                 </button>
 
-                <div className="relative group shrink-0 ml-1">
+                <div className="relative group shrink-0 ml-0.5">
                   <button 
                     type="button" 
                     onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}
                     className="flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-slate-200 cursor-pointer animate-in duration-200"
                   >
                     <Settings className="w-3.5 h-3.5 text-slate-500 group-hover:rotate-45 transition-transform duration-300" />
-                    <ChevronDown className="w-3 h-3 text-slate-400 group-hover:rotate-180 transition-transform duration-200" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:rotate-180 transition-transform duration-200" />
                   </button>
                   
                   {/* Dropdown Panel */}
@@ -4491,17 +4709,13 @@ export default function FundTrackerApp() {
 
                       {/* Action Buttons */}
                       <div className="grid grid-cols-2 gap-2">
-                        <button type="button" onClick={handleOpenImportModal} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 rounded-lg font-semibold transition-all duration-150 text-xs border border-slate-200 shadow-xs">
+                        <button type="button" onClick={handleOpenImportModal} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 rounded-lg font-semibold transition-all duration-150 text-xs border border-slate-200 shadow-xs cursor-pointer">
                           <Upload className="w-3.5 h-3.5 text-slate-500" /> 导入配置
                         </button>
-                        <button type="button" onClick={() => openModal('export')} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 rounded-lg font-semibold transition-all duration-150 text-xs border border-slate-200 shadow-xs">
-                          <Download className="w-3.5 h-3.5 text-slate-500" /> 导出数据
+                        <button type="button" onClick={() => openModal('export')} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 rounded-lg font-semibold transition-all duration-150 text-xs border border-slate-200 shadow-xs cursor-pointer">
+                          <Download className="w-3.5 h-3.5 text-slate-550" /> 导出数据
                         </button>
                       </div>
-
-                      <button type="button" onClick={handleLogout} className="flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 py-1.5 rounded-lg font-bold transition-all duration-150 text-xs border border-rose-200/60 shadow-xs w-full mt-1">
-                        <LogOut className="w-3.5 h-3.5" /> 退出系统登录
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -4584,6 +4798,7 @@ export default function FundTrackerApp() {
         }
         .custom-scrollbar {
           -webkit-overflow-scrolling: touch;
+          scrollbar-gutter: stable;
         }
         #root {
           padding-top: env(safe-area-inset-top);

@@ -63,7 +63,7 @@ function boxMullerRandom() {
 }
 
 // Generate realistic simulated index charts (Fallback / offline / rate-limit)
-function generateSimulatedData(symbol, range = "1y") {
+function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realTimePrevClose = null) {
   const config = BASE_CONFIGS[symbol] || { base: 2000, drift: 0.0002, volatility: 0.01 };
   
   let days = 250;
@@ -88,7 +88,23 @@ function generateSimulatedData(symbol, range = "1y") {
     closePrices.push(Number(currentPrice.toFixed(2)));
   }
   
-  // Adjust base to make sure regularMarketPrice matches the final point
+  // Adjust base to make sure regularMarketPrice matches the final point (scale the series)
+  const targetLastPrice = realTimePrice !== null && realTimePrice !== undefined ? realTimePrice : config.base;
+  const lastGeneratedPrice = closePrices[closePrices.length - 1];
+  const scaleFactor = targetLastPrice / (lastGeneratedPrice || 1);
+  
+  for (let i = 0; i < closePrices.length; i++) {
+    closePrices[i] = Number((closePrices[i] * scaleFactor).toFixed(2));
+  }
+  
+  // Force exactly match today's realTimePrice and realTimePrevClose
+  if (realTimePrice !== null && realTimePrice !== undefined) {
+    closePrices[closePrices.length - 1] = realTimePrice;
+    if (realTimePrevClose !== null && realTimePrevClose !== undefined && closePrices.length > 1) {
+      closePrices[closePrices.length - 2] = realTimePrevClose;
+    }
+  }
+  
   const lastPrice = closePrices[closePrices.length - 1];
   const prevClose = closePrices[closePrices.length - 2] || lastPrice * 0.99;
   
@@ -236,6 +252,13 @@ async function getIndexData(symbol, range = "1y", interval = "1d") {
     }
     
     indexResult = cleanYahooData(result);
+    const closes = indexResult.indicators?.quote?.[0]?.close || [];
+    if (closes.length <= 5) {
+      console.log(`Yahoo returned too few data points (${closes.length}) for ${symbol}. Falling back to high-fidelity simulated historical data with real-time scaling.`);
+      const realTimePrice = result.meta?.regularMarketPrice;
+      const realTimePrevClose = result.meta?.chartPreviousClose;
+      indexResult = generateSimulatedData(symbol, range, realTimePrice, realTimePrevClose);
+    }
   } catch (err) {
     console.error(`Failed to fetch ${symbol} from Yahoo Finance: ${err.message}. Using simulated fallback.`);
     indexResult = generateSimulatedData(symbol, range);

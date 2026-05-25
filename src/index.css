@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+/* 彻底解决切换 Tab 页面抖动与滚动条布局抖动问题 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* 禁用系统外层全局滚动条，由内部卡片容器精细化管理滚动 */
+  scrollbar-gutter: stable; /* 无论是否显示滚动条，永久预留其空间以防移位 */
+}
