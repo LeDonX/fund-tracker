@@ -36,7 +36,16 @@ export default function FundTable({
   dailyRateColumnLabel,
   dailyProfitColumnLabel,
   handleOpenSyncTrade,
+  todayStr, // Add this prop
 }) {
+  const actualTodayStr = todayStr || (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = `${today.getMonth() + 1}`.padStart(2, '0');
+    const day = `${today.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+
   const hasCustomGroups = sectors.some((sector) => sector !== ungroupedSector);
   const [openGroupMenu, setOpenGroupMenu] = useState('');
   const groupMenuRef = useRef(null);
@@ -318,9 +327,14 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenFundDetail(fund)}
-                          className="text-left font-semibold text-slate-800 hover:text-blue-700 text-[14.5px] block truncate w-full"
+                          className="text-left font-semibold text-slate-800 hover:text-blue-700 text-[14.5px] flex items-center gap-1.5 w-full truncate"
                         >
-                          <span>{fund.name}</span>
+                          <span className="truncate">{fund.name}</span>
+                          {fund.netValueDate && fund.netValueDate !== actualTodayStr && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-50/70 text-amber-700 border border-amber-200/50 select-none shrink-0 scale-90 origin-left">
+                              {fund.netValueDate.slice(5)}
+                            </span>
+                          )}
                         </button>
                         <span className="text-[10px] text-slate-400 font-semibold font-mono">{fund.code}</span>
                       </div>
@@ -340,11 +354,16 @@ export default function FundTable({
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">{dailyProfitColumnLabel}</span>
-                        <span className="text-xs font-black font-mono mt-0.5">
+                        <span className="text-xs font-black font-mono mt-0.5 flex flex-wrap items-center gap-1.5">
                           <FormatNumber value={fund.dailyProfit} isCurrency={true} />
-                          <span className="text-[9.5px] ml-1 font-semibold text-slate-400">
+                          <span className="text-[9.5px] font-semibold text-slate-400">
                             (<FormatNumber value={fund.dailyRate} isPercent={true} />)
                           </span>
+                          {fund.netValueDate && fund.netValueDate !== actualTodayStr && (
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100/60 border border-slate-200/50 px-1 py-0.2 rounded select-none shrink-0" title={`非今日收益 (${fund.netValueDate})`}>
+                              {fund.netValueDate.slice(5)}
+                            </span>
+                          )}
                         </span>
                       </div>
                       <div className="flex flex-col">
@@ -551,6 +570,11 @@ export default function FundTable({
                               已更新
                             </span>
                           )}
+                          {fund.netValueDate && fund.netValueDate !== actualTodayStr && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50/70 text-amber-700 border border-amber-200/50 select-none scale-[0.9] origin-left shrink-0" title={`非今日数据 (净值日期: ${fund.netValueDate})`}>
+                              {fund.netValueDate.slice(5)}
+                            </span>
+                          )}
                         </div>
                       </button>
                       <div className="text-xs text-slate-400 mt-0.5 font-medium">
@@ -562,10 +586,24 @@ export default function FundTable({
                       {formatCurrencyAmount(fund.amount)}
                     </td>
                     <td className="p-4 text-right">
-                      <FormatNumber value={fund.dailyRate} isPercent={true} />
+                      <div className="flex flex-col items-end">
+                        <FormatNumber value={fund.dailyRate} isPercent={true} />
+                        {fund.netValueDate && fund.netValueDate !== actualTodayStr && (
+                          <span className="text-[9px] font-semibold text-slate-400 mt-0.5" title={`估值日期为 ${fund.netValueDate}`}>
+                            {fund.netValueDate.slice(5)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-right bg-blue-50/20 font-extrabold text-[15.5px] border-r border-blue-50/10">
-                      <FormatNumber value={fund.dailyProfit} isCurrency={true} />
+                      <div className="flex flex-col items-end">
+                        <FormatNumber value={fund.dailyProfit} isCurrency={true} />
+                        {fund.netValueDate && fund.netValueDate !== actualTodayStr && (
+                          <span className="text-[9px] font-semibold text-slate-400 mt-0.5" title={`收益日期为 ${fund.netValueDate}`}>
+                            {fund.netValueDate.slice(5)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-right">
                       <FormatNumber value={fund.totalRate} isPercent={true} />

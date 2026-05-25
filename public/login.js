@@ -5,6 +5,15 @@ let currentMode = 'login'; // 'login' or 'register'
 
 // Check session on page load
 document.addEventListener('DOMContentLoaded', async () => {
+  // If guest mode is enabled, redirect directly to app home page
+  if (localStorage.getItem('fundTrackerGuestMode') === 'true') {
+    showToast('以本地免登录模式登录，正在跳转...', 'success');
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 1000);
+    return;
+  }
+
   // If in local Vite development mode (port 5173), there is no backend server
   if (window.location.port === '5173') {
     const emailInput = document.getElementById('email');
@@ -332,3 +341,41 @@ function showToast(message, type = 'info') {
     });
   }, 3500);
 }
+
+// ========== Guest Mode / Login-Free Functionality ==========
+
+function triggerGuestMode() {
+  const overlay = document.getElementById('guest-modal-overlay');
+  if (overlay) {
+    overlay.classList.add('visible');
+  }
+}
+
+function closeGuestModal() {
+  const overlay = document.getElementById('guest-modal-overlay');
+  if (overlay) {
+    overlay.classList.remove('visible');
+  }
+}
+
+function confirmGuestMode() {
+  closeGuestModal();
+  
+  // Set guest mode flag
+  localStorage.setItem('fundTrackerGuestMode', 'true');
+  
+  showToast('进入免登录本地模式！正在跳转至主页...', 'success');
+  
+  // Smooth redirect to app home page
+  setTimeout(() => {
+    window.location.href = '/';
+  }, 1200);
+}
+
+// Close guest modal if clicking outside
+document.addEventListener('click', (e) => {
+  const overlay = document.getElementById('guest-modal-overlay');
+  if (overlay && e.target === overlay) {
+    closeGuestModal();
+  }
+});

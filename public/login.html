@@ -84,6 +84,13 @@
               <div class="btn-spinner" id="btn-spinner"></div>
             </button>
           </form>
+
+          <div class="guest-mode-container">
+            <div class="divider-line"><span>或</span></div>
+            <button type="button" class="guest-btn" onclick="triggerGuestMode()">
+              <i class="icon-zap"></i> 免登录直接使用
+            </button>
+          </div>
           
           <div class="auth-footer">
             托管于 Cloudflare Pages 边缘节点 · 数据库由 D1 强力驱动
@@ -99,6 +106,27 @@
 
   <!-- Sleek Custom Toast Container for notifications -->
   <div class="toast-container" id="toast-container"></div>
+
+  <!-- Premium Glassmorphic Confirmation Modal for Guest Mode -->
+  <div class="modal-overlay" id="guest-modal-overlay">
+    <div class="guest-modal">
+      <div class="guest-modal-icon">
+        <i class="icon-alert-triangle animate-pulse"></i>
+      </div>
+      <h3 class="guest-modal-title">确认以免登录模式进入？</h3>
+      <div class="guest-modal-content">
+        <p><strong>⚠️ 重要安全提示：</strong></p>
+        <p>1. <strong>不使用数据库：</strong> 您的所有持仓、交易记录和设置仅保存在本浏览器的本地缓存中，云端不会存储任何数据。</p>
+        <p>2. <strong>无法跨设备同步：</strong> 数据不会在多个设备或浏览器之间同步。更换设备或浏览器将无法查看持仓数据。</p>
+        <p>3. <strong>数据丢失风险：</strong> 清除浏览器缓存、使用隐私模式或重装系统将导致您的数据<strong>永久丢失</strong>。</p>
+        <p>💡 建议您定期通过系统导出功能备份配置，或直接注册正式云端账户以确保安全。</p>
+      </div>
+      <div class="guest-modal-actions">
+        <button type="button" class="modal-btn modal-btn-cancel" onclick="closeGuestModal()">返回登录</button>
+        <button type="button" class="modal-btn modal-btn-confirm" onclick="confirmGuestMode()">确认并进入</button>
+      </div>
+    </div>
+  </div>
   
   <script src="login.js"></script>
 </body>

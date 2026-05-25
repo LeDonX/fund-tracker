@@ -337,8 +337,13 @@ const buildFundSnapshot = (fund, overrides = {}) => {
     : 0;
   const dailyRate = toNumber(dailyRateOverride ?? derivedDailyRate);
   const fallbackMarketValue = Math.max(0, toNumber(overrides.amount ?? fund.amount));
+
+  const quoteSource = overrides.quoteSource ?? fund.quoteSource;
+  const isEstimated = quoteSource === 'estimate';
+  const calculationNetValue = (isEstimated && lastNetValue > 0) ? lastNetValue : currentNetValue;
+
   const marketValue = hasTrackedShares
-    ? (shares > 0 ? (currentNetValue > 0 ? shares * currentNetValue : (lastNetValue > 0 ? shares * lastNetValue : fallbackMarketValue)) : 0)
+    ? (shares > 0 ? (calculationNetValue > 0 ? shares * calculationNetValue : (lastNetValue > 0 ? shares * lastNetValue : fallbackMarketValue)) : 0)
     : fallbackMarketValue;
   const fallbackCostAmount = fund.costAmount !== undefined
     ? Math.max(0, toNumber(fund.costAmount))
@@ -1605,6 +1610,7 @@ const CURATED_MARKET_FUNDS = [
 ];
 
 export default function FundTrackerApp() {
+  const todayStr = useMemo(() => getTodayDateKey(), []);
   
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -1680,6 +1686,12 @@ export default function FundTrackerApp() {
         });
         
         if (res.status === 401) {
+          // If guest mode is enabled, we DO NOT redirect! We just set guest state.
+          if (localStorage.getItem('fundTrackerGuestMode') === 'true') {
+            setUser({ email: 'guest@local', isGuest: true, name: '免登录用户' });
+            setIsAuthenticated(false);
+            return;
+          }
           // If port is not 5173, redirect to login page
           if (window.location.port !== '5173') {
             window.location.href = '/login.html';
@@ -1690,6 +1702,9 @@ export default function FundTrackerApp() {
         if (res.ok) {
           const authData = await res.json();
           if (authData?.authenticated && authData?.user) {
+            // Clear guest mode flag if user actually logged in on backend
+            localStorage.removeItem('fundTrackerGuestMode');
+            
             const loggedInEmail = authData.user.email;
             setUser(authData.user);
             setIsAuthenticated(true);
@@ -1785,6 +1800,10 @@ export default function FundTrackerApp() {
   };
 
   const handleLogout = async () => {
+    // Clear guest mode flag and synced user flag on logout
+    localStorage.removeItem('fundTrackerGuestMode');
+    localStorage.removeItem('fundTrackerSyncedUser');
+
     // If running in local Vite development mode, bypass backend call and redirect
     if (window.location.port === '5173') {
       window.location.href = '/login.html';
@@ -1793,8 +1812,6 @@ export default function FundTrackerApp() {
     try {
       const res = await fetch('/api/auth/me', { method: 'POST' });
       if (res.ok) {
-        // Clear synced user flag on logout
-        localStorage.removeItem('fundTrackerSyncedUser');
         window.location.href = '/login.html';
       } else {
         alert('退出登录失败，请重试');
@@ -2134,7 +2151,6 @@ export default function FundTrackerApp() {
   };
 
   const displayedFunds = useMemo(() => {
-    const todayStr = getTodayDateKey();
     const currentMonthPrefix = todayStr.slice(0, 7);
 
     // Get Monday of current week
@@ -2169,7 +2185,7 @@ export default function FundTrackerApp() {
         sourceFund: fund,
       };
     });
-  }, [funds, selectedDataSource, dailyProfits]);
+  }, [funds, selectedDataSource, dailyProfits, todayStr]);
 
   // 自动记录每日收益到历史表中
   useEffect(() => {
@@ -2276,8 +2292,10 @@ export default function FundTrackerApp() {
       groups[targetSector].funds.push(fund);
 
       if (Number.isFinite(fund.dailyProfit)) {
-        groups[targetSector].sectorDailyProfit += fund.dailyProfit;
-        tDaily += fund.dailyProfit;
+        if (fund.netValueDate === todayStr) {
+          groups[targetSector].sectorDailyProfit += fund.dailyProfit;
+          tDaily += fund.dailyProfit;
+        }
       } else {
         groups[targetSector].hasIncompleteDaily = true;
         hasIncompleteDaily = true;
@@ -2319,7 +2337,7 @@ export default function FundTrackerApp() {
       hasIncompleteAmount,
       hasIncompleteProfit,
     };
-  }, [displayedFunds, sectors]);
+  }, [displayedFunds, sectors, todayStr]);
 
   // 监听当日盈亏状态和隐私设置，实时同步更新网页标题和 Favicon 页签图标
   useEffect(() => {
@@ -4342,6 +4360,15 @@ export default function FundTrackerApp() {
             </h1>
             <div className="flex flex-wrap items-center gap-3 mt-3">
               <p className="text-slate-400 text-xs md:text-sm">全天候精准追踪您的基金组合与盘中实时估值</p>
+              {!isAuthenticated ? (
+                <span className="flex items-center gap-1 text-[10px] md:text-[11px] font-bold text-amber-300 bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 backdrop-blur-md shadow-sm" title="数据仅保存在当前浏览器本地，多个设备间不会同步">
+                  <AlertCircle className="w-3.5 h-3.5" /> 免登录本地模式
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[10px] md:text-[11px] font-bold text-emerald-350 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30 backdrop-blur-md shadow-sm" title={`云端数据库连接成功，支持多端数据同步: ${user?.email}`}>
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-450" /> 云端同步模式
+                </span>
+              )}
               {updateBadgeText && (
                 <span className="flex items-center gap-1 text-[10px] md:text-[11px] font-semibold text-blue-300 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20 backdrop-blur-md">
                   <Clock className="w-3.5 h-3.5 animate-spin-slow" /> {updateBadgeText}
@@ -4408,8 +4435,13 @@ export default function FundTrackerApp() {
                 {/* Hover/Toggle Panel */}
                 <div className={`absolute right-0 top-full pt-2 z-30 w-72 ${settingsDropdownOpen ? 'block' : 'hidden group-hover:block group-focus-within:block'}`}>
                   <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-4 flex flex-col gap-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase border-b border-slate-100 pb-2">
-                      工具与参数配置
+                    <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase border-b border-slate-100 pb-2 flex justify-between items-center">
+                      <span>工具与参数配置</span>
+                      {!isAuthenticated ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-amber-50 text-amber-600 border border-amber-200/50">免登录本地版</span>
+                      ) : (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/50">云端已同步</span>
+                      )}
                     </div>
                     
                     {/* 数据源 */}
@@ -4478,6 +4510,7 @@ export default function FundTrackerApp() {
               dailyRateColumnLabel={dailyRateColumnLabel}
               dailyProfitColumnLabel={dailyProfitColumnLabel}
               handleOpenSyncTrade={handleOpenSyncTrade}
+              todayStr={todayStr}
             />
           </>
         ) : activeTab === 'market' ? (
@@ -4651,7 +4684,14 @@ export default function FundTrackerApp() {
           {settingsDropdownOpen && (
             <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-72 bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/60 p-5 z-50 animate-in slide-in-from-bottom-5 duration-300 ease-out">
               <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase border-b border-slate-100/60 pb-2 flex justify-between items-center">
-                <span>控制与设置中心</span>
+                <span className="flex items-center gap-1.5">
+                  <span>控制与设置中心</span>
+                  {!isAuthenticated ? (
+                    <span className="text-[8px] px-1 py-0.5 rounded font-bold bg-amber-50 text-amber-600 border border-amber-200/50">免登录</span>
+                  ) : (
+                    <span className="text-[8px] px-1 py-0.5 rounded font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/50">已同步</span>
+                  )}
+                </span>
                 <button type="button" onClick={() => setSettingsDropdownOpen(false)} className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100/80 transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
