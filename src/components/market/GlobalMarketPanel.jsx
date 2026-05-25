@@ -92,6 +92,7 @@ export default function GlobalMarketPanel() {
   const [marketTab, setMarketTab] = useState('overview'); // 'overview' | 'predictor' | 'advisor'
 
   // Quantitative Advisor States
+  const [isNoviceMode, setIsNoviceMode] = useState(true); // Default to true (jargon-free novice mode!)
   const [advisorSubTab, setAdvisorSubTab] = useState('china'); // 'china' | 'us'
   const [chinaA50Input, setChinaA50Input] = useState(0.0);
   const [chinaHxcInput, setChinaHxcInput] = useState(0.0);
@@ -317,6 +318,94 @@ export default function GlobalMarketPanel() {
     
     return { f_nasdaq, f_sp500, has_macro_data, spread, activeRule, signal, action, label, color, bg, border, indicator, cardGradient };
   }, [usNasdaqInput, usSp505Input, usMacroData]);
+
+  // Jargon-free market weather indicators for Novice Mode
+  const chinaWeather = useMemo(() => {
+    const f_a50 = chinaA50Input;
+    const hxc = chinaHxcInput;
+    
+    let a50Weather = "⛅ 多云 (平稳没有大涨大跌)";
+    let a50Bg = "bg-slate-50 border-slate-200/50";
+    let a50Emoji = "⛅";
+    let a50Color = "text-slate-600";
+    
+    if (f_a50 >= 0.8) {
+      a50Weather = "☀️ 晴天 (大上市公司强劲拉升)";
+      a50Bg = "bg-rose-50/70 border-rose-150 shadow-3xs";
+      a50Emoji = "☀️";
+      a50Color = "text-rose-600";
+    } else if (f_a50 <= -0.8) {
+      a50Weather = "🌧️ 雨天 (核心股票明显下跌)";
+      a50Bg = "bg-emerald-50/70 border-emerald-150 shadow-3xs";
+      a50Emoji = "🌧️";
+      a50Color = "text-emerald-600";
+    }
+    
+    let hxcWeather = "⛅ 多云 (科技股平稳整理)";
+    let hxcBg = "bg-slate-50 border-slate-200/50";
+    let hxcEmoji = "⛅";
+    let hxcColor = "text-slate-600";
+    
+    if (hxc >= 1.5) {
+      hxcWeather = "☀️ 晴天 (中概科技股超级大涨)";
+      hxcBg = "bg-rose-50/70 border-rose-150 shadow-3xs";
+      hxcEmoji = "☀️";
+      hxcColor = "text-rose-600";
+    } else if (hxc <= -1.5) {
+      hxcWeather = "🌧️ 雨天 (中概科技股陷入大跌)";
+      hxcBg = "bg-emerald-50/70 border-emerald-150 shadow-3xs";
+      hxcEmoji = "🌧️";
+      hxcColor = "text-emerald-600";
+    }
+    
+    return { a50Weather, a50Bg, a50Emoji, a50Color, hxcWeather, hxcBg, hxcEmoji, hxcColor };
+  }, [chinaA50Input, chinaHxcInput]);
+
+  const usWeather = useMemo(() => {
+    const nq = usNasdaqInput;
+    const es = usSp505Input;
+    
+    let nqWeather = "⛅ 多云 (科技股走势温和)";
+    let nqBg = "bg-slate-50 border-slate-200/50";
+    let nqEmoji = "⛅";
+    let nqColor = "text-slate-600";
+    
+    if (nq >= 0.8) {
+      nqWeather = "☀️ 晴天 (科技股强劲大涨)";
+      nqBg = "bg-rose-50/70 border-rose-150 shadow-3xs";
+      nqEmoji = "☀️";
+      nqColor = "text-rose-600";
+    } else if (nq <= -0.8) {
+      nqWeather = "🌧️ 雨天 (科技股恐慌下杀)";
+      nqBg = "bg-emerald-50/70 border-emerald-150 shadow-3xs";
+      nqEmoji = "🌧️";
+      nqColor = "text-emerald-600";
+    } else if (nq <= -5.0) {
+      nqWeather = "🚨 暴风雪 (特大崩盘熔断！)";
+      nqBg = "bg-red-50/70 border-red-150 shadow-3xs";
+      nqEmoji = "🚨";
+      nqColor = "text-red-600 animate-pulse";
+    }
+    
+    let esWeather = "⛅ 多云 (美国大盘窄幅整理)";
+    let esBg = "bg-slate-50 border-slate-200/50";
+    let esEmoji = "⛅";
+    let esColor = "text-slate-600";
+    
+    if (es >= 0.5) {
+      esWeather = "☀️ 晴天 (美国整体大公司普涨)";
+      esBg = "bg-rose-50/70 border-rose-150 shadow-3xs";
+      esEmoji = "☀️";
+      esColor = "text-rose-600";
+    } else if (es <= -0.6) {
+      esWeather = "🌧️ 雨天 (美国整体大公司回调)";
+      esBg = "bg-emerald-50/70 border-emerald-150 shadow-3xs";
+      esEmoji = "🌧️";
+      esColor = "text-emerald-600";
+    }
+    
+    return { nqWeather, nqBg, nqEmoji, nqColor, esWeather, esBg, esEmoji, esColor };
+  }, [usNasdaqInput, usSp505Input]);
 
   // Filter indices into main stock indices and leading wind vane indicators
   const mainIndices = useMemo(() => {
@@ -743,9 +832,330 @@ export default function GlobalMarketPanel() {
     return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  const renderTopControlBar = () => {
+    return (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 select-none pb-1">
+        {/* Left Side: Segment controller for A-shares vs US-shares */}
+        <div className="bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-inner flex items-center gap-1 w-full sm:w-auto">
+          <button
+            onClick={() => setAdvisorSubTab('china')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+              advisorSubTab === 'china'
+                ? 'bg-white text-blue-600 shadow-xs border border-slate-200/50 font-black'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span>🇨🇳 A股/创业板早盘预测 (09:15前)</span>
+          </button>
+          <button
+            onClick={() => setAdvisorSubTab('us')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+              advisorSubTab === 'us'
+                ? 'bg-white text-blue-600 shadow-xs border border-slate-200/50 font-black'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span>🇺🇸 美股/海外基金决策 (15:00前)</span>
+          </button>
+        </div>
+
+        {/* Right Side: Jargon-free Novice Mode Switcher */}
+        <div className="flex items-center gap-2 bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-inner self-end sm:self-auto select-none">
+          <button
+            onClick={() => setIsNoviceMode(true)}
+            className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+              isNoviceMode
+                ? 'bg-blue-600 text-white shadow-xs border border-blue-500/20 font-black'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span>极简小白模式 🐣</span>
+          </button>
+          <button
+            onClick={() => setIsNoviceMode(false)}
+            className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+              !isNoviceMode
+                ? 'bg-blue-600 text-white shadow-xs border border-blue-500/20 font-black'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span>专业量化模式 ⚙️</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderNoviceView = () => {
+    // Dynamic mapping of technical signal labels into jargon-free weather conditions for Novice Mode
+    const chinaStatusLabel = {
+      '共振暴跌': '🌧️ 全线大跌 (雷雨天气)',
+      '多头逼空': '☀️ 全线大涨 (晴空万里)',
+      '二八分化': '⛅ 蓝筹涨、科技跌 (冷热不均)',
+      '震荡整理': '☁️ 窄幅震荡 (微风轻拂)'
+    }[chinaAdvisorData.label] || chinaAdvisorData.label;
+
+    const usStatusLabel = {
+      '极端熔断': '🚨 极端崩盘 (台风红色预警)',
+      '宏观过滤': '⏳ 重磅数据日 (方向多变静观)',
+      '空头共振': '🌧️ 全线普跌 (阴雨绵绵)',
+      '多头逼空': '☀️ 全线大涨 (阳光普照)',
+      '区间震荡': '☁️ 温和震荡 (多云微风)',
+      '背离撕裂': '⚠️ 科技与大盘分裂 (冷热不均)',
+      '震荡观望': '☁️ 窄幅波动 (无风微波)'
+    }[usAdvisorData.label] || usAdvisorData.label;
+
+    return (
+      <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0">
+        
+        {/* Left Area: Market Weather Station (5/12 cols) */}
+        <div className="col-span-1 md:col-span-5 flex flex-col gap-4 select-none">
+          
+          <div className="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-2xs flex flex-col gap-4 shrink-0 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/20 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">📡</span>
+                <span className="text-xs font-black text-slate-700 tracking-wider">海外市场实时气象站</span>
+              </div>
+              <span className="text-[10px] text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-250 animate-pulse flex items-center gap-1">
+                <span className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
+                卫星实时同步中
+              </span>
+            </div>
+
+            {advisorSubTab === 'china' ? (
+              // China Weather Station
+              <div className="flex flex-col gap-4">
+                {/* A50 Weather Card */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${chinaWeather.a50Bg}`}>
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="text-xs font-black text-slate-600">A股核心大公司前瞻 (如茅台、银行等)</span>
+                    <span className="text-[10px] text-slate-400 font-bold">(富时中国 A50 指数)</span>
+                    <span className={`text-[13px] font-black mt-1.5 ${chinaWeather.a50Color}`}>{chinaWeather.a50Weather}</span>
+                  </div>
+                  <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{chinaWeather.a50Emoji}</span>
+                </div>
+
+                {/* HXC Weather Card */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${chinaWeather.hxcBg}`}>
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="text-xs font-black text-slate-600">中国科技股前瞻 (如阿里、拼多多等)</span>
+                    <span className="text-[10px] text-slate-400 font-bold">(中概金龙指数 HXC)</span>
+                    <span className={`text-[13px] font-black mt-1.5 ${chinaWeather.hxcColor}`}>{chinaWeather.hxcWeather}</span>
+                  </div>
+                  <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{chinaWeather.hxcEmoji}</span>
+                </div>
+              </div>
+            ) : (
+              // US Weather Station
+              <div className="flex flex-col gap-4">
+                {/* Nasdaq Futures Card */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${usWeather.nqBg}`}>
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="text-xs font-black text-slate-600">美国高科技巨头气温 (如苹果、英伟达等)</span>
+                    <span className="text-[10px] text-slate-400 font-bold">(纳斯达克 100 期货)</span>
+                    <span className={`text-[13px] font-black mt-1.5 ${usWeather.nqColor}`}>{usWeather.nqWeather}</span>
+                  </div>
+                  <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{usWeather.nqEmoji}</span>
+                </div>
+
+                {/* S&P 500 Futures Card */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${usWeather.esBg}`}>
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="text-xs font-black text-slate-600">美国整体大盘气温 (跟踪500家美国大企业)</span>
+                    <span className="text-[10px] text-slate-400 font-bold">(标谱 500 期货)</span>
+                    <span className={`text-[13px] font-black mt-1.5 ${usWeather.esColor}`}>{usWeather.esWeather}</span>
+                  </div>
+                  <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{usWeather.esEmoji}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Novice Help Card */}
+          <div className="bg-slate-50 border border-slate-200/50 rounded-3xl p-4.5 text-left flex flex-col gap-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
+              <span>💡</span>
+              <span>小白快速避坑指南</span>
+            </div>
+            <div className="flex flex-col gap-2 text-[10.5px] leading-relaxed font-bold text-slate-500 font-sans">
+              <div className="bg-white p-2.5 rounded-xl border border-slate-150 shadow-3xs">
+                <span className="text-slate-700 font-extrabold block">📌 问：我持有的哪些基金能用到这个提示？</span>
+                <span className="text-slate-450 block mt-1 font-semibold leading-normal">
+                  答：凡是跟踪国内大A股的【沪深300】、【创业板】或者海外美股的【纳斯达克100】、【标普500】走的基金都适用。包括您持仓里的大A基金和美股海外基金。
+                </span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-150 shadow-3xs">
+                <span className="text-slate-700 font-extrabold block">📌 问：为什么下午3点前暂停扣款能省钱？</span>
+                <span className="text-slate-450 block mt-1 font-semibold leading-normal">
+                  答：因为美股跳空大跌会导致明天补跌。今天下午 3:00 前去您的基金账户里【暂停定投】，明天下午就能用便宜 1% 到 2% 的更低净值买入相同的份额，白白省下买入成本！
+                </span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-150 shadow-3xs">
+                <span className="text-slate-700 font-extrabold block">📌 问：这个投资助手是全自动的吗？为什么有手动调节的？</span>
+                <span className="text-slate-450 block mt-1 font-semibold leading-normal">
+                  答：本助手<span className="font-black text-rose-500">100%全自动运行，已自动接入全球实时行情</span>！页面显示的今日走势和操作意见都是系统自动算好的，您不需要手动调任何东西。手动的滑动条和输入框是“专业量化模式”下供高阶玩家模拟测试用的，小白可以直接忽略它，直接看本页的红绿字建议操作即可，超级简单！
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right Area: Extremely simple large action cards (7/12 cols) */}
+        <div className="col-span-1 md:col-span-7 flex flex-col md:h-full md:overflow-y-auto pr-0 md:pr-1 custom-scrollbar shrink-0">
+          
+          {advisorSubTab === 'china' ? (
+            // China Novice Output
+            <div className={`border rounded-3xl p-6.5 flex flex-col gap-5 shadow-xs transition-all duration-300 ${chinaAdvisorData.border} bg-gradient-to-br ${chinaAdvisorData.cardGradient}`}>
+              
+              <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🤖</span>
+                  <span className="text-xs font-black text-slate-750 tracking-wider">智能理财管家早盘建议</span>
+                </div>
+                <span className={`text-[10px] font-black px-3.5 py-1 rounded-full border ${chinaAdvisorData.bg} ${chinaAdvisorData.color}`}>
+                  今日走势: {chinaStatusLabel}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-4 text-left">
+                <h2 className="text-xl md:text-2xl font-black text-slate-850 tracking-tight leading-snug">
+                  {chinaAdvisorData.activeRule === 1 ? '🔴 今天建议暂停定投！去暂停今天扣款，明天能用更便宜的价格买入！' : 
+                   chinaAdvisorData.activeRule === 2 ? '🟢 今天非常适合买入！大资金正在疯狂抢购，大涨在招手！' : 
+                   chinaAdvisorData.activeRule === 3 ? '🟡 核心大公司护盘但科技股暴跌，市场冷热不均，建议不要盲目买卖！' :
+                   '☁️ 今天行情很平稳。不要乱折腾，继续保持平时原有的常规扣款即可！'}
+                </h2>
+                
+                <div className="bg-white/95 backdrop-blur-md p-5 rounded-2.5xl border border-slate-200 shadow-sm leading-relaxed flex flex-col gap-4">
+                  <div className="flex gap-2.5 items-start">
+                    <span className="text-2xl select-none shrink-0 filter drop-shadow-sm">💡</span>
+                    <div className="flex flex-col gap-1 text-[12.5px] font-extrabold text-slate-650 leading-relaxed font-sans">
+                      <h4 className="text-xs font-black text-slate-450 uppercase tracking-widest leading-none mb-1 select-none">操作指导意见</h4>
+                      {chinaAdvisorData.activeRule === 1 && (
+                        <p>
+                          今天市场下跌意愿强劲，大盘开盘必然暴跌。<span className="text-rose-500 font-black">请立刻去理财APP或天天基金暂停您今天的扣款申购</span>。今天把定投省下来，明天下午您就能用更低的价格申购，凭空多得 1%~2% 的基金份额！
+                        </p>
+                      )}
+                      {chinaAdvisorData.activeRule === 2 && (
+                        <p>
+                          大资金多头共振超级爆发，主力拉高确立！今天市场大涨概率极高，光头大阳线在招手。<span className="text-emerald-500 font-black">如果您打算做多或加仓建仓，下午 14:30 左右可以果断加仓买入</span>，直接坐享红利！手里持有的千万别卖，让利润跑起来！
+                        </p>
+                      )}
+                      {chinaAdvisorData.activeRule === 3 && (
+                        <p>
+                          二八分化严重。国家队拉大蓝筹、银行板块护盘，但科技创业板权重受美股拖累走弱，板块走势南辕北辙。<span className="text-amber-500 font-black">乱折腾买卖极易吃耳光，最佳操作是持股不动，避免盲目调仓！</span>
+                        </p>
+                      )}
+                      {chinaAdvisorData.activeRule === 4 && (
+                        <p>
+                          今天离岸风向标波动非常微弱，大盘将大概率横向震荡拉锯。<span className="text-blue-500 font-black">不要做任何打破常规的调仓！继续严格遵循您原有的周定投/月定投日常扣款即可</span>，多动多错，不折腾就是变相赚钱。
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          ) : (
+            // US Novice Output
+            <div className={`border rounded-3xl p-6.5 flex flex-col gap-5 shadow-xs transition-all duration-300 ${usAdvisorData.border} bg-gradient-to-br ${usAdvisorData.cardGradient}`}>
+              
+              <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🤖</span>
+                  <span className="text-xs font-black text-slate-755 tracking-wider">智能理财管家午后建议</span>
+                </div>
+                <span className={`text-[10px] font-black px-3.5 py-1 rounded-full border ${usAdvisorData.bg} ${usAdvisorData.color}`}>
+                  今日走势: {usStatusLabel}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-4 text-left">
+                <h2 className="text-xl md:text-2xl font-black text-slate-850 tracking-tight leading-snug">
+                  {usAdvisorData.activeRule === 0 ? '⚠️ 紧急紧急！美股面临灾难级暴跌，赶快赎回跑路！' :
+                   usAdvisorData.activeRule === 1 ? '⏳ 重大事件日！下午行情多噪音，按常规计划不调仓！' :
+                   usAdvisorData.activeRule === 2 ? '🔴 今天建议暂停定投！去暂停今日扣款，明天能省下买入成本！' : 
+                   usAdvisorData.activeRule === 3 ? '🟢 今天非常适合加仓！今晚美股极大概率大涨，下午3点前直接上车！' : 
+                   usAdvisorData.activeRule === 4 ? '☁️ 市场平稳没有大方向，继续执行您的常规日常定投即可！' :
+                   usAdvisorData.activeRule === 5 ? '🟡 科技股与核心大企业分裂分化，剧烈震荡洗盘中，先别买卖！' :
+                   '☁️ 窄幅波动，老老实实执行常规定投，不动如山。'}
+                </h2>
+                
+                <div className="bg-white/95 backdrop-blur-md p-5 rounded-2.5xl border border-slate-200 shadow-sm leading-relaxed flex flex-col gap-4">
+                  <div className="flex gap-2.5 items-start">
+                    <span className="text-2xl select-none shrink-0 filter drop-shadow-sm">💡</span>
+                    <div className="flex flex-col gap-1 text-[12.5px] font-extrabold text-slate-650 leading-relaxed font-sans">
+                      <h4 className="text-xs font-black text-slate-450 uppercase tracking-widest leading-none mb-1 select-none">操作指导意见</h4>
+                      {usAdvisorData.activeRule === 0 && (
+                        <p>
+                          美股盘前触发了特大事故大熔断！开盘将面临惨烈下杀。<span className="text-red-500 font-black">请赶在下午 15:00 结束交易前申请卖出赎回避险，绝对绝对不能买入！</span>
+                        </p>
+                      )}
+                      {usAdvisorData.activeRule === 1 && (
+                        <p>
+                          美国今晚有特大重磅宏观数据公布，下午的行情全是假动作烟雾弹，毫无胜率优势。<span className="text-slate-650 font-black">不要进行任何临时加仓或卖出，老老实实维持原有仓位以静制动！</span>
+                        </p>
+                      )}
+                      {usAdvisorData.activeRule === 2 && (
+                        <p>
+                          欧美资金正在崩盘式出逃，今晚大跌已成定局！<span className="text-rose-500 font-black">请在下午 15:00 前去您的基金理财APP中把今天的定投扣款临时【暂停】</span>。明天下午您将以便宜 1% 到 2% 的超低成本价格买到同样的份额！如果有赎回止盈计划的，赶紧在 15:00 前卖出锁定收益！
+                        </p>
+                      )}
+                      {usAdvisorData.activeRule === 3 && (
+                        <p>
+                          主力大资金多头疯抢，空头被打爆的单边大逼空行情确立！今晚美股100%跳空大涨。<span className="text-emerald-500 font-black">如果您原本就有做多计划，在下午 15:00 前赶紧砸钱加仓买入</span>，直接坐享昨晚的高额跳空红利！手里持有的筹码绝对别动！
+                        </p>
+                      )}
+                      {usAdvisorData.activeRule === 4 && (
+                        <p>
+                          市场毫无方向，盘整垃圾时间。<span className="text-blue-500 font-black">严格禁止打破常规的调仓动作！继续保持日常周/月定投日常扣款即可</span>，多动多错，省下交易手续费。
+                        </p>
+                      )}
+                      {usAdvisorData.activeRule === 5 && (
+                        <p>
+                          科技股被大盘撕裂割裂分化，震荡极强，洗盘行情明显。<span className="text-amber-500 font-black">信号失真，不买不卖以静制动，严格遵守日常纪律即可！</span>
+                        </p>
+                      )}
+                      {usAdvisorData.activeRule === 6 && (
+                        <p>
+                          指数在窄幅区间波动，没有强单边多空信号。<span className="text-slate-600 font-black">老老实实执行您原有的定投计划，大仓位按兵不动，不用做任何额外动作。</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+        </div>
+
+      </div>
+    );
+  };
+
   const renderQuantAdvisorView = () => {
     return (
-      <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0 animate-in fade-in duration-300">
+      <div className="flex-1 flex flex-col gap-4 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0 animate-in fade-in duration-300">
+        
+        {/* Top Control Bar */}
+        {renderTopControlBar()}
+
+        {/* Dynamic content depending on isNoviceMode */}
+        {isNoviceMode ? renderNoviceView() : renderProView()}
+
+      </div>
+    );
+  };
+
+  const renderProView = () => {
+    return (
+      <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0 animate-in duration-300">
         
         {/* Left Column: Sandbox, sliders, 4D Matrix (5 cols on desktop) */}
         <div className="col-span-1 md:col-span-5 flex flex-col gap-4 md:h-full md:overflow-y-auto pr-0 md:pr-1 custom-scrollbar shrink-0 select-none">

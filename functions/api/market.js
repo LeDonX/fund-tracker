@@ -144,8 +144,70 @@ function cleanYahooData(result) {
   };
 }
 
+const SINA_MAP = {
+  "CN=F": "hf_CHA50CFD",
+  "NQ=F": "hf_NQ",
+  "ES=F": "hf_ES",
+  "USDCNH=X": "fx_susdcnh"
+};
+
+async function fetchSinaRealtime(symbol) {
+  const sinaSym = SINA_MAP[symbol];
+  if (!sinaSym) return null;
+  
+  try {
+    const url = `https://hq.sinajs.cn/list=${sinaSym}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500); // Strict 2.5 second timeout
+    
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://finance.sina.com.cn/"
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) return null;
+    
+    const text = await response.text();
+    const match = text.match(/var\s+hq_str_[a-zA-Z0-9_]+\s*=\s*"([^"]*)"/);
+    if (!match || !match[1]) return null;
+    
+    const dataStr = match[1];
+    const parts = dataStr.split(',');
+    if (parts.length < 10) return null;
+    
+    let price = 0;
+    let prevClose = 0;
+    
+    if (symbol === 'USDCNH=X') {
+      // CNH Forex: [1] currentPrice, [3] previousClose
+      price = parseFloat(parts[1]);
+      prevClose = parseFloat(parts[3]);
+    } else {
+      // Index Futures: [0] currentPrice, [7] previousClose (settlement)
+      price = parseFloat(parts[0]);
+      prevClose = parseFloat(parts[7]);
+    }
+    
+    if (Number.isNaN(price) || Number.isNaN(prevClose) || prevClose <= 0) return null;
+    
+    return {
+      price,
+      prevClose
+    };
+  } catch (err) {
+    console.error(`Sina real-time fetch failed for ${symbol}:`, err.message);
+    return null;
+  }
+}
+
 // Fetch single index from Yahoo Finance with fallback
 async function getIndexData(symbol, range = "1y", interval = "1d") {
+  let indexResult;
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`;
     
@@ -173,11 +235,34 @@ async function getIndexData(symbol, range = "1y", interval = "1d") {
       throw new Error("Empty Yahoo result");
     }
     
-    return cleanYahooData(result);
+    indexResult = cleanYahooData(result);
   } catch (err) {
     console.error(`Failed to fetch ${symbol} from Yahoo Finance: ${err.message}. Using simulated fallback.`);
-    return generateSimulatedData(symbol, range);
+    indexResult = generateSimulatedData(symbol, range);
   }
+  
+  // ================= DUAL-SOURCE REAL-TIME OVERWRITE =================
+  if (SINA_MAP[symbol]) {
+    const sinaQuote = await fetchSinaRealtime(symbol);
+    if (sinaQuote) {
+      console.log(`Successfully patched ${symbol} with real-time Sina quote: Price = ${sinaQuote.price}, PrevClose = ${sinaQuote.prevClose}`);
+      
+      if (indexResult.meta) {
+        indexResult.meta.regularMarketPrice = sinaQuote.price;
+        indexResult.meta.chartPreviousClose = sinaQuote.prevClose;
+      }
+      
+      const closes = indexResult.indicators?.quote?.[0]?.close || [];
+      if (closes.length > 0) {
+        closes[closes.length - 1] = sinaQuote.price;
+      }
+      if (closes.length > 1 && symbol !== 'USDCNH=X') {
+        closes[closes.length - 2] = sinaQuote.prevClose;
+      }
+    }
+  }
+  
+  return indexResult;
 }
 
 // Main handler
