@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:wrangler": "wrangler pages dev --proxy 5173 --d1 DB --compatibility-date=2024-03-01",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

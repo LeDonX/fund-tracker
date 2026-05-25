@@ -43,6 +43,7 @@ import OcrSyncModal from './components/modals/OcrSyncModal';
 import FundTable from './components/FundTable';
 import AddFundModal from './components/forms/AddFundModal';
 import EditFundModal from './components/forms/EditFundModal';
+import GlobalMarketPanel from './components/market/GlobalMarketPanel';
 import {
   buildDetailCacheEntry,
   buildFundDetailModel,
@@ -3685,7 +3686,80 @@ export default function FundTrackerApp() {
           ? 'text-emerald-600 bg-emerald-50 border-emerald-100/60' 
           : 'text-slate-500 bg-slate-50 border-slate-150';
 
-      // Left
+      // Left Badge (Rank cup or Sector Icon)
+      let badgeElement = null;
+      if (badgeType === 'rank') {
+        const colors = [
+          'bg-amber-100 text-amber-800 border-amber-250',
+          'bg-slate-100 text-slate-700 border-slate-250',
+          'bg-orange-100 text-orange-800 border-orange-250',
+        ];
+        const color = colors[index] || 'bg-slate-50 text-slate-400 border-slate-200';
+        badgeElement = (
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black border ${color} shrink-0`}>
+            {index + 1}
+          </div>
+        );
+      } else {
+        badgeElement = (
+          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500 shrink-0">
+            <Globe className="w-5 h-5" />
+          </div>
+        );
+      }
+
+      return (
+        <div 
+          key={item.code} 
+          onClick={() => handleOpenFundDetail({ code: item.code, name: item.name })}
+          className="flex items-center justify-between p-3.5 bg-gradient-to-r from-white to-slate-50/40 border border-slate-200/60 rounded-xl hover:bg-slate-50 active:bg-slate-100/80 transition-all cursor-pointer shadow-2xs relative overflow-hidden"
+        >
+          <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
+            {badgeElement}
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-1.5">
+                <h4 className="font-extrabold text-slate-800 text-[14px] leading-snug line-clamp-1" title={item.name}>
+                  {item.name}
+                </h4>
+                {isExisting && (
+                  <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[8.5px] font-black bg-emerald-500 text-white leading-none scale-90 origin-left">已持仓</span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[9.5px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-mono tracking-wider leading-none scale-95 origin-left shrink-0 whitespace-nowrap">{item.code}</span>
+                <span className="text-[9.5px] font-bold text-slate-400 bg-slate-100 border border-slate-200/40 px-1.5 py-0.5 rounded leading-none scale-95 origin-left shrink-0 whitespace-nowrap">{item.category || '公募基金'}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex flex-col items-end gap-1 min-w-[65px] shrink-0">
+              <div className={`inline-flex items-center justify-center px-2 py-1 border rounded-lg font-mono font-bold text-[11px] min-w-[65px] text-center leading-none ${rateColorClass}`}>
+                {dailyRate > 0 ? '+' : ''}{dailyRate.toFixed(2)}%
+              </div>
+              <div className="text-[11px] font-mono text-slate-500 font-semibold leading-none mt-1 whitespace-nowrap shrink-0">
+                {displayValue !== null ? displayValue.toFixed(4) : '--'}
+                <span className="text-[8.5px] text-slate-400 ml-0.5 scale-90 inline-block font-sans font-medium">
+                  {quote?.quoteSource === 'estimate' ? '估' : '实'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenSyncTradeForNewFund(item.code, item.name);
+              }}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 active:from-blue-700 active:to-indigo-700 hover:from-blue-700 hover:to-indigo-700 text-white shadow-2xs hover:shadow-xs active:scale-[0.88] transition-all cursor-pointer shrink-0"
+              title="添加买入交易"
+            >
+              <Plus className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        </div>
+      );
+    };
       const renderRankingsView = () => {
         const popularFunds = [...CURATED_MARKET_FUNDS].sort((a, b) => b.hotScore - a.hotScore).slice(0, 5);
         const gainerFunds = [...CURATED_MARKET_FUNDS]
@@ -4178,16 +4252,23 @@ export default function FundTrackerApp() {
               <button
                 type="button"
                 onClick={() => setActiveTab('portfolio')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${activeTab === 'portfolio' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${activeTab === 'portfolio' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
               >
                 自选持仓
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('search')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${activeTab === 'search' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${activeTab === 'search' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
               >
                 查找基金
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('market')}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${activeTab === 'market' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+              >
+                全球股市
               </button>
             </div>
             <div className="flex items-center gap-2">
@@ -4248,6 +4329,14 @@ export default function FundTrackerApp() {
                 >
                   <Search className="w-3 h-3" />
                   <span>查找基金</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('market')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-lg font-extrabold text-[11px] tracking-tight transition-all duration-200 ${activeTab === 'market' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:text-white'}`}
+                >
+                  <Globe className="w-3 h-3" />
+                  <span>全球股市</span>
                 </button>
               </div>
             </h1>
@@ -4391,6 +4480,8 @@ export default function FundTrackerApp() {
               handleOpenSyncTrade={handleOpenSyncTrade}
             />
           </>
+        ) : activeTab === 'market' ? (
+          <GlobalMarketPanel />
         ) : (
           renderSearchTab()
         )}
