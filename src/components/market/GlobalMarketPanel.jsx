@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as echarts from 'echarts';
-import { Globe, RefreshCw, AlertCircle, TrendingUp, TrendingDown, Clock, Compass, Gauge, Flame, BookOpen, ArrowUpRight, ArrowDownRight, Info, HelpCircle } from 'lucide-react';
+import { Globe, RefreshCw, AlertCircle, TrendingUp, TrendingDown, Clock, Compass, Gauge, Flame, BookOpen, ArrowUpRight, ArrowDownRight, Info, HelpCircle, Cpu, Sliders, Play, ShieldAlert, CheckCircle, Activity } from 'lucide-react';
 
 // Light-weight pure SVG sparkline component for grid cards
 function Sparkline({ data, isPositive }) {
@@ -89,11 +89,238 @@ export default function GlobalMarketPanel() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
   const [period, setPeriod] = useState('1Y'); // 1M, 3M, 6M, 1Y
-  const [marketTab, setMarketTab] = useState('overview'); // 'overview' | 'predictor'
+  const [marketTab, setMarketTab] = useState('overview'); // 'overview' | 'predictor' | 'advisor'
+
+  // Quantitative Advisor States
+  const [advisorSubTab, setAdvisorSubTab] = useState('china'); // 'china' | 'us'
+  const [chinaA50Input, setChinaA50Input] = useState(0.0);
+  const [chinaHxcInput, setChinaHxcInput] = useState(0.0);
+  const [chinaSimMode, setChinaSimMode] = useState(false);
+
+  const [usNasdaqInput, setUsNasdaqInput] = useState(0.0);
+  const [usSp505Input, setUsSp505Input] = useState(0.0);
+  const [usMacroData, setUsMacroData] = useState(false);
+  const [usSimMode, setUsSimMode] = useState(false);
+
+  // Sync real-time rates to inputs when indices load
+  useEffect(() => {
+    if (indices && indices.length > 0) {
+      const a50Obj = indices.find(idx => idx.symbol === 'CN=F');
+      const hxcObj = indices.find(idx => idx.symbol === '^HXC');
+      const nqObj = indices.find(idx => idx.symbol === 'NQ=F');
+      const esObj = indices.find(idx => idx.symbol === 'ES=F');
+
+      const a50Val = a50Obj ? a50Obj.changePercent : 0.0;
+      const hxcVal = hxcObj ? hxcObj.changePercent : 0.0;
+      const nqVal = nqObj ? nqObj.changePercent : 0.0;
+      const esVal = esObj ? esObj.changePercent : 0.0;
+
+      if (!chinaSimMode) {
+        setChinaA50Input(Number(a50Val.toFixed(2)));
+        setChinaHxcInput(Number(hxcVal.toFixed(2)));
+      }
+      if (!usSimMode) {
+        setUsNasdaqInput(Number(nqVal.toFixed(2)));
+        setUsSp505Input(Number(esVal.toFixed(2)));
+      }
+    }
+  }, [indices, chinaSimMode, usSimMode]);
+
+  const handleResetChinaRealTime = () => {
+    setChinaSimMode(false);
+    if (indices && indices.length > 0) {
+      const a50 = indices.find(idx => idx.symbol === 'CN=F')?.changePercent ?? 0.0;
+      const hxc = indices.find(idx => idx.symbol === '^HXC')?.changePercent ?? 0.0;
+      setChinaA50Input(Number(a50.toFixed(2)));
+      setChinaHxcInput(Number(hxc.toFixed(2)));
+    }
+  };
+
+  const handleResetUsRealTime = () => {
+    setUsSimMode(false);
+    if (indices && indices.length > 0) {
+      const nq = indices.find(idx => idx.symbol === 'NQ=F')?.changePercent ?? 0.0;
+      const es = indices.find(idx => idx.symbol === 'ES=F')?.changePercent ?? 0.0;
+      setUsNasdaqInput(Number(nq.toFixed(2)));
+      setUsSp505Input(Number(es.toFixed(2)));
+    }
+  };
+
+  // China / A-shares advisor signal processing
+  const chinaAdvisorData = useMemo(() => {
+    const f_a50_morning = chinaA50Input;
+    const hxc_last_night = chinaHxcInput;
+    const growth_sentiment = 0.4 * f_a50_morning + 0.6 * hxc_last_night;
+    
+    let activeRule = -1;
+    let signal = "";
+    let action = "";
+    let label = "";
+    let color = "";
+    let bg = "";
+    let border = "";
+    let indicator = "";
+    let cardGradient = "";
+    
+    // 决策 1：全面共振暴跌
+    if (f_a50_morning <= -0.8 && hxc_last_night <= -1.5) {
+      activeRule = 1;
+      signal = "🔴 [严重警报] 大A与创业板今早将大幅低开！";
+      action = "今日场外基金禁止加仓。场内ETF若想减仓，静待9:45左右的反抽高点，切勿在9:30开盘第一分钟割肉。";
+      label = "共振暴跌";
+      color = "text-rose-600";
+      bg = "bg-rose-50/90";
+      border = "border-rose-250";
+      indicator = "bg-rose-500 animate-pulse";
+      cardGradient = "from-red-500/10 via-rose-500/5 to-transparent";
+    }
+    // 决策 2：全面共振大涨
+    else if (f_a50_morning >= 0.8 && hxc_last_night >= 1.5) {
+      activeRule = 2;
+      signal = "🟢 [多头逼空] 大A与创业板今早将大幅高开！";
+      action = "情绪极其亢奋。场内ETF切勿开盘无脑追高（谨防高开低走）；场外基金如需建仓，可在下午14:30观察是否抱团封死阳线再做决定。";
+      label = "多头逼空";
+      color = "text-emerald-600";
+      bg = "bg-emerald-50/90";
+      border = "border-emerald-250";
+      indicator = "bg-emerald-500 animate-pulse";
+      cardGradient = "from-emerald-500/10 via-teal-500/5 to-transparent";
+    }
+    // 决策 3：存量博弈，结构分化
+    else if (f_a50_morning >= 0.5 && hxc_last_night <= -1.0) {
+      activeRule = 3;
+      signal = "🟡 [二八分化] 传统蓝筹护盘，创业板承压！";
+      action = "今天国家队可能会拉中字头、银行（A50强），但新能源、半导体等创业板权重（受中概拖累）会走弱。个股/行业基金各走各路，不宜盲目乱动。";
+      label = "二八分化";
+      color = "text-amber-600";
+      bg = "bg-amber-50/90";
+      border = "border-amber-250";
+      indicator = "bg-amber-500 animate-pulse";
+      cardGradient = "from-amber-500/10 via-yellow-500/5 to-transparent";
+    }
+    // 默认：震荡市
+    else {
+      activeRule = 4;
+      signal = "⚪ [震荡市] 离岸市场波动微弱";
+      action = "大A今天大概率维持震荡横盘，按照既定定投计划执行即可，无超额盘中交易机会。";
+      label = "震荡整理";
+      color = "text-slate-650";
+      bg = "bg-slate-50/90";
+      border = "border-slate-250";
+      indicator = "bg-slate-400";
+      cardGradient = "from-slate-400/5 to-transparent";
+    }
+    
+    return { f_a50_morning, hxc_last_night, growth_sentiment, activeRule, signal, action, label, color, bg, border, indicator, cardGradient };
+  }, [chinaA50Input, chinaHxcInput]);
+
+  // US stocks dual-threshold advisor signal processing
+  const usAdvisorData = useMemo(() => {
+    const f_nasdaq = usNasdaqInput;
+    const f_sp500 = usSp505Input;
+    const has_macro_data = usMacroData;
+    const spread = Math.abs(f_nasdaq - f_sp500);
+    
+    let activeRule = -1;
+    let signal = "";
+    let action = "";
+    let label = "";
+    let color = "";
+    let bg = "";
+    let border = "";
+    let indicator = "";
+    let cardGradient = "";
+    
+    // 规则 0: 熔断机制保护
+    if (f_nasdaq <= -5.0 || f_sp500 <= -5.0) {
+      activeRule = 0;
+      signal = "⚠️ EMERGENCY_STOP - 期货触发盘前熔断！";
+      action = "🔥 今晚美股将面临灾难级暴跌。15:00前有仓位的立刻申请赎回避险，绝对禁止买入！";
+      label = "极端熔断";
+      color = "text-red-750";
+      bg = "bg-red-100/90 animate-pulse";
+      border = "border-red-400";
+      indicator = "bg-red-650 animate-ping";
+      cardGradient = "from-red-600/20 to-transparent";
+    }
+    // 规则 1: 宏观黑天鹅过滤
+    else if (has_macro_data) {
+      activeRule = 1;
+      signal = "⏳ [数据日] 宏观数据落地，下午走势强欺骗性！";
+      action = "⏳ 今晚有重大数据公布，下午期货属于强欺骗性信号。推测开盘：无法精准推测。操作：维持常规计划，不做任何临时增减仓。";
+      label = "宏观过滤";
+      color = "text-slate-600";
+      bg = "bg-slate-50/90";
+      border = "border-slate-300";
+      indicator = "bg-slate-400";
+      cardGradient = "from-slate-400/10 to-transparent";
+    }
+    // 规则 2: 空头多模共振
+    else if (f_nasdaq <= -0.8 && f_sp500 <= -0.6 && spread <= 0.6) {
+      activeRule = 2;
+      signal = "🔴 [精准卖出 / 暂停申购] 信号触发";
+      action = "🔴 推测开盘：21:30 100%低开。操作：今晚美股大概率暴跌，适合15:00前卖出止盈；若要买入则执行【暂停】，等明天以更低净值低吸。";
+      label = "空头共振";
+      color = "text-rose-650";
+      bg = "bg-rose-50/90";
+      border = "border-rose-250";
+      indicator = "bg-rose-500 animate-pulse";
+      cardGradient = "from-red-500/10 via-rose-500/5 to-transparent";
+    }
+    // 规则 3: 多头多模共振
+    else if (f_nasdaq >= 0.8 && f_sp500 >= 0.5 && spread <= 0.6) {
+      activeRule = 3;
+      signal = "🟢 [精准买入 / 坚定加仓] 信号触发";
+      action = "🟢 推测开盘：21:30 100%高开。操作：逼空行情确立，适合15:00前果断加仓买入，直接收割今晚涨幅，禁止卖出让利润奔跑。";
+      label = "多头逼空";
+      color = "text-emerald-650";
+      bg = "bg-emerald-50/90";
+      border = "border-emerald-250";
+      indicator = "bg-emerald-500 animate-pulse";
+      cardGradient = "from-emerald-500/10 via-teal-500/5 to-transparent";
+    }
+    // 规则 4: 数据撕裂或区间震荡 - 波动极小
+    else if (Math.abs(f_nasdaq) < 0.5 && Math.abs(f_sp500) < 0.5) {
+      activeRule = 4;
+      signal = "⚪ [静默观望] 进入无方向垃圾时间";
+      action = "⚪ 推测开盘：平开或温和震荡。操作：下午走势属于噪音，无胜率优势。严格禁止打破常规的调仓，维持既定定投。";
+      label = "区间震荡";
+      color = "text-slate-650";
+      bg = "bg-slate-50/90";
+      border = "border-slate-200/60";
+      indicator = "bg-slate-400";
+      cardGradient = "from-slate-400/5 to-transparent";
+    }
+    // 规则 4: 数据撕裂或区间震荡 - 背离过大
+    else if (spread > 1.2) {
+      activeRule = 5;
+      signal = "🟡 [背离警告] 指数发生严重割裂失真";
+      action = "🟡 推测开盘：指数严重撕裂分化，开盘后极易剧烈震荡洗盘。操作：信号失真，严格禁止任何调仓，以默认定投应万变。";
+      label = "背离撕裂";
+      color = "text-amber-650";
+      bg = "bg-amber-50/90";
+      border = "border-amber-250";
+      indicator = "bg-amber-550";
+      cardGradient = "from-amber-500/10 via-yellow-500/5 to-transparent";
+    }
+    else {
+      activeRule = 6;
+      signal = "⚪ 执行默认日常计划";
+      action = "执行默认日常定投计划。盘前大盘走势未形成多空偏好，维持雷打不动的日常动作。";
+      label = "震荡观望";
+      color = "text-slate-500";
+      bg = "bg-slate-50/90";
+      border = "border-slate-200/60";
+      indicator = "bg-slate-400";
+      cardGradient = "from-slate-400/5 to-transparent";
+    }
+    
+    return { f_nasdaq, f_sp500, has_macro_data, spread, activeRule, signal, action, label, color, bg, border, indicator, cardGradient };
+  }, [usNasdaqInput, usSp505Input, usMacroData]);
 
   // Filter indices into main stock indices and leading wind vane indicators
   const mainIndices = useMemo(() => {
-    return indices.filter(idx => !idx.symbol.includes('CN=F') && !idx.symbol.includes('NQ=F') && !idx.symbol.includes('^HXC') && !idx.symbol.includes('USDCNH=X'));
+    return indices.filter(idx => !idx.symbol.includes('CN=F') && !idx.symbol.includes('NQ=F') && !idx.symbol.includes('ES=F') && !idx.symbol.includes('^HXC') && !idx.symbol.includes('USDCNH=X'));
   }, [indices]);
 
   const leadingIndices = useMemo(() => {
@@ -516,11 +743,634 @@ export default function GlobalMarketPanel() {
     return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  const renderQuantAdvisorView = () => {
+    return (
+      <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0 animate-in fade-in duration-300">
+        
+        {/* Left Column: Sandbox, sliders, 4D Matrix (5 cols on desktop) */}
+        <div className="col-span-1 md:col-span-5 flex flex-col gap-4 md:h-full md:overflow-y-auto pr-0 md:pr-1 custom-scrollbar shrink-0 select-none">
+          
+          {/* Section 1: Mode segment controller */}
+          <div className="bg-slate-100 p-1 rounded-2xl border border-slate-250/60 shadow-inner flex items-center gap-1">
+            <button
+              onClick={() => setAdvisorSubTab('china')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                advisorSubTab === 'china'
+                  ? 'bg-white text-blue-650 shadow-sm border border-slate-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span className="text-sm">🇨🇳</span>
+              <span>A股/创业板早盘预测 (09:15前)</span>
+            </button>
+            <button
+              onClick={() => setAdvisorSubTab('us')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                advisorSubTab === 'us'
+                  ? 'bg-white text-blue-650 shadow-sm border border-slate-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span className="text-sm">🇺🇸</span>
+              <span>美股/QDII双阈过滤 (15:00前)</span>
+            </button>
+          </div>
+
+          {/* Section 2: Simulator Panel */}
+          <div className="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-2xs relative overflow-hidden flex flex-col gap-4 shrink-0">
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-blue-500" />
+                <span className="text-xs font-black text-slate-700 tracking-wider">量化决策沙盒模拟器</span>
+              </div>
+              
+              {advisorSubTab === 'china' ? (
+                chinaSimMode ? (
+                  <button
+                    onClick={handleResetChinaRealTime}
+                    className="flex items-center gap-1 text-[10px] font-black text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-full border border-rose-200 cursor-pointer transition-all active:scale-95"
+                  >
+                    <Activity className="w-3 h-3 text-rose-450" />
+                    <span>恢复实时数据</span>
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-250">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>实时数据链接中</span>
+                  </span>
+                )
+              ) : (
+                usSimMode ? (
+                  <button
+                    onClick={handleResetUsRealTime}
+                    className="flex items-center gap-1 text-[10px] font-black text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-full border border-rose-200 cursor-pointer transition-all active:scale-95"
+                  >
+                    <Activity className="w-3 h-3 text-rose-455" />
+                    <span>恢复实时数据</span>
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-250">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>实时数据链接中</span>
+                  </span>
+                )
+              )}
+            </div>
+
+            {advisorSubTab === 'china' ? (
+              // China Controls
+              <div className="flex flex-col gap-4">
+                
+                {/* A50 Futures Slider */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-slate-500">富时中国 A50 期指日内涨跌幅 (A50期指)</span>
+                    <span className={`font-mono font-extrabold ${chinaA50Input >= 0 ? 'text-rose-550' : 'text-emerald-550'}`}>
+                      {chinaA50Input >= 0 ? '+' : ''}{chinaA50Input.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="-4.00"
+                      max="4.00"
+                      step="0.05"
+                      value={chinaA50Input}
+                      onChange={(e) => {
+                        setChinaSimMode(true);
+                        setChinaA50Input(parseFloat(e.target.value));
+                      }}
+                      className="flex-1 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={chinaA50Input}
+                      onChange={(e) => {
+                        setChinaSimMode(true);
+                        setChinaA50Input(parseFloat(e.target.value) || 0.0);
+                      }}
+                      className="w-16 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 text-slate-700 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* HXC Index Slider */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-slate-500">昨晚美股中概金龙指数收盘涨跌幅 (中概金龙)</span>
+                    <span className={`font-mono font-extrabold ${chinaHxcInput >= 0 ? 'text-rose-550' : 'text-emerald-550'}`}>
+                      {chinaHxcInput >= 0 ? '+' : ''}{chinaHxcInput.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="-6.00"
+                      max="6.00"
+                      step="0.05"
+                      value={chinaHxcInput}
+                      onChange={(e) => {
+                        setChinaSimMode(true);
+                        setChinaHxcInput(parseFloat(e.target.value));
+                      }}
+                      className="flex-1 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={chinaHxcInput}
+                      onChange={(e) => {
+                        setChinaSimMode(true);
+                        setChinaHxcInput(parseFloat(e.target.value) || 0.0);
+                      }}
+                      className="w-16 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 text-slate-700 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Calculated Sentiment Score Indicator */}
+                <div className="border-t border-slate-100 pt-3 flex flex-col gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/30">
+                  <div className="flex justify-between items-center text-xs font-black text-slate-700">
+                    <span>创业板/科创板高敏感度因子</span>
+                    <span className={`font-mono font-extrabold px-2 py-0.5 rounded-lg border text-[11px] font-black ${
+                      chinaAdvisorData.growth_sentiment >= 0.5 
+                        ? 'text-rose-650 bg-rose-50/70 border-rose-200' 
+                        : (chinaAdvisorData.growth_sentiment <= -0.5 ? 'text-emerald-650 bg-emerald-50/70 border-emerald-200' : 'text-slate-500 bg-slate-100 border-slate-200')
+                    }`}>
+                      {chinaAdvisorData.growth_sentiment >= 0 ? '+' : ''}{chinaAdvisorData.growth_sentiment.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden relative">
+                    <div
+                      className={`h-full transition-all duration-300 rounded-full ${
+                        chinaAdvisorData.growth_sentiment >= 0.5 ? 'bg-rose-500' : (chinaAdvisorData.growth_sentiment <= -0.5 ? 'bg-emerald-500' : 'bg-slate-400')
+                      }`}
+                      style={{
+                        width: `${Math.min(100, Math.max(0, (chinaAdvisorData.growth_sentiment + 5) * 10))}%`
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-450 leading-relaxed font-bold">
+                    * 该因子由 0.4 × A50期指涨跌幅 + 0.6 × 中概金龙涨跌幅加权计算，对以新能源、半导体、医药为主的科技成长标的集合竞价具有强前瞻指引作用。
+                  </p>
+                </div>
+
+              </div>
+            ) : (
+              // US Controls
+              <div className="flex flex-col gap-4">
+                
+                {/* Nasdaq Slider */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-slate-500">微纳指期货日内涨跌幅 (纳指期货)</span>
+                    <span className={`font-mono font-extrabold ${usNasdaqInput >= 0 ? 'text-rose-550' : 'text-emerald-555'}`}>
+                      {usNasdaqInput >= 0 ? '+' : ''}{usNasdaqInput.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="-6.00"
+                      max="6.00"
+                      step="0.05"
+                      value={usNasdaqInput}
+                      onChange={(e) => {
+                        setUsSimMode(true);
+                        setUsNasdaqInput(parseFloat(e.target.value));
+                      }}
+                      className="flex-1 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={usNasdaqInput}
+                      onChange={(e) => {
+                        setUsSimMode(true);
+                        setUsNasdaqInput(parseFloat(e.target.value) || 0.0);
+                      }}
+                      className="w-16 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 text-slate-700 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* S&P 500 Slider */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-slate-500">微标普期货日内涨跌幅 (标普期货)</span>
+                    <span className={`font-mono font-extrabold ${usSp505Input >= 0 ? 'text-rose-550' : 'text-emerald-555'}`}>
+                      {usSp505Input >= 0 ? '+' : ''}{usSp505Input.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="-6.00"
+                      max="6.00"
+                      step="0.05"
+                      value={usSp505Input}
+                      onChange={(e) => {
+                        setUsSimMode(true);
+                        setUsSp505Input(parseFloat(e.target.value));
+                      }}
+                      className="flex-1 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={usSp505Input}
+                      onChange={(e) => {
+                        setUsSimMode(true);
+                        setUsSp505Input(parseFloat(e.target.value) || 0.0);
+                      }}
+                      className="w-16 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 text-slate-700 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Macro Data Toggle */}
+                <label className="flex items-center justify-between rounded-2xl border border-slate-150 bg-slate-50 px-4 py-3 text-xs font-black text-slate-700 gap-2 cursor-pointer hover:bg-slate-100/50 transition-all select-none">
+                  <div className="flex flex-col text-left">
+                    <span>当晚 20:30 有重磅宏观数据公布</span>
+                    <span className="text-[10px] text-slate-400 font-bold mt-0.5">CPI/非农就业/美联储议息决议等</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={usMacroData}
+                    onChange={(e) => setUsMacroData(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </label>
+
+                {/* Spread (Divergence) indicators */}
+                <div className="border-t border-slate-100 pt-3 flex flex-col gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/30">
+                  <div className="flex justify-between items-center text-xs font-black text-slate-700">
+                    <span>两指偏离度 (偏离度 Spread)</span>
+                    <span className={`font-mono font-extrabold px-2 py-0.5 rounded-lg border text-[11px] font-black ${
+                      usAdvisorData.spread > 1.2 
+                        ? 'text-amber-655 bg-amber-50/70 border-amber-200 animate-pulse' 
+                        : (usAdvisorData.spread < 0.5 ? 'text-emerald-655 bg-emerald-50/70 border-emerald-200' : 'text-slate-500 bg-slate-100 border-slate-200')
+                    }`}>
+                      {usAdvisorData.spread.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden relative">
+                    <div
+                      className={`h-full transition-all duration-300 rounded-full ${
+                        usAdvisorData.spread > 1.2 ? 'bg-amber-500' : (usAdvisorData.spread < 0.5 ? 'bg-emerald-500' : 'bg-slate-400')
+                      }`}
+                      style={{
+                        width: `${Math.min(100, (usAdvisorData.spread / 2.0) * 100)}%`
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-450 leading-relaxed font-bold">
+                    {usAdvisorData.spread > 1.2 
+                      ? '⚠️ 两指分歧度过高！科技股与价值大盘出现严重撕裂背离，信号失真，属于无效垃圾时间。' 
+                      : (usAdvisorData.spread <= 0.5 ? '✅ 两指同向共振，属于极高确定性的普涨/普跌单边行情。' : 'ℹ️ 两指在日常常规震荡范围内。')}
+                  </p>
+                </div>
+
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: 4D Matrix Grid */}
+          <div className="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-2xs relative overflow-hidden flex flex-col gap-3 shrink-0">
+            <div className="flex items-center gap-1.5 mb-1.5 self-start">
+              <Cpu className="w-4 h-4 text-blue-500 animate-pulse" />
+              <span className="text-xs font-black text-slate-700 tracking-wider">四维量化信号矩阵映射</span>
+            </div>
+            
+            {advisorSubTab === 'china' ? (
+              // China 4D Matrix
+              <div className="grid grid-cols-2 gap-3 text-center text-[11px] font-bold select-none">
+                <div className={`p-3 rounded-2xl border transition-all duration-300 ${
+                  chinaAdvisorData.activeRule === 2 
+                    ? 'border-emerald-500 bg-emerald-50/70 text-emerald-800 ring-2 ring-emerald-500/20 scale-[1.02]' 
+                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                }`}>
+                  <div className="font-black text-xs">🟢 全面共振大涨</div>
+                  <p className="text-[9.5px] mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 >= +0.8% 且 中概金龙 >= +1.5%"}</p>
+                </div>
+
+                <div className={`p-3 rounded-2xl border transition-all duration-300 ${
+                  chinaAdvisorData.activeRule === 1 
+                    ? 'border-rose-500 bg-rose-50/70 text-rose-800 ring-2 ring-rose-500/20 scale-[1.02]' 
+                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                }`}>
+                  <div className="font-black text-xs">🔴 全面共振暴跌</div>
+                  <p className="text-[9.5px] mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 <= -0.8% 且 中概金龙 <= -1.5%"}</p>
+                </div>
+
+                <div className={`p-3 rounded-2xl border transition-all duration-300 ${
+                  chinaAdvisorData.activeRule === 3 
+                    ? 'border-amber-500 bg-amber-50/70 text-amber-800 ring-2 ring-amber-500/20 scale-[1.02]' 
+                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                }`}>
+                  <div className="font-black text-xs">🟡 二八结构分化</div>
+                  <p className="text-[9.5px] mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 >= +0.5% 且 中概金龙 <= -1.0%"}</p>
+                </div>
+
+                <div className={`p-3 rounded-2xl border transition-all duration-300 ${
+                  chinaAdvisorData.activeRule === 4 
+                    ? 'border-blue-500 bg-blue-50/70 text-blue-800 ring-2 ring-blue-500/20 scale-[1.02]' 
+                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                }`}>
+                  <div className="font-black text-xs">⚪ 震荡横盘市</div>
+                  <p className="text-[9.5px] mt-1 opacity-70 leading-relaxed font-semibold">离岸前瞻指标微弱 呈现方向不明宽幅震荡</p>
+                </div>
+              </div>
+            ) : (
+              // US 4D Matrix
+              <div className="grid grid-cols-3 gap-2.5 text-center text-[10px] font-bold select-none">
+                <div className={`p-2.5 rounded-2xl border transition-all duration-300 ${
+                  usAdvisorData.activeRule === 3 
+                    ? 'border-emerald-500 bg-emerald-50/70 text-emerald-800 ring-2 ring-emerald-500/20 scale-[1.02]' 
+                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                }`}>
+                  <div className="font-black text-[11px]">🟢 强趋势多头</div>
+                  <p className="text-[9px] mt-1 opacity-70 leading-normal font-semibold">{"多头共振 且 偏离度 <= 0.6%"}</p>
+                </div>
+
+                <div className={`p-2.5 rounded-2xl border transition-all duration-300 ${
+                  usAdvisorData.activeRule === 2 
+                    ? 'border-rose-500 bg-rose-50/70 text-rose-800 ring-2 ring-rose-500/20 scale-[1.02]' 
+                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                }`}>
+                  <div className="font-black text-[11px]">🔴 强趋势空头</div>
+                  <p className="text-[9px] mt-1 opacity-70 leading-normal font-semibold">{"空头共振 且 偏离度 <= 0.6%"}</p>
+                </div>
+
+                <div className={`p-2.5 rounded-2xl border transition-all duration-300 ${
+                  usAdvisorData.activeRule === 5 
+                    ? 'border-amber-500 bg-amber-50/70 text-amber-800 ring-2 ring-amber-500/20 scale-[1.02]' 
+                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                }`}>
+                  <div className="font-black text-[11px]">🟡 指数背离阱</div>
+                  <p className="text-[9px] mt-1 opacity-70 leading-normal font-semibold">{"同向背离较大 或 偏离度 >= 1.2%"}</p>
+                </div>
+
+                <div className={`col-span-3 p-2.5 rounded-2xl border transition-all duration-300 ${
+                  (usAdvisorData.activeRule === 4 || usAdvisorData.activeRule === 1 || usAdvisorData.activeRule === 6 || usAdvisorData.activeRule === 0) 
+                    ? 'border-blue-500 bg-blue-50/70 text-blue-800 ring-2 ring-blue-500/20 scale-[1.01]' 
+                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                }`}>
+                  <div className="font-black text-[11px]">⚪ 区间震荡 / 宏观黑天鹅过滤 / 熔断保护</div>
+                  <p className="text-[9px] mt-1 opacity-70 leading-normal font-semibold">波动在 $\pm$0.6% 内，或宏观数据发布，或触发 $-5\%$ 大熔断</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Right Column: Execution Output, Dynamic Highlighted Code Debugger (7 cols on desktop) */}
+        <div className="col-span-1 md:col-span-7 flex flex-col gap-4 md:h-full md:overflow-y-auto pr-0 md:pr-1 custom-scrollbar shrink-0">
+          
+          {/* Section 4: Quantitative Action Signal Block */}
+          {advisorSubTab === 'china' ? (
+            // China Output Block
+            <div className={`border rounded-3xl p-6 flex flex-col gap-4 shadow-xs bg-gradient-to-br ${chinaAdvisorData.cardGradient} transition-all duration-500 ${chinaAdvisorData.border}`}>
+              
+              <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-blue-500" />
+                  <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 09:15 前置早盘决策指令</span>
+                </div>
+                
+                <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1 rounded-full border ${chinaAdvisorData.bg} ${chinaAdvisorData.color}`}>
+                  <span className={`w-2 h-2 rounded-full ${chinaAdvisorData.indicator}`} />
+                  {chinaAdvisorData.label}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <h3 className="text-lg md:text-xl font-extrabold text-slate-800 leading-snug">
+                  {chinaAdvisorData.signal}
+                </h3>
+                
+                <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/50 flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-base select-none shrink-0 font-black">📊</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-700 leading-none">前瞻预测与开盘逻辑</h4>
+                      <p className="text-[11.5px] text-slate-500 leading-relaxed font-bold mt-1.5">
+                        新加坡富时中国 A50 指数是外资主力博弈中国资产唯一的夜盘及盘前枢纽。早上 9:00 - 9:15 的 15 分钟走势完成了对“昨晚美股表现 + 昨晚国内重磅政策 + 早上消息面”的终极统一定价。当前 A50 盘前涨跌幅为 <span className="font-extrabold font-mono text-slate-700">{chinaA50Input >= 0 ? '+' : ''}{chinaA50Input.toFixed(2)}%</span>，中概金龙指数收盘涨跌幅为 <span className="font-extrabold font-mono text-slate-700">{chinaHxcInput >= 0 ? '+' : ''}{chinaHxcInput.toFixed(2)}%</span>。
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 my-1"></div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="text-base select-none shrink-0 font-black">⚡</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-700 leading-none">量化操作指导建议</h4>
+                      <p className="text-[11.5px] text-slate-650 leading-relaxed font-extrabold mt-1.5">
+                        {chinaAdvisorData.action}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Educational info box */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-200/20 text-[10px] text-slate-450 leading-relaxed font-bold">
+                <p>
+                  💡 <span className="text-slate-650 font-extrabold">场内 ETF 操作:</span> 牛市高开情绪极其亢奋，开盘无脑追高往往会吃“高开低走”的闷棍。建议耐心等待 10:00 获利盘砸出的日内低吸黄金点。
+                </p>
+                <p>
+                  💡 <span className="text-slate-650 font-extrabold">场外 15:00 决策:</span> 场外基金以当天15:00收盘净值成交。早盘强单边共振往往决定了全天“光头大阳”或“大阴线”的走向，能够帮助我们提前锁定低吸或成功规避连续阴跌。
+                </p>
+              </div>
+
+            </div>
+          ) : (
+            // US Output Block
+            <div className={`border rounded-3xl p-6 flex flex-col gap-4 shadow-xs bg-gradient-to-br ${usAdvisorData.cardGradient} transition-all duration-500 ${usAdvisorData.border}`}>
+              
+              <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-blue-500" />
+                  <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 15:00 午后交易决策指令</span>
+                </div>
+                
+                <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1 rounded-full border ${usAdvisorData.bg} ${usAdvisorData.color}`}>
+                  <span className={`w-2 h-2 rounded-full ${usAdvisorData.indicator}`} />
+                  {usAdvisorData.label}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <h3 className="text-lg md:text-xl font-extrabold text-slate-800 leading-snug">
+                  {usAdvisorData.signal}
+                </h3>
+                
+                <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/50 flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-base select-none shrink-0 font-black">📊</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-700 leading-none">美股盘前趋势推测</h4>
+                      <p className="text-[11.5px] text-slate-500 leading-relaxed font-bold mt-1.5">
+                        在 14:50 核心节点，美股主力机构尚未进场，期货价格反映了全球盘前多空情绪共振。当前微纳指期货涨跌幅为 <span className="font-extrabold font-mono text-slate-700">{usNasdaqInput >= 0 ? '+' : ''}{usNasdaqInput.toFixed(2)}%</span>，微标普期货涨跌幅为 <span className="font-extrabold font-mono text-slate-700">{usSp505Input >= 0 ? '+' : ''}{usSp505Input.toFixed(2)}%</span>，两指偏离度为 <span className="font-extrabold font-mono text-slate-700">{usAdvisorData.spread.toFixed(2)}%</span>。
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 my-1"></div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="text-base select-none shrink-0 font-black">⚡</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-700 leading-none">精准买卖操作决策</h4>
+                      <p className="text-[11.5px] text-slate-650 leading-relaxed font-extrabold mt-1.5">
+                        {usAdvisorData.action}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Educational info box */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-200/20 text-[10px] text-slate-450 leading-relaxed font-bold font-sans">
+                <p>
+                  💡 <span className="text-slate-650 font-extrabold">QDII 赎回与暂停逻辑:</span> QDII 赎回按照当天（T日）收盘净值确认。由于盘前期货大跌预示今晚 21:30 跳空低开，15:00 前立刻申请卖出或暂停买入，可变相白赚 1%-2% 的份额资产。
+                </p>
+                <p>
+                  💡 <span className="text-slate-650 font-extrabold">逼空坚定加仓逻辑:</span> 很多人涨了不敢追，但在量化多模共振暴涨里，这预示着欧美资金大举扫货逼空。在 A 股 15:00 结束交易前果断买入加仓直接“坐轿子”，明天净值将直接大吃一笔昨晚的高开涨幅。
+                </p>
+              </div>
+
+            </div>
+          )}
+
+          {/* Section 5: Dynamic Highlighting Code Debugger Terminal */}
+          <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 shadow-xl relative overflow-hidden flex flex-col gap-3 font-mono text-left select-text">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div className="flex justify-between items-center border-b border-slate-850 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="flex gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                </span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none ml-1">Quant Python Debugger Terminal</span>
+              </div>
+              <span className="text-[9px] font-bold text-slate-600 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md leading-none">Python v3.11</span>
+            </div>
+
+            {/* Python code output with dynamic line-by-line highlighting */}
+            <div className="text-[11.5px] font-semibold leading-relaxed overflow-x-auto custom-scrollbar whitespace-nowrap text-slate-400 py-1 font-mono">
+              {advisorSubTab === 'china' ? (
+                // China Python Code
+                <div className="flex flex-col gap-0.5 select-text font-mono">
+                  <div className="text-slate-500">1: <span className="text-blue-450 font-bold">def</span> <span className="text-emerald-400 font-bold">generate_china_market_signal</span>(f_a50_morning, hxc_last_night):</div>
+                  <div className="text-slate-500">2:     <span className="text-slate-550 italic"># 创业板高敏感度因子 = 40% A50期指 + 60% 中概金龙指数</span></div>
+                  <div className="text-slate-500">3:     growth_sentiment = 0.4 * f_a50_morning + 0.6 * hxc_last_night</div>
+                  <div className="text-slate-500">4: </div>
+                  
+                  {/* Rule 1: Collapse共振暴跌 */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${chinaAdvisorData.activeRule === 1 ? 'bg-rose-500/20 text-rose-350 border border-rose-500/40 ring-1 ring-rose-500/10' : 'text-slate-400'}`}>
+                    <div>5:     <span className="text-blue-450 font-bold">if</span> f_a50_morning &lt;= -0.8 <span className="text-blue-450 font-bold">and</span> hxc_last_night &lt;= -1.5:</div>
+                    <div className="pl-4">6:         <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"🔴 [严重警报] 大A与创业板今早将大幅低开！"</span>, <span className="text-amber-300">"场外禁止加仓..."</span></div>
+                  </div>
+
+                  {/* Rule 2: Bullish共振大涨 */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${chinaAdvisorData.activeRule === 2 ? 'bg-emerald-500/20 text-emerald-350 border border-emerald-500/40 ring-1 ring-emerald-500/10' : 'text-slate-400'}`}>
+                    <div>7:     <span className="text-blue-450 font-bold">elif</span> f_a50_morning &gt;= +0.8 <span className="text-blue-450 font-bold">and</span> hxc_last_night &gt;= +1.5:</div>
+                    <div className="pl-4">8:         <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"🟢 [多头逼空] 大A与创业板今早将大幅高开！"</span>, <span className="text-amber-300">"场内冲高切勿追..."</span></div>
+                  </div>
+
+                  {/* Rule 3: 二八结构分化 */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${chinaAdvisorData.activeRule === 3 ? 'bg-amber-500/20 text-amber-350 border border-amber-500/40 ring-1 ring-amber-500/10' : 'text-slate-400'}`}>
+                    <div>9:     <span className="text-blue-450 font-bold">elif</span> f_a50_morning &gt;= +0.5 <span className="text-blue-450 font-bold">and</span> hxc_last_night &lt;= -1.0:</div>
+                    <div className="pl-4">10:        <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"🟡 [二八分化] 传统蓝筹护盘，创业板承压！"</span>, <span className="text-amber-300">"蓝筹走强但科技走弱..."</span></div>
+                  </div>
+
+                  {/* Rule 4: 默认横向震荡 */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${chinaAdvisorData.activeRule === 4 ? 'bg-blue-500/20 text-blue-350 border border-blue-500/40 ring-1 ring-blue-500/10' : 'text-slate-400'}`}>
+                    <div>11:    <span className="text-blue-450 font-bold">else</span>:</div>
+                    <div className="pl-4">12:        <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"⚪ [震荡市]"</span>, <span className="text-amber-300">"大A大概率维持横向整理，继续坚守日常定投计划..."</span></div>
+                  </div>
+                </div>
+              ) : (
+                // US Python Code
+                <div className="flex flex-col gap-0.5 select-text text-slate-400 font-mono">
+                  <div className="text-slate-500">1: <span className="text-blue-450 font-bold">def</span> <span className="text-emerald-400 font-bold">generate_us_fund_signal</span>(f_nasdaq, f_sp500, has_macro_data=False):</div>
+                  
+                  {/* Rule 0: circuit breaker */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${usAdvisorData.activeRule === 0 ? 'bg-red-500/35 text-red-305 border border-red-500/50 ring-1 ring-red-500/10' : 'text-slate-400'}`}>
+                    <div>2:     <span className="text-blue-450 font-bold">if</span> f_nasdaq &lt;= -5.0 <span className="text-blue-450 font-bold">or</span> f_sp500 &lt;= -5.0:</div>
+                    <div className="pl-4">3:         <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"⚠️ EMERGENCY_STOP"</span>, <span className="text-amber-300">"🔥 期货盘前熔断！立刻申请赎回避险，禁止买入！"</span></div>
+                  </div>
+
+                  {/* Rule 1: Macro Data */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${usAdvisorData.activeRule === 1 ? 'bg-slate-500/30 text-slate-300 border border-slate-500/40 ring-1 ring-slate-500/10' : 'text-slate-400'}`}>
+                    <div>4:     <span className="text-blue-450 font-bold">if</span> has_macro_data:</div>
+                    <div className="pl-4">5:         <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"HOLD_REGULAR"</span>, <span className="text-amber-300">"⏳ 今晚有重大数据，下午期货走势极具欺骗性。不做调仓。"</span></div>
+                  </div>
+
+                  <div className="text-slate-500">6:     spread = abs(f_nasdaq - f_sp500)</div>
+                  
+                  {/* Rule 2: Short co-resonance */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${usAdvisorData.activeRule === 2 ? 'bg-rose-500/20 text-rose-350 border border-rose-500/40 ring-1 ring-rose-500/10' : 'text-slate-400'}`}>
+                    <div>7:     <span className="text-blue-450 font-bold">if</span> f_nasdaq &lt;= -0.8 <span className="text-blue-450 font-bold">and</span> f_sp500 &lt;= -0.6 <span className="text-blue-450 font-bold">and</span> spread &lt;= 0.6:</div>
+                    <div className="pl-4">8:         <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"SELL_OR_STOP_BUY"</span>, <span className="text-amber-300">"🔴 21:30低开。适合15:00前卖出止盈；买入执行暂停。"</span></div>
+                  </div>
+
+                  {/* Rule 3: Long co-resonance */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${usAdvisorData.activeRule === 3 ? 'bg-emerald-500/20 text-emerald-355 border border-emerald-500/40 ring-1 ring-emerald-500/10' : 'text-slate-400'}`}>
+                    <div>9:     <span className="text-blue-450 font-bold">if</span> f_nasdaq &gt;= +0.8 <span className="text-blue-450 font-bold">and</span> f_sp500 &gt;= +0.5 <span className="text-blue-450 font-bold">and</span> spread &lt;= 0.6:</div>
+                    <div className="pl-4">10:        <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"BUY_STRONG"</span>, <span className="text-amber-300">"🟢 21:30高开。逼空确立，适合15:00前加仓买入，直接收割涨幅。"</span></div>
+                  </div>
+
+                  {/* Rule 4: Noise or range bound - small changes */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${usAdvisorData.activeRule === 4 ? 'bg-blue-500/20 text-blue-350 border border-blue-500/40 ring-1 ring-blue-500/10' : 'text-slate-400'}`}>
+                    <div>11:    <span className="text-blue-450 font-bold">if</span> abs(f_nasdaq) &lt; 0.5 <span className="text-blue-450 font-bold">and</span> abs(f_sp500) &lt; 0.5:</div>
+                    <div className="pl-4">12:        <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"HOLD_REGULAR"</span>, <span className="text-amber-300">"⚪ 平开震荡，进入垃圾时间。下午走势无精准参考。维持常规。"</span></div>
+                  </div>
+
+                  {/* Rule 5: Noise or range bound - spread too high */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${usAdvisorData.activeRule === 5 ? 'bg-amber-500/20 text-amber-350 border border-amber-500/40 ring-1 ring-amber-500/10' : 'text-slate-400'}`}>
+                    <div>13:    <span className="text-blue-450 font-bold">if</span> spread &gt; 1.2:</div>
+                    <div className="pl-4">14:        <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"HOLD_REGULAR"</span>, <span className="text-amber-300">"🟡 剧烈洗盘。指数背离严重分化，信号失真。维持常规定投。"</span></div>
+                  </div>
+
+                  {/* Default fallback */}
+                  <div className={`transition-all duration-300 py-0.5 px-2 rounded-md ${usAdvisorData.activeRule === 6 ? 'bg-slate-550/20 text-slate-350 border border-slate-550/30' : 'text-slate-400'}`}>
+                    <div>15:    <span className="text-blue-450 font-bold">return</span> <span className="text-amber-300">"HOLD_REGULAR"</span>, <span className="text-amber-350">"执行默认日常计划。"</span></div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Terminal status bar */}
+            <div className="flex items-center justify-between text-[9px] text-slate-550 border-t border-slate-850 pt-2 font-bold select-none font-mono">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Sandbox Active</span>
+              </span>
+              <span>Lines: {advisorSubTab === 'china' ? '12' : '15'} • UTF-8 • PySparkle Compiler</span>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0">
+
       
       {/* Left Area: Indices Card Grid (7/12 cols on desktop) */}
-      <div className="col-span-1 md:col-span-7 flex flex-col gap-4 min-h-[300px] md:h-full md:overflow-hidden">
+      <div className={`${marketTab === 'advisor' ? 'col-span-12' : 'col-span-1 md:col-span-7'} flex flex-col gap-4 min-h-[300px] md:h-full md:overflow-hidden`}>
         
         {/* Dashboard Title & Actions Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-3 sm:px-5 sm:py-3 rounded-2xl border border-slate-200/50 shadow-xs shrink-0 gap-3 sm:gap-0 animate-in fade-in duration-200">
@@ -554,6 +1404,17 @@ export default function GlobalMarketPanel() {
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
                 </span>
               </span>
+            </button>
+            <button
+              onClick={() => setMarketTab('advisor')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer relative ${
+                marketTab === 'advisor'
+                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
+                  : 'text-slate-500 hover:text-slate-805'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span>双阈值投资助手</span>
             </button>
           </div>
           
@@ -670,7 +1531,7 @@ export default function GlobalMarketPanel() {
                 );
               })}
             </div>
-          ) : (
+          ) : marketTab === 'predictor' ? (
             /* ================= TAB 2: PREDICTOR & WIND VANE ================= */
             <div className="flex flex-col gap-5 animate-in fade-in duration-200">
               
@@ -888,12 +1749,15 @@ export default function GlobalMarketPanel() {
               </div>
 
             </div>
+          ) : (
+            renderQuantAdvisorView()
           )}
         </div>
       </div>
 
       {/* Right Area: Large Interactive Detailed ECharts Panel (5/12 cols on desktop) */}
-      <div className="col-span-1 md:col-span-5 flex flex-col bg-white border border-slate-200/60 rounded-3xl shadow-sm md:h-full md:overflow-hidden p-4 md:p-5 gap-4">
+      {marketTab !== 'advisor' && (
+        <div className="col-span-1 md:col-span-5 flex flex-col bg-white border border-slate-200/60 rounded-3xl shadow-sm md:h-full md:overflow-hidden p-4 md:p-5 gap-4">
         
         {activeIndex ? (
           <>
@@ -1003,6 +1867,7 @@ export default function GlobalMarketPanel() {
           </div>
         )}
       </div>
+      )}
 
     </div>
   );

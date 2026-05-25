@@ -22,6 +22,7 @@ const INDICES = [
   { symbol: "BTC-USD", name: "比特币现货", englishName: "Bitcoin USD", region: "CRP", regionName: "₿ 加密" },
   { symbol: "CN=F", name: "富时中国A50期指", englishName: "FTSE China A50 Futures", region: "FUT", regionName: "期货", isLeading: true },
   { symbol: "NQ=F", name: "纳斯达克100期指", englishName: "Nasdaq 100 Futures", region: "FUT", regionName: "期货", isLeading: true },
+  { symbol: "ES=F", name: "标普500期指", englishName: "S&P 500 Futures", region: "FUT", regionName: "期货", isLeading: true },
   { symbol: "^HXC", name: "纳斯达克金龙中国指数", englishName: "Nasdaq Golden Dragon", region: "US", regionName: "美国", isLeading: true },
   { symbol: "USDCNH=X", name: "离岸人民币汇率", englishName: "USD/CNH Exchange Rate", region: "FX", regionName: "外汇", isLeading: true }
 ];
@@ -46,10 +47,11 @@ const BASE_CONFIGS = {
   "GC=F": { base: 2355.20, drift: 0.0002, volatility: 0.0060 },
   "CL=F": { base: 78.45, drift: 0.0001, volatility: 0.0155 },
   "BTC-USD": { base: 68500.00, drift: 0.0008, volatility: 0.0320 },
-  "CN=F": { base: 12200.00, drift: 0.0001, volatility: 0.0120 },
-  "NQ=F": { base: 18800.00, drift: 0.0004, volatility: 0.0130 },
-  "^HXC": { base: 6200.00, drift: 0.0002, volatility: 0.0180 },
-  "USDCNH=X": { base: 7.2500, drift: -0.00005, volatility: 0.0030 }
+  "CN=F": { base: 12200.00, drift: 0.0001, volatility: 0.0065 },
+  "NQ=F": { base: 18800.00, drift: 0.0004, volatility: 0.0070 },
+  "ES=F": { base: 5310.00, drift: 0.0003, volatility: 0.0080 },
+  "^HXC": { base: 6200.00, drift: 0.0002, volatility: 0.0110 },
+  "USDCNH=X": { base: 7.2500, drift: -0.00005, volatility: 0.0015 }
 };
 
 // Simple normal distribution approximation using Central Limit Theorem
@@ -217,7 +219,9 @@ export async function onRequestGet(context) {
       }
       
       const currentPrice = indexResult.meta?.regularMarketPrice || closes[closes.length - 1] || 0;
-      const prevClose = indexResult.meta?.chartPreviousClose || closes[closes.length - 2] || currentPrice;
+      const prevClose = (range === "1d" || interval === "5m") 
+        ? (indexResult.meta?.chartPreviousClose || closes[0] || currentPrice)
+        : (closes.length > 1 ? closes[closes.length - 2] : (indexResult.meta?.chartPreviousClose || currentPrice));
       const change = Number((currentPrice - prevClose).toFixed(2));
       const changePercent = Number(((change / prevClose) * 100).toFixed(2));
       
@@ -262,8 +266,8 @@ export async function onRequestGet(context) {
           });
         }
         
-        const currentPrice = indexResult.meta?.regularMarketPrice || closes[closes.length - 1] || 0;
-        const prevClose = indexResult.meta?.chartPreviousClose || closes[closes.length - 2] || currentPrice;
+        const currentPrice = closes.length > 0 ? closes[closes.length - 1] : (indexResult.meta?.regularMarketPrice || 0);
+        const prevClose = closes.length > 1 ? closes[closes.length - 2] : (indexResult.meta?.chartPreviousClose || currentPrice);
         const change = Number((currentPrice - prevClose).toFixed(2));
         const changePercent = Number(((change / prevClose) * 100).toFixed(2));
         
