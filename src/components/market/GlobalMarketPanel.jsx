@@ -35,6 +35,61 @@ function Sparkline({ data, isPositive }) {
   );
 }
 
+// Calculate target trading date for predictions based on markets timezone/schedule
+function getTargetTradingDate(region, currentTime) {
+  const day = currentTime.getDay(); // 0 is Sunday, 6 is Saturday
+  const hour = currentTime.getHours();
+  const minute = currentTime.getMinutes();
+  const timeValue = hour * 100 + minute; // e.g. 1530 for 15:30
+  
+  let target = new Date(currentTime);
+  
+  if (region === 'cn' || region === 'hk') {
+    // A-shares / HK-shares close around 15:00/16:00.
+    // If it's after 15:00 on a weekday, the next session is the next business day.
+    // If it's weekend, it's next Monday.
+    if (day === 6) { // Saturday
+      target.setDate(target.getDate() + 2);
+    } else if (day === 0) { // Sunday
+      target.setDate(target.getDate() + 1);
+    } else if (day === 5 && timeValue >= 1500) { // Friday after 15:00
+      target.setDate(target.getDate() + 3);
+    } else if (timeValue >= 1500) { // Mon-Thu after 15:00
+      target.setDate(target.getDate() + 1);
+    }
+  } else if (region === 'us') {
+    // US market regular trading: 21:30 - 04:00 (Beijing time)
+    // Cutoff at 15:00 to predict tonight's open vs. tomorrow's open.
+    // If it is Saturday or Sunday, next session is Monday.
+    // If it is early morning Saturday before 06:00 AM, it is Friday's active session.
+    if (day === 6) { // Saturday
+      if (hour < 6) {
+        target.setDate(target.getDate() - 1); // Friday night session
+      } else {
+        target.setDate(target.getDate() + 2); // Monday session
+      }
+    } else if (day === 0) { // Sunday
+      target.setDate(target.getDate() + 1); // Monday session
+    } else { // Mon-Fri
+      // Early morning before 06:00 AM represents yesterday's US session closing
+      if (hour < 6) {
+        target.setDate(target.getDate() - 1);
+      }
+    }
+  }
+  return target;
+}
+
+// Format Date object to "M月D日 (周X)"
+function formatTargetDate(date) {
+  if (!date) return '';
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const weekday = weekdays[date.getDay()];
+  return `${month}月${day} (周${weekday.charAt(1)})`;
+}
+
 // ECharts line renderer for detailed interactive historical chart
 function DetailedChart({ option }) {
   const chartRef = useRef(null);
@@ -88,8 +143,16 @@ export default function GlobalMarketPanel() {
   const [detailHistory, setDetailHistory] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
-  const [period, setPeriod] = useState('1Y'); // 1M, 3M, 6M, 1Y
+  const [period, setPeriod] = useState('1D'); // 1D, 1M, 3M, 6M, 1Y
   const [marketTab, setMarketTab] = useState('overview'); // 'overview' | 'predictor' | 'advisor'
+
+  const targetDateCN = useMemo(() => {
+    return formatTargetDate(getTargetTradingDate('cn', new Date()));
+  }, []);
+
+  const targetDateUS = useMemo(() => {
+    return formatTargetDate(getTargetTradingDate('us', new Date()));
+  }, []);
 
   // Quantitative Advisor States
   const [isNoviceMode, setIsNoviceMode] = useState(true); // Default to true (jargon-free novice mode!)
@@ -171,7 +234,7 @@ export default function GlobalMarketPanel() {
       label = "共振暴跌";
       color = "text-rose-600";
       bg = "bg-rose-50/90";
-      border = "border-rose-250";
+      border = "border-rose-200";
       indicator = "bg-rose-500 animate-pulse";
       cardGradient = "from-red-500/10 via-rose-500/5 to-transparent";
     }
@@ -183,7 +246,7 @@ export default function GlobalMarketPanel() {
       label = "多头逼空";
       color = "text-emerald-600";
       bg = "bg-emerald-50/90";
-      border = "border-emerald-250";
+      border = "border-emerald-200";
       indicator = "bg-emerald-500 animate-pulse";
       cardGradient = "from-emerald-500/10 via-teal-500/5 to-transparent";
     }
@@ -195,7 +258,7 @@ export default function GlobalMarketPanel() {
       label = "二八分化";
       color = "text-amber-600";
       bg = "bg-amber-50/90";
-      border = "border-amber-250";
+      border = "border-amber-200";
       indicator = "bg-amber-500 animate-pulse";
       cardGradient = "from-amber-500/10 via-yellow-500/5 to-transparent";
     }
@@ -207,7 +270,7 @@ export default function GlobalMarketPanel() {
       label = "震荡整理";
       color = "text-slate-650";
       bg = "bg-slate-50/90";
-      border = "border-slate-250";
+      border = "border-slate-200";
       indicator = "bg-slate-400";
       cardGradient = "from-slate-400/5 to-transparent";
     }
@@ -264,7 +327,7 @@ export default function GlobalMarketPanel() {
       label = "空头共振";
       color = "text-rose-650";
       bg = "bg-rose-50/90";
-      border = "border-rose-250";
+      border = "border-rose-200";
       indicator = "bg-rose-500 animate-pulse";
       cardGradient = "from-red-500/10 via-rose-500/5 to-transparent";
     }
@@ -276,7 +339,7 @@ export default function GlobalMarketPanel() {
       label = "多头逼空";
       color = "text-emerald-650";
       bg = "bg-emerald-50/90";
-      border = "border-emerald-250";
+      border = "border-emerald-200";
       indicator = "bg-emerald-500 animate-pulse";
       cardGradient = "from-emerald-500/10 via-teal-500/5 to-transparent";
     }
@@ -300,7 +363,7 @@ export default function GlobalMarketPanel() {
       label = "背离撕裂";
       color = "text-amber-650";
       bg = "bg-amber-50/90";
-      border = "border-amber-250";
+      border = "border-amber-200";
       indicator = "bg-amber-550";
       cardGradient = "from-amber-500/10 via-yellow-500/5 to-transparent";
     }
@@ -507,7 +570,7 @@ export default function GlobalMarketPanel() {
       label = '极度恐慌';
       colorClass = 'text-emerald-750';
       bgClass = 'bg-emerald-100/70';
-      borderClass = 'border-emerald-250';
+      borderClass = 'border-emerald-200';
       gradientFromTo = 'from-emerald-500 via-teal-600 to-green-700';
       shadowColor = 'rgba(16, 185, 129, 0.4)';
       desc = '风向标惨烈低迷，人民币出现较快贬值，空头占据绝对优势，翌日大盘或加速回调。';
@@ -527,6 +590,12 @@ export default function GlobalMarketPanel() {
     const hxcChg = hxc ? hxc.changePercent : 0;
     const nqChg = nq ? nq.changePercent : 0;
     const cnhChg = cnh ? cnh.changePercent : 0;
+
+    // Calculate dynamic target trading dates based on market schedules
+    const now = new Date();
+    const dateCNStr = formatTargetDate(getTargetTradingDate('cn', now));
+    const dateHKStr = formatTargetDate(getTargetTradingDate('hk', now));
+    const dateUSStr = formatTargetDate(getTargetTradingDate('us', now));
 
     // 1. A-shares prediction
     const aShareWeight = a50Chg * 0.5 + hxcChg * 0.3 - cnhChg * 2.0;
@@ -619,9 +688,9 @@ export default function GlobalMarketPanel() {
     }
 
     return [
-      { id: 'cn', name: '中国 A 股大盘', status: aShareStatus, prob: aShareProb, color: aShareColor, dot: aShareDot, rationales: aShareRationales },
-      { id: 'hk', name: '中国港股 (恒指/恒科)', status: hkStatus, prob: hkProb, color: hkColor, dot: hkDot, rationales: hkRationales },
-      { id: 'us', name: '美股科技/纳指100', status: usStatus, prob: usProb, color: usColor, dot: usDot, rationales: usRationales }
+      { id: 'cn', name: '中国 A 股大盘', targetDateStr: dateCNStr, status: aShareStatus, prob: aShareProb, color: aShareColor, dot: aShareDot, rationales: aShareRationales },
+      { id: 'hk', name: '中国港股 (恒指/恒科)', targetDateStr: dateHKStr, status: hkStatus, prob: hkProb, color: hkColor, dot: hkDot, rationales: hkRationales },
+      { id: 'us', name: '美股科技/纳指100', targetDateStr: dateUSStr, status: usStatus, prob: usProb, color: usColor, dot: usDot, rationales: usRationales }
     ];
   }, [leadingIndices]);
 
@@ -659,12 +728,18 @@ export default function GlobalMarketPanel() {
     }
   };
 
-  // Fetch detailed history for selected symbol
-  const fetchDetail = async (symbol) => {
+  // Fetch detailed history for selected symbol based on dynamic period
+  const fetchDetail = async (symbol, currentPeriod = '1D') => {
     setDetailLoading(true);
     setDetailError(null);
     try {
-      const res = await fetch(`/api/market?symbol=${encodeURIComponent(symbol)}&range=1y`);
+      let rangeParam = '1y';
+      if (currentPeriod === '1D') rangeParam = '1d';
+      else if (currentPeriod === '1M') rangeParam = '1m';
+      else if (currentPeriod === '3M') rangeParam = '3m';
+      else if (currentPeriod === '6M') rangeParam = '6m';
+      
+      const res = await fetch(`/api/market?symbol=${encodeURIComponent(symbol)}&range=${rangeParam}`);
       if (!res.ok) {
         throw new Error(`加载详细历史行情失败: HTTP ${res.status}`);
       }
@@ -686,12 +761,12 @@ export default function GlobalMarketPanel() {
     fetchOverview();
   }, []);
 
-  // Fetch details when selected symbol changes
+  // Fetch details when selected symbol or period changes
   useEffect(() => {
     if (selectedSymbol) {
-      fetchDetail(selectedSymbol);
+      fetchDetail(selectedSymbol, period);
     }
-  }, [selectedSymbol]);
+  }, [selectedSymbol, period]);
 
   // Find active index information
   const activeIndex = useMemo(() => {
@@ -701,6 +776,7 @@ export default function GlobalMarketPanel() {
   // Filter history based on selected period
   const filteredHistory = useMemo(() => {
     if (detailHistory.length === 0) return [];
+    if (period === '1D') return detailHistory; // For 1D, return intraday points directly
     
     const now = new Date();
     let daysToKeep = 365;
@@ -744,7 +820,19 @@ export default function GlobalMarketPanel() {
   const chartOption = useMemo(() => {
     if (filteredHistory.length === 0 || !activeIndex) return null;
     
-    const dates = filteredHistory.map(pt => pt.date);
+    const dates = filteredHistory.map(pt => {
+      if (period === '1D') {
+        try {
+          const d = new Date(pt.date);
+          const hours = String(d.getHours()).padStart(2, '0');
+          const minutes = String(d.getMinutes()).padStart(2, '0');
+          return `${hours}:${minutes}`;
+        } catch (e) {
+          return pt.date;
+        }
+      }
+      return pt.date;
+    });
     const values = filteredHistory.map(pt => pt.value);
     
     const isPositive = activeIndex.changePercent >= 0;
@@ -755,9 +843,22 @@ export default function GlobalMarketPanel() {
         trigger: 'axis',
         formatter: (params) => {
           const pt = params[0];
+          let labelText = pt.name;
+          if (period === '1D' && filteredHistory[pt.dataIndex]) {
+            try {
+              const originalDate = new Date(filteredHistory[pt.dataIndex].date);
+              labelText = originalDate.toLocaleString('zh-CN', {
+                month: 'numeric',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+              });
+            } catch (e) {}
+          }
           return `
             <div style="font-family: sans-serif; padding: 4px 8px;">
-              <div style="font-size: 10px; color: #94a3b8; font-weight: bold; margin-bottom: 4px;">${pt.name}</div>
+              <div style="font-size: 10px; color: #94a3b8; font-weight: bold; margin-bottom: 4px;">${labelText}</div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: ${lineColor};"></span>
                 <span style="font-size: 13px; font-weight: 800; color: #334155; font-family: monospace;">${Number(pt.value).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</span>
@@ -919,7 +1020,7 @@ export default function GlobalMarketPanel() {
                 <span className="text-base">📡</span>
                 <span className="text-xs font-black text-slate-700 tracking-wider">海外市场实时气象站</span>
               </div>
-              <span className="text-[10px] text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-250 animate-pulse flex items-center gap-1">
+              <span className="text-[10px] text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200 animate-pulse flex items-center gap-1">
                 <span className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
                 卫星实时同步中
               </span>
@@ -1161,7 +1262,7 @@ export default function GlobalMarketPanel() {
         <div className="col-span-1 md:col-span-5 flex flex-col gap-4 md:h-full md:overflow-y-auto pr-0 md:pr-1 custom-scrollbar shrink-0 select-none">
           
           {/* Section 1: Mode segment controller */}
-          <div className="bg-slate-100 p-1 rounded-2xl border border-slate-250/60 shadow-inner flex items-center gap-1">
+          <div className="bg-slate-100 p-1 rounded-2xl border border-slate-200/60 shadow-inner flex items-center gap-1">
             <button
               onClick={() => setAdvisorSubTab('china')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
@@ -1205,7 +1306,7 @@ export default function GlobalMarketPanel() {
                     <span>恢复实时数据</span>
                   </button>
                 ) : (
-                  <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-250">
+                  <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span>实时数据链接中</span>
                   </span>
@@ -1220,7 +1321,7 @@ export default function GlobalMarketPanel() {
                     <span>恢复实时数据</span>
                   </button>
                 ) : (
-                  <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-250">
+                  <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span>实时数据链接中</span>
                   </span>
@@ -1548,7 +1649,7 @@ export default function GlobalMarketPanel() {
               <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-blue-500" />
-                  <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 09:15 前置早盘决策指令</span>
+                  <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 09:15 前置早盘决策指令 ({targetDateCN})</span>
                 </div>
                 
                 <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1 rounded-full border ${chinaAdvisorData.bg} ${chinaAdvisorData.color}`}>
@@ -1605,7 +1706,7 @@ export default function GlobalMarketPanel() {
               <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-blue-500" />
-                  <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 15:00 午后交易决策指令</span>
+                  <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 15:00 午后交易决策指令 ({targetDateUS})</span>
                 </div>
                 
                 <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1 rounded-full border ${usAdvisorData.bg} ${usAdvisorData.color}`}>
@@ -2007,7 +2108,7 @@ export default function GlobalMarketPanel() {
                 <div className="xl:col-span-7 bg-white border border-slate-200/60 rounded-3xl p-5 flex flex-col gap-4 shadow-2xs">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <TrendingUp className="w-4 h-4 text-blue-500" />
-                    <span className="text-[11px] font-black text-slate-450 uppercase tracking-wider">翌日大盘开盘前瞻预测</span>
+                    <span className="text-[11px] font-black text-slate-450 uppercase tracking-wider">大盘开盘前瞻预测 (基于当前风向标)</span>
                   </div>
                   
                   <div className="flex-1 flex flex-col gap-3">
@@ -2016,7 +2117,10 @@ export default function GlobalMarketPanel() {
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <span className={`w-1.5 h-1.5 rounded-full ${pred.dot}`} />
-                            <h4 className="text-xs font-black text-slate-700">{pred.name}</h4>
+                            <div className="flex flex-col text-left">
+                              <h4 className="text-xs font-black text-slate-700">{pred.name}</h4>
+                              <span className="text-[9px] text-slate-400 font-bold mt-0.5">预测目标: {pred.targetDateStr}</span>
+                            </div>
                           </div>
                           
                           <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 border rounded-lg ${pred.color}`}>
@@ -2211,15 +2315,15 @@ export default function GlobalMarketPanel() {
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">历史趋势大图</span>
               
               <div className="flex gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 w-fit shrink-0 select-none">
-                {['1M', '3M', '6M', '1Y'].map(p => (
+                {['1D', '1M', '3M', '6M', '1Y'].map(p => (
                   <button
                     key={p}
                     onClick={() => setPeriod(p)}
                     className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all cursor-pointer ${
-                      period === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                      period === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-650'
                     }`}
                   >
-                    {p === '1M' ? '近1月' : p === '3M' ? '近3月' : p === '6M' ? '近6月' : '近1年'}
+                    {p === '1D' ? '实时分时' : p === '1M' ? '近1月' : p === '3M' ? '近3月' : p === '6M' ? '近6月' : '近1年'}
                   </button>
                 ))}
               </div>

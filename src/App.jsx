@@ -27,7 +27,8 @@ import {
   Globe,
   ShieldCheck,
   Award,
-  Users
+  Users,
+  Calendar
 } from 'lucide-react';
 import Sortable from 'sortablejs';
 import FormatNumber from './components/common/FormatNumber';
@@ -40,6 +41,7 @@ import GroupModal from './components/modals/GroupModal';
 import SyncTradeModal from './components/modals/SyncTradeModal';
 import SyncModal from './components/modals/SyncModal';
 import OcrSyncModal from './components/modals/OcrSyncModal';
+import ProfitCalendarModal from './components/modals/ProfitCalendarModal';
 import FundTable from './components/FundTable';
 import AddFundModal from './components/forms/AddFundModal';
 import EditFundModal from './components/forms/EditFundModal';
@@ -1801,6 +1803,7 @@ export default function FundTrackerApp() {
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, success, error
   const [localDataStats, setLocalDataStats] = useState({ fundsCount: 0, txsCount: 0 });
+  const [profitCalendarOpen, setProfitCalendarOpen] = useState(false);
 
   async function loadCloudData() {
     try {
@@ -2352,15 +2355,27 @@ export default function FundTrackerApp() {
 
       // Aggregate weekly profits
       const weeklyLogs = dailyProfits.filter(dp => dp.fundCode === fund.code && dp.date >= currentMondayStr);
-      const computedWeeklyProfit = weeklyLogs.length > 0
+      let computedWeeklyProfit = weeklyLogs.length > 0
         ? weeklyLogs.reduce((sum, dp) => sum + dp.dailyProfit, 0)
         : toNumber(fund.weeklyProfit);
 
+      // Include today's real-time estimate or settled profit if not already logged in weekly logs
+      const hasTodayProfitInUI = Number.isFinite(baseDisp.dailyProfit) && (baseDisp.netValueDate === todayStr || baseDisp.valuationSource === 'estimate');
+      const todayLogExists = weeklyLogs.some(dp => dp.date === todayStr);
+      if (!todayLogExists && hasTodayProfitInUI) {
+        computedWeeklyProfit += baseDisp.dailyProfit;
+      }
+
       // Aggregate monthly profits
       const monthlyLogs = dailyProfits.filter(dp => dp.fundCode === fund.code && dp.date.startsWith(currentMonthPrefix));
-      const computedMonthlyProfit = monthlyLogs.length > 0
+      let computedMonthlyProfit = monthlyLogs.length > 0
         ? monthlyLogs.reduce((sum, dp) => sum + dp.dailyProfit, 0)
         : toNumber(fund.monthlyProfit);
+
+      const todayLogExistsMonth = monthlyLogs.some(dp => dp.date === todayStr);
+      if (!todayLogExistsMonth && hasTodayProfitInUI) {
+        computedMonthlyProfit += baseDisp.dailyProfit;
+      }
 
       return {
         ...baseDisp,
@@ -2379,6 +2394,11 @@ export default function FundTrackerApp() {
     const nextDailyProfits = [...dailyProfits];
 
     displayedFunds.forEach((fund) => {
+      // 避免记录盘中估算数据以防止历史数据污染
+      if (fund.valuationSource === 'estimate') {
+        return;
+      }
+
       const date = fund.netValueDate;
       const profit = fund.dailyProfit;
       const code = fund.code;
@@ -2476,7 +2496,7 @@ export default function FundTrackerApp() {
       groups[targetSector].funds.push(fund);
 
       if (Number.isFinite(fund.dailyProfit)) {
-        if (fund.netValueDate === todayStr) {
+        if (fund.netValueDate === todayStr || fund.valuationSource === 'estimate') {
           groups[targetSector].sectorDailyProfit += fund.dailyProfit;
           tDaily += fund.dailyProfit;
         }
@@ -3893,9 +3913,9 @@ export default function FundTrackerApp() {
       let badgeElement = null;
       if (badgeType === 'rank') {
         const colors = [
-          'bg-amber-100 text-amber-800 border-amber-250',
-          'bg-slate-100 text-slate-700 border-slate-250',
-          'bg-orange-100 text-orange-800 border-orange-250',
+          'bg-amber-100 text-amber-800 border-amber-200',
+          'bg-slate-100 text-slate-700 border-slate-200',
+          'bg-orange-100 text-orange-800 border-orange-200',
         ];
         const color = colors[index] || 'bg-slate-50 text-slate-400 border-slate-200';
         badgeElement = (
@@ -4487,8 +4507,15 @@ export default function FundTrackerApp() {
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">总资产 (元)</span>
                 <span className="text-lg font-black font-mono mt-0.5">{formatCurrencyAmount(totalAmount)}</span>
               </div>
-              <div className="flex flex-col items-end relative z-10">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{dailySummaryLabel.replace(' (元)', '')}</span>
+              <div 
+                onClick={() => setProfitCalendarOpen(true)}
+                className="flex flex-col items-end relative z-10 cursor-pointer hover:opacity-85 active:scale-[0.98] transition-all group"
+                title="查看收益日历"
+              >
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-400 transition-colors">
+                  {dailySummaryLabel.replace(' (元)', '')}
+                  <Calendar className="w-2.5 h-2.5 text-slate-500 group-hover:text-blue-400 transition-colors" />
+                </span>
                 <span className="text-lg font-black font-mono mt-0.5">
                   <FormatNumber value={totalDailyProfit} isCurrency={true} />
                 </span>
@@ -4600,9 +4627,16 @@ export default function FundTrackerApp() {
                 </span>
               </div>
               <div className="w-px bg-slate-800 h-4"></div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{dailySummaryLabel.replace(' (元)', '')}</span>
-                <span className="text-sm font-extrabold font-mono tracking-tight">
+              <div 
+                onClick={() => setProfitCalendarOpen(true)}
+                className="flex items-baseline gap-2 cursor-pointer hover:text-blue-400 active:scale-[0.98] transition-all group"
+                title="查看收益日历"
+              >
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-400 transition-colors">
+                  {dailySummaryLabel.replace(' (元)', '')}
+                  <Calendar className="w-2.5 h-2.5 text-slate-500 group-hover:text-blue-400 transition-colors" />
+                </span>
+                <span className="text-sm font-extrabold font-mono tracking-tight text-white group-hover:text-blue-400 transition-colors">
                   <FormatNumber value={totalDailyProfit} isCurrency={true} />
                   {hasIncompleteDaily && <span className="ml-0.5 text-amber-500 text-xs font-bold cursor-help" title="数据加载中">*</span>}
                 </span>
@@ -4887,6 +4921,13 @@ export default function FundTrackerApp() {
         formatDateTimeLabel={formatDateTimeLabel}
         renderShareDelta={renderShareDelta}
         toNumber={toNumber}
+      />
+
+      <ProfitCalendarModal
+        isOpen={profitCalendarOpen}
+        onClose={() => setProfitCalendarOpen(false)}
+        dailyProfits={dailyProfits}
+        funds={funds}
       />
 
       <EditFundModal

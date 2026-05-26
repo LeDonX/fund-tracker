@@ -15,7 +15,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
         
         <div className="flex justify-between items-center px-5 py-4 sm:p-5 border-b border-slate-100 flex-shrink-0">
           <h3 className="text-base sm:text-lg font-bold text-slate-800">{title}</h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors focus:outline-none">
             <X className="w-5 h-5" />
           </button>
         </div>

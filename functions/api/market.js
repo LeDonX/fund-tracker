@@ -67,10 +67,20 @@ function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realT
   const config = BASE_CONFIGS[symbol] || { base: 2000, drift: 0.0002, volatility: 0.01 };
   
   let days = 250;
-  if (range === "30d" || range === "1m") days = 30;
-  else if (range === "3m" || range === "3mo") days = 90;
-  else if (range === "6m" || range === "6mo") days = 180;
-  else if (range === "1y") days = 252;
+  let intervalMs = 24 * 60 * 60 * 1000;
+  
+  if (range === "1d") {
+    days = 78; // 6.5 hours * 12 points/hour = 78 points (5-minute intervals)
+    intervalMs = 5 * 60 * 1000;
+  } else if (range === "30d" || range === "1m") {
+    days = 30;
+  } else if (range === "3m" || range === "3mo") {
+    days = 90;
+  } else if (range === "6m" || range === "6mo") {
+    days = 180;
+  } else if (range === "1y") {
+    days = 252;
+  }
   
   const timestamps = [];
   const closePrices = [];
@@ -79,11 +89,14 @@ function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realT
   
   // We generate backward from now
   for (let i = days - 1; i >= 0; i--) {
-    const time = now - i * 24 * 60 * 60 * 1000;
+    const time = now - i * intervalMs;
     timestamps.push(Math.floor(time / 1000));
     
     const rand = boxMullerRandom();
-    const change = config.drift + config.volatility * rand;
+    // Reduce volatility for 5m intervals to keep the chart looking stable
+    const vol = range === "1d" ? config.volatility * 0.15 : config.volatility;
+    const drift = range === "1d" ? config.drift * 0.15 : config.drift;
+    const change = drift + vol * rand;
     currentPrice = currentPrice * (1 + change);
     closePrices.push(Number(currentPrice.toFixed(2)));
   }
@@ -318,8 +331,8 @@ export async function onRequestGet(context) {
       
       for (let i = 0; i < timestamps.length; i++) {
         const d = new Date(timestamps[i] * 1000);
-        // Format as YYYY-MM-DD
-        const dateStr = d.toISOString().split('T')[0];
+        // For intraday (1d), return full ISO string, otherwise YYYY-MM-DD
+        const dateStr = range === "1d" ? d.toISOString() : d.toISOString().split('T')[0];
         history.push({
           date: dateStr,
           value: closes[i]
