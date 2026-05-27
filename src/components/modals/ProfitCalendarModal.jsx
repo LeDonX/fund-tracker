@@ -882,31 +882,31 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
     const weekdayHeaders = ['一', '二', '三', '四', '五'];
     
     return (
-      <div className="grid grid-cols-12 gap-4 items-stretch h-full overflow-y-auto sm:overflow-hidden pb-4 sm:pb-0">
-        {/* 左侧：日历大版块（包含上面的走势图，下面的日历） */}
-        <div className="col-span-12 sm:col-span-7 flex flex-col gap-3 h-full shrink-0">
-          {/* 上面：分时走势图 */}
-          <div className="border border-slate-200/60 bg-white rounded-2xl p-3 sm:p-3.5 shadow-3xs flex flex-col">
-            <div className="flex items-center justify-between pb-2 mb-2 flex-wrap gap-2">
-              <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
-                <LineChart className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-                {selectedDateStr} 分时收益波动走势
-              </span>
-              {renderBenchmarkSelector()}
-            </div>
-            <div className="relative w-full h-24 sm:h-28 overflow-hidden">
-              {loadingChart && (
-                <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center text-9 font-extrabold text-slate-400 gap-1 rounded-xl">
-                  <span className="w-2.5 h-2.5 bg-blue-500 animate-spin" />
-                  正在载入分时走势...
-                </div>
-              )}
-              <div key="day-chart" ref={dayChartRef} className="w-full h-full" />
-            </div>
+      <div className="flex flex-col gap-3 h-full overflow-y-auto sm:overflow-hidden pb-4 sm:pb-0">
+        {/* 上面：分时走势图占满一行 */}
+        <div className="border border-slate-200/60 bg-white rounded-2xl p-3 sm:p-3.5 shadow-3xs flex flex-col shrink-0">
+          <div className="flex items-center justify-between pb-2 mb-2 flex-wrap gap-2">
+            <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+              <LineChart className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+              {selectedDateStr} 分时收益波动走势
+            </span>
+            {renderBenchmarkSelector()}
           </div>
+          <div className="relative w-full h-24 sm:h-28 overflow-hidden">
+            {loadingChart && (
+              <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center text-9 font-extrabold text-slate-400 gap-1 rounded-xl">
+                <span className="w-2.5 h-2.5 bg-blue-500 animate-spin" />
+                正在载入分时走势...
+              </div>
+            )}
+            <div key="day-chart" ref={dayChartRef} className="w-full h-full" />
+          </div>
+        </div>
 
-          {/* 下面：工作日月历 */}
-          <div className="border border-slate-200/60 bg-white rounded-2xl p-3 sm:p-3.5 shadow-3xs flex flex-col flex-1 justify-start gap-2">
+        {/* 下面：日历和损益排行放在一行 */}
+        <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
+          {/* 左侧：工作日月历 */}
+          <div className="col-span-12 sm:col-span-7 border border-slate-200/60 bg-white rounded-2xl p-3 sm:p-3.5 shadow-3xs flex flex-col min-h-0 justify-start gap-2">
             <div className="flex items-center justify-between border-b border-slate-100/50 pb-1.5">
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-white border border-slate-200 rounded-xl shadow-3xs overflow-hidden">
@@ -984,58 +984,58 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
               })}
             </div>
           </div>
-        </div>
 
-        {/* 右侧：排行 */}
-        <div className="col-span-12 sm:col-span-5 border border-slate-200/35 bg-white rounded-2xl p-3 sm:p-3.5 shadow-3xs flex flex-col h-[320px] sm:h-full overflow-hidden shrink-0">
-          <div className="flex items-center justify-between border-b border-slate-100/50 pb-2 mb-2 select-none">
-            <span className="text-xs font-black text-slate-700 shrink-0">
-              基金损益排行
-            </span>
-            <div className="text-right shrink-0 flex items-center gap-1.5">
-              <span className="text-9 text-slate-400 font-bold bg-slate-50 border border-slate-200/60 px-1.5 py-0.5 rounded font-mono">
-                {selectedDateStr.slice(5)}
+          {/* 右侧：排行，高度随父级拉伸，内部可滚动 */}
+          <div className="col-span-12 sm:col-span-5 border border-slate-200/35 bg-white rounded-2xl p-3 sm:p-3.5 shadow-3xs flex flex-col min-h-0 h-[280px] sm:h-full overflow-hidden shrink-0 sm:shrink">
+            <div className="flex items-center justify-between border-b border-slate-100/50 pb-2 mb-2 select-none">
+              <span className="text-xs font-black text-slate-700 shrink-0">
+                基金损益排行
               </span>
-              <span className={`text-12 font-black font-mono leading-none ${getAmountColorClass(selectedDayTotal)}`}>
-                <span>{formatAmount(selectedDayTotal)}</span>
-                <span className="text-9 font-bold ml-0.5">元</span>
-              </span>
+              <div className="text-right shrink-0 flex items-center gap-1.5">
+                <span className="text-9 text-slate-400 font-bold bg-slate-50 border border-slate-200/60 px-1.5 py-0.5 rounded font-mono">
+                  {selectedDateStr.slice(5)}
+                </span>
+                <span className={`text-12 font-black font-mono leading-none ${getAmountColorClass(selectedDayTotal)}`}>
+                  <span>{formatAmount(selectedDayTotal)}</span>
+                  <span className="text-9 font-bold ml-0.5">元</span>
+                </span>
+              </div>
             </div>
+
+            {selectedDayBreakdown.length > 0 ? (
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
+                {selectedDayBreakdown.map((item, idx) => {
+                  const isProfit = item.profit > 0;
+                  return (
+                    <div 
+                      key={`${item.code}_${idx}`}
+                      className="flex items-center justify-between bg-gradient-to-r from-slate-50/80 to-white/90 hover:from-slate-100/70 hover:to-slate-50 border border-slate-200/35 hover:border-slate-300/40 p-2.5 rounded-xl shadow-4xs hover:translate-x-0.5 hover:shadow-3xs transition-all duration-200"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <h4 className="text-10 font-black text-slate-700 truncate leading-tight" title={item.name}>{item.name}</h4>
+                        <span className="text-8 font-mono text-slate-450 font-black tracking-wider leading-none mt-0.5 block">{item.code}</span>
+                      </div>
+                      <div className="shrink-0 flex items-center">
+                        <span className={`px-2 py-1 rounded-lg text-10 font-black font-mono tracking-tight ${
+                          isProfit 
+                            ? 'bg-rose-50/60 text-rose-600 border border-rose-100/50' 
+                            : item.profit < 0 
+                              ? 'bg-emerald-50/60 text-emerald-600 border border-emerald-100/50' 
+                              : 'bg-slate-50 text-slate-550 border border-slate-200'
+                        }`}>
+                          {formatAmount(item.profit)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center py-10 text-slate-400 font-semibold select-none flex-1">
+                <p className="text-10">该日期无个股损益数据</p>
+              </div>
+            )}
           </div>
-
-          {selectedDayBreakdown.length > 0 ? (
-            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
-              {selectedDayBreakdown.map((item, idx) => {
-                const isProfit = item.profit > 0;
-                return (
-                  <div 
-                    key={`${item.code}_${idx}`}
-                    className="flex items-center justify-between bg-gradient-to-r from-slate-50/80 to-white/90 hover:from-slate-100/70 hover:to-slate-50 border border-slate-200/35 hover:border-slate-300/40 p-2.5 rounded-xl shadow-4xs hover:translate-x-0.5 hover:shadow-3xs transition-all duration-200"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <h4 className="text-10 font-black text-slate-700 truncate leading-tight" title={item.name}>{item.name}</h4>
-                      <span className="text-8 font-mono text-slate-450 font-black tracking-wider leading-none mt-0.5 block">{item.code}</span>
-                    </div>
-                    <div className="shrink-0 flex items-center">
-                      <span className={`px-2 py-1 rounded-lg text-10 font-black font-mono tracking-tight ${
-                        isProfit 
-                          ? 'bg-rose-50/60 text-rose-600 border border-rose-100/50' 
-                          : item.profit < 0 
-                            ? 'bg-emerald-50/60 text-emerald-600 border border-emerald-100/50' 
-                            : 'bg-slate-50 text-slate-550 border border-slate-200'
-                      }`}>
-                        {formatAmount(item.profit)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center py-10 text-slate-400 font-semibold select-none flex-1">
-              <p className="text-10">该日期无个股损益数据</p>
-            </div>
-          )}
         </div>
       </div>
     );

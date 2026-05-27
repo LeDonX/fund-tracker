@@ -580,7 +580,7 @@ const shouldPreferOfficialValuation = (fund) => {
   const officialNetValueDate = typeof fund.officialNetValueDate === 'string' ? fund.officialNetValueDate : '';
 
   if (quoteSource === 'estimate') {
-    return Boolean(quoteNetValueDate && officialNetValueDate && officialNetValueDate > quoteNetValueDate);
+    return Boolean(quoteNetValueDate && officialNetValueDate && officialNetValueDate >= quoteNetValueDate);
   }
 
   if (quoteSource === 'quote') {
@@ -2797,7 +2797,49 @@ export default function FundTrackerApp() {
       ]);
 
       if (quoteMap.size > 0 || officialMap.size > 0) {
-        setFunds((currentFunds) => mergeFundsWithSources(currentFunds, quoteMap, officialMap, marketData));
+        let mergedFunds = [];
+        setFunds((currentFunds) => {
+          mergedFunds = mergeFundsWithSources(currentFunds, quoteMap, officialMap, marketData);
+          return mergedFunds;
+        });
+
+        // 自动将正式净值更新导致金额发生改变的基金同步到云端
+        if (isAuthenticated && mergedFunds.length > 0) {
+          const changedFunds = mergedFunds.filter((newF) => {
+            const oldF = funds.find(f => f.id === newF.id);
+            if (!oldF) return false;
+            return newF.amount !== oldF.amount || 
+                   newF.currentNetValue !== oldF.currentNetValue || 
+                   newF.netValueDate !== oldF.netValueDate;
+          });
+
+          if (changedFunds.length > 0) {
+            Promise.allSettled(changedFunds.map(f => 
+              fetch('/api/funds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: f.id,
+                  code: f.code,
+                  name: f.name,
+                  sector: f.sector,
+                  quoteSource: f.quoteSource,
+                  holdingStartDate: f.holdingStartDate,
+                  bootstrapSharesFromAmount: f.bootstrapSharesFromAmount,
+                  shares: f.shares,
+                  costAmount: f.costAmount,
+                  amount: f.amount
+                })
+              }).then(res => {
+                if (!res.ok) {
+                  console.warn(`自动同步更新基金 ${f.code} 至云端失败，HTTP 状态码: ${res.status}`);
+                }
+              }).catch(err => {
+                console.warn(`自动同步更新基金 ${f.code} 至云端出现异常:`, err);
+              })
+            ));
+          }
+        }
 
         const now = new Date();
         setLastUpdateTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`);
@@ -2814,7 +2856,7 @@ export default function FundTrackerApp() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [funds, showToast]);
+  }, [funds, showToast, isAuthenticated]);
 
   useEffect(() => {
     if (hasAutoRefreshedRef.current || funds.length === 0) {
@@ -4619,53 +4661,56 @@ export default function FundTrackerApp() {
           </button>
         </div>
 
-        {/* 侧边栏三个实时大盘分时走势图 */}
-        <SidebarMarketTrends setActiveTab={setActiveTab} />
+        {/* 侧边栏底部区域 (走势图 + 账号与参数配置) */}
+        <div className="mt-auto flex flex-col gap-3.5 border-t border-slate-200/50 pt-4 select-none">
+          {/* 侧边栏三个实时大盘分时走势图 */}
+          <SidebarMarketTrends setActiveTab={setActiveTab} />
 
-        {/* 侧边栏底部：登录与同步状态 + 系统参数按钮 (常驻侧边栏并排为一行 - 极致空间利用) */}
-        <div className="mt-auto flex items-center gap-2 border-t border-slate-200/50 pt-4 select-none">
-          {/* 登录与账号状态 */}
-          <div className="flex-1 flex items-center justify-between bg-slate-50 border border-slate-200/50 rounded-xl px-3 py-2 min-w-0 h-10">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className={`w-2 h-2 rounded-full shrink-0 ${isAuthenticated ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
-              <div className="flex flex-col min-w-0">
-                <span className="text-[9px] font-bold text-slate-400 leading-none">
-                  {isAuthenticated ? '已连接云端' : '本地离线'}
-                </span>
-                <span className="font-bold text-slate-700 truncate mt-0.5 text-10 leading-none" title={user?.email || '本地账户'}>
-                  {user?.email || '本地账户'}
-                </span>
+          {/* 登录与同步状态 + 系统参数按钮 (常驻侧边栏并排为一行 - 极致空间利用) */}
+          <div className="flex items-center gap-2">
+            {/* 登录与账号状态 */}
+            <div className="flex-1 flex items-center justify-between bg-slate-50 border border-slate-200/50 rounded-xl px-3 py-2 min-w-0 h-10">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${isAuthenticated ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[9px] font-bold text-slate-400 leading-none">
+                    {isAuthenticated ? '已连接云端' : '本地离线'}
+                  </span>
+                  <span className="font-bold text-slate-700 truncate mt-0.5 text-10 leading-none" title={user?.email || '本地账户'}>
+                    {user?.email || '本地账户'}
+                  </span>
+                </div>
               </div>
+              {isAuthenticated ? (
+                <button 
+                  type="button" 
+                  onClick={handleLogout} 
+                  className="text-slate-400 hover:text-rose-500 transition-colors p-1 rounded hover:bg-slate-100 cursor-pointer shrink-0 flex items-center justify-center"
+                  title="退出登录"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <a 
+                  href="/login.html" 
+                  className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-slate-100 cursor-pointer shrink-0 flex items-center justify-center"
+                  title="链接云端账户"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                </a>
+              )}
             </div>
-            {isAuthenticated ? (
-              <button 
-                type="button" 
-                onClick={handleLogout} 
-                className="text-slate-400 hover:text-rose-500 transition-colors p-1 rounded hover:bg-slate-100 cursor-pointer shrink-0 flex items-center justify-center"
-                title="退出登录"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            ) : (
-              <a 
-                href="/login.html" 
-                className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-slate-100 cursor-pointer shrink-0 flex items-center justify-center"
-                title="链接云端账户"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-              </a>
-            )}
-          </div>
 
-          {/* 系统参数与设置按钮 (仅图标) */}
-          <button 
-            type="button" 
-            onClick={() => openModal('systemSettings')}
-            className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl font-bold transition-all duration-150 border border-slate-200/50 cursor-pointer shadow-3xs hover:scale-[1.02] active:scale-[0.98] shrink-0"
-            title="系统参数与配置"
-          >
-            <Settings className="w-4 h-4 text-slate-500" />
-          </button>
+            {/* 系统参数与设置按钮 (仅图标) */}
+            <button 
+              type="button" 
+              onClick={() => openModal('systemSettings')}
+              className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl font-bold transition-all duration-150 border border-slate-200/50 cursor-pointer shadow-3xs hover:scale-[1.02] active:scale-[0.98] shrink-0"
+              title="系统参数与配置"
+            >
+              <Settings className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
         </div>
       </aside>
 

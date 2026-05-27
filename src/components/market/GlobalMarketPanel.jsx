@@ -23,13 +23,19 @@ function Sparkline({ data, isPositive }) {
   
   // Rose for up, Emerald for down (Chinese standard)
   const strokeColor = isPositive ? '#f43f5e' : '#10b981';
-  const fillColor = isPositive ? 'rgba(244, 63, 94, 0.04)' : 'rgba(16, 185, 129, 0.04)';
+  const gradId = isPositive ? 'sparkline-grad-up' : 'sparkline-grad-down';
   
   const fillPoints = `0,${height} ${points} ${width},${height}`;
   
   return (
     <svg className="w-full h-8 overflow-visible mt-2" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-      <polygon points={fillPoints} fill={fillColor} />
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={isPositive ? '#f43f5e' : '#10b981'} stopOpacity="0.24" />
+          <stop offset="100%" stopColor={isPositive ? '#f43f5e' : '#10b981'} stopOpacity="0.01" />
+        </linearGradient>
+      </defs>
+      <polygon points={fillPoints} fill={`url(#${gradId})`} />
       <polyline fill="none" stroke={strokeColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={points} />
     </svg>
   );
@@ -923,6 +929,7 @@ export default function GlobalMarketPanel() {
     
     const dates = filteredHistory.map(pt => {
       if (period === '1D') {
+        if (pt.time) return pt.time;
         try {
           const d = new Date(pt.date);
           const hours = String(d.getHours()).padStart(2, '0');
@@ -2148,61 +2155,63 @@ export default function GlobalMarketPanel() {
                         <div
                           key={item.symbol}
                           onClick={() => setSelectedSymbol(item.symbol)}
-                          className={`border rounded-2xl p-4 flex flex-col justify-between bg-gradient-to-br from-white to-slate-50/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer relative group overflow-hidden ${
+                          className={`border rounded-2xl flex flex-col justify-between bg-gradient-to-br from-white to-slate-50/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer relative group ${
                             isSelected 
                               ? 'border-blue-500 ring-3 ring-blue-500/10 bg-gradient-to-br from-white to-blue-50/20' 
                               : 'border-slate-200/60'
                           }`}
                         >
-                          {/* Header info inside card */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between items-center gap-1">
-                              <span className="text-10 font-extrabold text-slate-400 font-mono tracking-wider">{item.symbol}</span>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {pinnedSymbols.includes(item.symbol) ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleTogglePin(item.symbol, e)}
-                                    className="p-1 rounded-md bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer shadow-3xs transition-all hover:bg-blue-100/60 flex items-center justify-center"
-                                    title="从侧边栏取消固定"
-                                  >
-                                    <Pin className="w-3 h-3 fill-current rotate-45" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleTogglePin(item.symbol, e)}
-                                    className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 border border-transparent hover:border-slate-200/60 cursor-pointer opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
-                                    title="固定到侧边栏"
-                                  >
-                                    <Pin className="w-3 h-3" />
-                                  </button>
-                                )}
-                                <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2 py-0.5 rounded-full shrink-0 select-none">
-                                  {regionBadges[item.region] || item.regionName}
+                          <div className="w-full h-full flex flex-col justify-between p-4 rounded-[inherit] overflow-hidden">
+                            {/* Header info inside card */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center gap-1">
+                                <span className="text-10 font-extrabold text-slate-400 font-mono tracking-wider">{item.symbol}</span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {pinnedSymbols.includes(item.symbol) ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleTogglePin(item.symbol, e)}
+                                      className="p-1 rounded-md bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer shadow-3xs transition-all hover:bg-blue-100/60 flex items-center justify-center"
+                                      title="从侧边栏取消固定"
+                                    >
+                                      <Pin className="w-3 h-3 fill-current rotate-45" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleTogglePin(item.symbol, e)}
+                                      className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 border border-transparent hover:border-slate-200/60 cursor-pointer opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                                      title="固定到侧边栏"
+                                    >
+                                      <Pin className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2 py-0.5 rounded-full shrink-0 select-none">
+                                    {regionBadges[item.region] || item.regionName}
+                                  </span>
+                                </div>
+                              </div>
+                              <h4 className="font-extrabold text-slate-700 text-xs leading-snug group-hover:text-blue-600 transition-colors mt-0.5 text-left" title={item.englishName}>
+                                {item.name}
+                              </h4>
+                            </div>
+
+                            {/* Numeric panel inside card */}
+                            <div className="mt-3.5 flex justify-between items-end">
+                              <div className="flex flex-col text-left">
+                                <span className="text-base font-black font-mono text-slate-700 tracking-tight">
+                                  {formatIndexPrice(item.currentPrice)}
                                 </span>
                               </div>
-                            </div>
-                            <h4 className="font-extrabold text-slate-700 text-xs leading-snug group-hover:text-blue-600 transition-colors mt-0.5 text-left" title={item.englishName}>
-                              {item.name}
-                            </h4>
-                          </div>
-
-                          {/* Numeric panel inside card */}
-                          <div className="mt-3.5 flex justify-between items-end">
-                            <div className="flex flex-col text-left">
-                              <span className="text-base font-black font-mono text-slate-700 tracking-tight">
-                                {formatIndexPrice(item.currentPrice)}
+                              <span className={`inline-flex items-center text-10 font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
+                                {isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%
                               </span>
                             </div>
-                            <span className={`inline-flex items-center text-10 font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
-                              {isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%
-                            </span>
-                          </div>
 
-                          {/* Pure SVG Sparkline */}
-                          <div className="h-8 mt-2.5 flex items-end">
-                            <Sparkline data={item.sparkline} isPositive={isPositive} />
+                            {/* Pure SVG Sparkline */}
+                            <div className="h-8 mt-2.5 flex items-end">
+                              <Sparkline data={item.sparkline} isPositive={isPositive} />
+                            </div>
                           </div>
                         </div>
                       );
@@ -2349,48 +2358,50 @@ export default function GlobalMarketPanel() {
                       <div
                         key={item.symbol}
                         onClick={() => setSelectedSymbol(item.symbol)}
-                        className={`border rounded-3xl p-4.5 flex flex-col justify-between bg-gradient-to-br from-white to-slate-50/50 hover:shadow-md hover:scale-[1.005] transition-all duration-200 cursor-pointer relative group overflow-hidden ${
+                        className={`border rounded-2xl flex flex-col justify-between bg-gradient-to-br from-white to-slate-50/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer relative group ${
                           isSelected 
                             ? 'border-blue-500 ring-3 ring-blue-500/10 bg-gradient-to-br from-white to-blue-50/20' 
                             : 'border-slate-200/60'
                         }`}
                       >
-                        {/* Card header */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between items-start">
-                            <span className="text-10 font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md font-mono tracking-wider">{item.symbol}</span>
-                            <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2.5 py-0.5 rounded-full shrink-0">
-                              {item.regionName}
+                        <div className="w-full h-full flex flex-col justify-between p-4 rounded-[inherit] overflow-hidden">
+                          {/* Card header */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center gap-1">
+                              <span className="text-10 font-extrabold text-blue-650 bg-blue-50/70 border border-blue-100/60 px-2 py-0.5 rounded-lg font-mono tracking-wider">{item.symbol}</span>
+                              <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2.5 py-0.5 rounded-full shrink-0 select-none">
+                                {item.regionName}
+                              </span>
+                            </div>
+                            <h4 className="font-extrabold text-slate-700 text-xs leading-snug group-hover:text-blue-600 transition-colors mt-0.5 text-left">
+                              {item.name}
+                            </h4>
+                          </div>
+                          
+                          {/* Pricing panels */}
+                          <div className="mt-3.5 flex justify-between items-end">
+                            <div className="flex flex-col text-left">
+                              <span className="text-base font-black font-mono text-slate-700 tracking-tight">
+                                {formatIndexPrice(item.currentPrice)}
+                              </span>
+                            </div>
+                            <span className={`inline-flex items-center text-10 font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
+                              {isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%
                             </span>
                           </div>
-                          <h4 className="font-extrabold text-slate-700 text-xs leading-snug group-hover:text-blue-600 transition-colors mt-0.5">
-                            {item.name}
-                          </h4>
-                        </div>
-                        
-                        {/* Pricing panels */}
-                        <div className="mt-3 flex justify-between items-end">
-                          <div className="flex flex-col">
-                            <span className="text-base font-black font-mono text-slate-755 tracking-tight">
-                              {formatIndexPrice(item.currentPrice)}
-                            </span>
+                          
+                          {/* Sparkline & custom instruction */}
+                          <div className="h-8 mt-2.5 flex items-end">
+                            <Sparkline data={item.sparkline} isPositive={isPositive} />
                           </div>
-                          <span className={`inline-flex items-center text-10 font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
-                            {isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%
-                          </span>
-                        </div>
-                        
-                        {/* Sparkline & custom instruction */}
-                        <div className="h-8 mt-2 flex items-end">
-                          <Sparkline data={item.sparkline} isPositive={isPositive} />
-                        </div>
-                        
-                        {/* Meaning instruction */}
-                        <div className="mt-3.5 border-t border-slate-100 pt-2.5">
-                          <p className="text-10 text-slate-450 font-semibold leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-200/20">
-                            <span className="font-black text-slate-550 mr-1">🔍 前瞻指引:</span>
-                            {meaningText}
-                          </p>
+                          
+                          {/* Meaning instruction */}
+                          <div className="mt-3.5 border-t border-slate-100 pt-2.5">
+                            <p className="text-10 text-slate-450 font-semibold leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-200/20">
+                              <span className="font-black text-slate-550 mr-1">🔍 前瞻指引:</span>
+                              {meaningText}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     );

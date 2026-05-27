@@ -54,6 +54,210 @@ const BASE_CONFIGS = {
   "USDCNH=X": { base: 7.2500, drift: -0.00005, volatility: 0.0015 }
 };
 
+// Get timezone-aware market schedules
+function getMarketSchedule(symbol) {
+  if (["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"].includes(symbol)) {
+    return {
+      timeZone: 'Asia/Shanghai',
+      sessions: [
+        { start: '09:30', end: '11:31' },
+        { start: '13:00', end: '15:02' }
+      ]
+    };
+  }
+  if (["^HSI", "^HSTECH"].includes(symbol)) {
+    return {
+      timeZone: 'Asia/Hong_Kong',
+      sessions: [
+        { start: '09:30', end: '12:02' },
+        { start: '13:00', end: '16:10' }
+      ]
+    };
+  }
+  if (["^GSPC", "^IXIC", "^DJI", "^HXC"].includes(symbol)) {
+    return {
+      timeZone: 'America/New_York',
+      sessions: [
+        { start: '09:30', end: '16:05' }
+      ]
+    };
+  }
+  if (symbol === "^N225") {
+    return {
+      timeZone: 'Asia/Tokyo',
+      sessions: [
+        { start: '09:00', end: '11:32' },
+        { start: '12:30', end: '15:05' }
+      ]
+    };
+  }
+  if (symbol === "^FTSE") {
+    return {
+      timeZone: 'Europe/London',
+      sessions: [
+        { start: '08:00', end: '16:35' }
+      ]
+    };
+  }
+  if (symbol === "^GDAXI") {
+    return {
+      timeZone: 'Europe/Berlin',
+      sessions: [
+        { start: '09:00', end: '17:35' }
+      ]
+    };
+  }
+  return {
+    timeZone: 'UTC',
+    sessions: [
+      { start: '00:00', end: '24:00' }
+    ]
+  };
+}
+
+// Check if a timestamp is within the active trading sessions
+function isWithinTradingSessions(timestampMs, schedule) {
+  if (schedule.timeZone === 'UTC' && schedule.sessions[0].start === '00:00' && schedule.sessions[0].end === '24:00') {
+    return true;
+  }
+  
+  const date = new Date(timestampMs);
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: schedule.timeZone,
+    hour12: false,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  const parts = formatter.formatToParts(date);
+  let weekday = '';
+  let hour = '';
+  let minute = '';
+  for (const part of parts) {
+    if (part.type === 'weekday') weekday = part.value;
+    if (part.type === 'hour') hour = part.value;
+    if (part.type === 'minute') minute = part.value;
+  }
+  
+  const timeStr = `${hour}:${minute}`;
+  
+  if (weekday === 'Sat' || weekday === 'Sun') {
+    return false;
+  }
+  
+  for (const session of schedule.sessions) {
+    if (timeStr >= session.start && timeStr <= session.end) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Generate valid intraday timestamps strictly within trading hours
+function generateIntradayTimestamps(symbol, count = 78, intervalMinutes = 5) {
+  const schedule = getMarketSchedule(symbol);
+  const timestamps = [];
+  
+  let curr = Date.now();
+  
+  // Move backward to the most recent trading minute
+  let safetyLoop = 0;
+  while (!isWithinTradingSessions(curr, schedule) && safetyLoop < 10000) {
+    curr -= 60 * 1000;
+    safetyLoop++;
+  }
+  
+  // Round to nearest 5 minutes
+  curr = Math.floor(curr / (intervalMinutes * 60 * 1000)) * (intervalMinutes * 60 * 1000);
+  
+  safetyLoop = 0;
+  while (timestamps.length < count && safetyLoop < 20000) {
+    if (isWithinTradingSessions(curr, schedule)) {
+      timestamps.push(Math.floor(curr / 1000));
+    }
+    curr -= intervalMinutes * 60 * 1000;
+    safetyLoop++;
+  }
+  
+  return timestamps.reverse();
+}
+
+const TENCENT_SYMBOL_MAP = {
+  "000001.SS": "sh000001",
+  "399001.SZ": "sz399001",
+  "000300.SS": "sh000300",
+  "399006.SZ": "sz399006",
+  "000688.SS": "sh000688",
+  "000905.SS": "sh000905",
+  "000016.SS": "sh000016",
+  "^HSI": "hkHSI",
+  "^HSTECH": "hkHSTECH"
+};
+
+// Parser for Tencent minute API data format
+function parseTencentMinuteData(json, symbolCode, matchName) {
+  const codeData = json?.data?.[symbolCode];
+  if (!codeData || !codeData.data || !Array.isArray(codeData.data.data)) {
+    throw new Error("Invalid Tencent minute response");
+  }
+  
+  const dateStr = codeData.data.date; // e.g. "20260527"
+  const points = codeData.data.data;
+  
+  const history = [];
+  const closes = [];
+  
+  // Format dates: YYYY-MM-DD
+  const year = dateStr.slice(0, 4);
+  const month = dateStr.slice(4, 6);
+  const day = dateStr.slice(6, 8);
+  const baseDateStr = `${year}-${month}-${day}`;
+  
+  for (const pt of points) {
+    const parts = pt.split(" ");
+    if (parts.length < 2) continue;
+    
+    const timeHHMM = parts[0]; // "0930"
+    const price = parseFloat(parts[1]);
+    if (isNaN(price)) continue;
+    
+    const hour = timeHHMM.slice(0, 2);
+    const minute = timeHHMM.slice(2, 4);
+    
+    // For A-shares and HK, standard timezone is Asia/Shanghai (UTC+8)
+    const localDate = new Date(`${baseDateStr}T${hour}:${minute}:00+08:00`);
+    
+    history.push({
+      date: localDate.toISOString(),
+      time: `${hour}:${minute}`,
+      value: price
+    });
+    closes.push(price);
+  }
+  
+  const qtInfo = codeData.qt?.[symbolCode] || [];
+  const currentPrice = parseFloat(qtInfo[3]) || closes[closes.length - 1] || 0;
+  const change = parseFloat(qtInfo[31]) || (currentPrice - (closes[0] || currentPrice)) || 0;
+  const changePercent = parseFloat(qtInfo[32]) || 0;
+  const prevClose = currentPrice - change;
+  
+  return {
+    success: true,
+    symbol: symbolCode,
+    name: matchName,
+    currentPrice,
+    change: Number(change.toFixed(2)),
+    changePercent: Number(changePercent.toFixed(2)),
+    history,
+    meta: {
+      symbol: symbolCode,
+      regularMarketPrice: currentPrice,
+      chartPreviousClose: prevClose
+    }
+  };
+}
+
 // Simple normal distribution approximation using Central Limit Theorem
 function boxMullerRandom() {
   let u = 0, v = 0;
@@ -82,16 +286,21 @@ function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realT
     days = 252;
   }
   
-  const timestamps = [];
+  let timestamps = [];
   const closePrices = [];
-  const now = range === "1d" ? Date.now() - 30 * 60 * 1000 : Date.now();
   let currentPrice = config.base;
   
-  // We generate backward from now
-  for (let i = days - 1; i >= 0; i--) {
-    const time = now - i * intervalMs;
-    timestamps.push(Math.floor(time / 1000));
-    
+  if (range === "1d") {
+    timestamps = generateIntradayTimestamps(symbol, days, 5);
+  } else {
+    const now = Date.now();
+    for (let i = days - 1; i >= 0; i--) {
+      const time = now - i * intervalMs;
+      timestamps.push(Math.floor(time / 1000));
+    }
+  }
+  
+  for (let i = 0; i < days; i++) {
     const rand = boxMullerRandom();
     // Reduce volatility for 5m intervals to keep the chart looking stable
     const vol = range === "1d" ? config.volatility * 0.15 : config.volatility;
@@ -375,29 +584,124 @@ export async function onRequestGet(context) {
       let interval = "1d";
       if (range === "1d") interval = "5m";
       
+      if (range === "1d" && TENCENT_SYMBOL_MAP[symbol]) {
+        const tenCode = TENCENT_SYMBOL_MAP[symbol];
+        try {
+          const res = await fetch(`https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=${tenCode}`, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Referer": "https://finance.sina.com.cn/"
+            }
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const parsed = parseTencentMinuteData(json, tenCode, match.name);
+            
+            // Force the last point's timestamp to exactly Now to align with the current real-time quote
+            if (parsed.history.length > 0) {
+              const now = new Date();
+              parsed.history[parsed.history.length - 1].date = now.toISOString();
+              
+              const localFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Shanghai',
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+              const parts = localFormatter.formatToParts(now);
+              let hour = '00';
+              let minute = '00';
+              for (const part of parts) {
+                if (part.type === 'hour') hour = part.value;
+                if (part.type === 'minute') minute = part.value;
+              }
+              parsed.history[parsed.history.length - 1].time = `${hour}:${minute}`;
+            }
+            
+            return new Response(
+              JSON.stringify(parsed),
+              {
+                status: 200,
+                headers: {
+                  "Content-Type": "application/json",
+                  "Cache-Control": "public, max-age=30" // Cache for 30 seconds
+                }
+              }
+            );
+          }
+        } catch (err) {
+          console.error(`Failed to fetch from Tencent for ${symbol}: ${err.message}. Falling back to Yahoo Finance.`);
+        }
+      }
+      
       const indexResult = await getIndexData(symbol, range, interval);
       
       // Parse history points
       const timestamps = indexResult.timestamp || [];
       const closes = indexResult.indicators?.quote?.[0]?.close || [];
-      const history = [];
+      let history = [];
       
       // If 1d range, shift timestamps forward by 30 minutes (1800 seconds) to compensate for feed lag
       const shiftSeconds = (range === "1d") ? 30 * 60 : 0;
+      const schedule = getMarketSchedule(symbol);
       
       for (let i = 0; i < timestamps.length; i++) {
-        const d = new Date((timestamps[i] + shiftSeconds) * 1000);
+        const timestampMs = (timestamps[i] + shiftSeconds) * 1000;
+        
+        // Filter out off-hours points for intraday (1d) range
+        if (range === "1d" && !isWithinTradingSessions(timestampMs, schedule)) {
+          continue;
+        }
+        
+        const d = new Date(timestampMs);
         // For intraday (1d), return full ISO string, otherwise YYYY-MM-DD
         const dateStr = range === "1d" ? d.toISOString() : d.toISOString().split('T')[0];
+        
+        // Generate pre-formatted local time for the chart X-axis
+        let timeStr = null;
+        if (range === "1d") {
+          const localFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: schedule.timeZone,
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          const parts = localFormatter.formatToParts(d);
+          let hour = '00';
+          let minute = '00';
+          for (const part of parts) {
+            if (part.type === 'hour') hour = part.value;
+            if (part.type === 'minute') minute = part.value;
+          }
+          timeStr = `${hour}:${minute}`;
+        }
+        
         history.push({
           date: dateStr,
+          time: timeStr,
           value: closes[i]
         });
       }
       
       if (range === "1d" && history.length > 0) {
         // Force the last point's timestamp to exactly Now to align with the current real-time quote
-        history[history.length - 1].date = new Date().toISOString();
+        const now = new Date();
+        history[history.length - 1].date = now.toISOString();
+        
+        const localFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: schedule.timeZone,
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const parts = localFormatter.formatToParts(now);
+        let hour = '00';
+        let minute = '00';
+        for (const part of parts) {
+          if (part.type === 'hour') hour = part.value;
+          if (part.type === 'minute') minute = part.value;
+        }
+        history[history.length - 1].time = `${hour}:${minute}`;
       }
       
       const currentPrice = indexResult.meta?.regularMarketPrice || closes[closes.length - 1] || 0;

@@ -36,8 +36,8 @@ function SidebarSparkline({ data, isPositive }) {
   const max = Math.max(...values);
   const range = max - min || 1;
   
-  const width = 80;
-  const height = 24;
+  const width = 110;
+  const height = 28;
   const padding = 1;
   
   const points = data.map((d, index) => {
@@ -48,13 +48,19 @@ function SidebarSparkline({ data, isPositive }) {
   
   // Chinese stock standard: Rose for up, Emerald for down
   const strokeColor = isPositive ? '#f43f5e' : '#10b981';
-  const fillColor = isPositive ? 'rgba(244, 63, 94, 0.03)' : 'rgba(16, 185, 129, 0.03)';
+  const gradId = isPositive ? 'sidebar-sparkline-grad-up' : 'sidebar-sparkline-grad-down';
   
   const fillPoints = `0,${height} ${points} ${width},${height}`;
   
   return (
-    <svg className="w-20 h-6 overflow-visible shrink-0 pointer-events-none" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-      <polygon points={fillPoints} fill={fillColor} />
+    <svg className="w-[110px] h-7 overflow-visible shrink-0 pointer-events-none" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={isPositive ? '#f43f5e' : '#10b981'} stopOpacity="0.20" />
+          <stop offset="100%" stopColor={isPositive ? '#f43f5e' : '#10b981'} stopOpacity="0.01" />
+        </linearGradient>
+      </defs>
+      <polygon points={fillPoints} fill={`url(#${gradId})`} />
       <polyline fill="none" stroke={strokeColor} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" points={points} />
     </svg>
   );
@@ -185,13 +191,13 @@ export default function SidebarMarketTrends({ setActiveTab }) {
         {loading ? (
           // Shimmer loading skeletons
           [1, 2, 3].map(i => (
-            <div key={i} className="h-[48px] w-full bg-white border border-slate-100 rounded-xl p-2 flex items-center justify-between animate-pulse">
+            <div key={i} className="h-[56px] w-full bg-white border border-slate-100 rounded-xl p-3 flex items-center justify-between animate-pulse">
               <div className="space-y-1.5 flex-1">
-                <div className="h-3 w-16 bg-slate-100 rounded" />
+                <div className="h-3.5 w-16 bg-slate-100 rounded" />
                 <div className="h-2.5 w-10 bg-slate-100/70 rounded" />
               </div>
-              <div className="h-5 w-16 bg-slate-100 rounded mx-3 shrink-0" />
-              <div className="h-5 w-12 bg-slate-100 rounded shrink-0" />
+              <div className="h-6 w-24 bg-slate-100 rounded mx-3 shrink-0" />
+              <div className="h-6 w-12 bg-slate-100 rounded shrink-0" />
             </div>
           ))
         ) : (
@@ -201,7 +207,7 @@ export default function SidebarMarketTrends({ setActiveTab }) {
 
             if (data.error) {
               return (
-                <div key={sym} className="flex items-center justify-between p-2 bg-white border border-slate-100 rounded-xl text-[10px] text-slate-400">
+                <div key={sym} className="flex items-center justify-between py-2.5 px-3 bg-white border border-slate-100 rounded-xl text-[10px] text-slate-400">
                   <span className="font-bold">{data.name}</span>
                   <span className="flex items-center gap-1 text-red-500 scale-90">
                     <AlertCircle className="w-3 h-3" /> 加载失败
@@ -219,7 +225,7 @@ export default function SidebarMarketTrends({ setActiveTab }) {
               <div
                 key={sym}
                 onClick={() => handleRowClick(sym)}
-                className="flex items-center justify-between p-2 bg-white hover:bg-blue-50/10 border border-slate-200/50 hover:border-blue-200 hover:shadow-2xs rounded-xl transition-all duration-200 cursor-pointer group active:scale-[0.98]"
+                className="flex items-center justify-between py-2.5 px-3 bg-white hover:bg-blue-50/10 border border-slate-200/50 hover:border-blue-200 hover:shadow-2xs rounded-xl transition-all duration-200 cursor-pointer group active:scale-[0.98]"
               >
                 {/* Index Info */}
                 <div className="flex flex-col min-w-0 pr-1 select-none">
@@ -232,7 +238,7 @@ export default function SidebarMarketTrends({ setActiveTab }) {
                 </div>
 
                 {/* SVG Intraday Sparkline */}
-                <div className="flex-1 flex justify-center px-1.5">
+                <div className="flex-1 flex justify-center px-1">
                   <SidebarSparkline data={data.history} isPositive={isPositive} />
                 </div>
 
