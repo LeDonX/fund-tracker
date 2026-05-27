@@ -36,7 +36,7 @@ export default function HistoryModal({
       <div className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-1 -mr-1">
         
         {/* 1. 基金基础信息及代码 */}
-        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-150 text-xs">
+        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs">
           <div className="flex items-center gap-2">
             <span className="bg-slate-200/70 text-slate-700 px-2 py-0.5 rounded-md font-mono font-bold">
               {selectedFund?.code}
@@ -54,7 +54,7 @@ export default function HistoryModal({
         {/* 2. 统计卡片面板 */}
         <div className="grid grid-cols-3 gap-2.5">
           <div className="bg-rose-50/40 border border-rose-100 p-2.5 rounded-2xl flex flex-col justify-between shadow-sm">
-            <span className="text-[10px] font-bold text-rose-600/90 uppercase tracking-wider flex items-center gap-1">
+            <span className="text-10 font-bold text-rose-600/90 uppercase tracking-wider flex items-center gap-1">
               <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
               累计加仓
             </span>
@@ -64,7 +64,7 @@ export default function HistoryModal({
           </div>
 
           <div className="bg-emerald-50/40 border border-emerald-100 p-2.5 rounded-2xl flex flex-col justify-between shadow-sm">
-            <span className="text-[10px] font-bold text-emerald-600/90 uppercase tracking-wider flex items-center gap-1">
+            <span className="text-10 font-bold text-emerald-600/90 uppercase tracking-wider flex items-center gap-1">
               <TrendingDown className="w-3.5 h-3.5 text-emerald-500" />
               累计减仓
             </span>
@@ -74,7 +74,7 @@ export default function HistoryModal({
           </div>
 
           <div className="bg-blue-50/40 border border-blue-100 p-2.5 rounded-2xl flex flex-col justify-between shadow-sm">
-            <span className="text-[10px] font-bold text-blue-600/90 uppercase tracking-wider flex items-center gap-1">
+            <span className="text-10 font-bold text-blue-600/90 uppercase tracking-wider flex items-center gap-1">
               <Activity className="w-3.5 h-3.5 text-blue-500" />
               交易笔数
             </span>
@@ -86,7 +86,7 @@ export default function HistoryModal({
 
         {/* 累计手续费提示 */}
         {totalFee > 0 && (
-          <div className="bg-slate-50 border border-slate-150 p-2 rounded-xl text-[10.5px] text-slate-500 flex items-center gap-1.5 font-bold font-mono">
+          <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl text-10 text-slate-500 flex items-center gap-1.5 font-bold font-mono">
             <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
             <span>累计交易手续费：¥{totalFee.toFixed(2)}</span>
           </div>
@@ -116,16 +116,16 @@ export default function HistoryModal({
                     </div>
 
                     {/* 流水明细卡片 */}
-                    <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm hover:shadow transition-all hover:border-slate-300">
+                    <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow transition-all hover:border-slate-300">
                       <div className="flex items-start justify-between">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-black tracking-wide ${
+                            <span className={`px-1.5 py-0.5 rounded text-9 font-black tracking-wide ${
                               isBuy ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                             }`}>
                               {isBuy ? '加仓' : '减仓'}
                             </span>
-                            <span className="text-[11px] font-bold text-slate-400 font-mono flex items-center gap-1">
+                            <span className="text-11 font-bold text-slate-400 font-mono flex items-center gap-1">
                               <Calendar className="w-3.5 h-3.5" />
                               {record.tradeDate || '--'}
                             </span>
@@ -139,9 +139,9 @@ export default function HistoryModal({
 
                         {/* 额外说明/备注/来源 */}
                         <div className="text-right">
-                          <span className="text-[9.5px] text-slate-400 font-medium block">登记时间 {formatDateTimeLabel(record.createdAt)}</span>
+                          <span className="text-9 text-slate-400 font-medium block">登记时间 {formatDateTimeLabel(record.createdAt)}</span>
                           {record.fee > 0 && (
-                            <span className="inline-block bg-slate-100 text-slate-500 border border-slate-200 text-[9px] px-1 py-0.5 rounded mt-1 font-bold font-mono">
+                            <span className="inline-block bg-slate-100 text-slate-500 border border-slate-200 text-9 px-1 py-0.5 rounded mt-1 font-bold font-mono">
                               手续费 ¥{toNumber(record.fee).toFixed(2)}
                             </span>
                           )}
@@ -149,9 +149,9 @@ export default function HistoryModal({
                       </div>
 
                       {/* 卡片内部指标栅格 */}
-                      <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[10.5px]">
+                      <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-10">
                         <div>
-                          <span className="text-slate-400 block text-[9px] font-bold uppercase tracking-wider">参考净值</span>
+                          <span className="text-slate-400 block text-9 font-bold uppercase tracking-wider">参考净值</span>
                           <span className="font-extrabold text-slate-700 font-mono mt-0.5 block">
                             {Number.isFinite(record.referenceNetValue) 
                               ? record.referenceNetValue.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) 
@@ -159,13 +159,13 @@ export default function HistoryModal({
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[9px] font-bold uppercase tracking-wider">份额变动</span>
+                          <span className="text-slate-400 block text-9 font-bold uppercase tracking-wider">份额变动</span>
                           <span className="mt-0.5 block">
                             {renderShareDelta(record.sharesDelta)}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[9px] font-bold uppercase tracking-wider">成本本金变动</span>
+                          <span className="text-slate-400 block text-9 font-bold uppercase tracking-wider">成本本金变动</span>
                           <span className="mt-0.5 block font-mono">
                             <FormatNumber value={record.costDelta} isCurrency={true} />
                           </span>
@@ -174,7 +174,7 @@ export default function HistoryModal({
 
                       {/* 备注面板 */}
                       {record.note && (
-                        <div className="mt-2.5 bg-slate-50 border border-slate-150 p-2 rounded-lg text-[10px] text-slate-500 flex items-start gap-1.5 font-medium leading-relaxed">
+                        <div className="mt-2.5 bg-slate-50 border border-slate-200 p-2 rounded-lg text-10 text-slate-500 flex items-start gap-1.5 font-medium leading-relaxed">
                           <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
                           <span>{record.note}</span>
                         </div>

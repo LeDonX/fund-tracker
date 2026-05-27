@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as echarts from 'echarts';
 import { Globe, RefreshCw, AlertCircle, TrendingUp, TrendingDown, Clock, Compass, Gauge, Flame, BookOpen, ArrowUpRight, ArrowDownRight, Info, HelpCircle, Cpu, Sliders, Play, ShieldAlert, CheckCircle, Activity } from 'lucide-react';
 
@@ -138,6 +138,19 @@ export default function GlobalMarketPanel() {
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToast({ show: true, message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 3000);
+  }, []);
   
   const [selectedSymbol, setSelectedSymbol] = useState('^GSPC');
   const [detailHistory, setDetailHistory] = useState([]);
@@ -475,6 +488,39 @@ export default function GlobalMarketPanel() {
     return indices.filter(idx => !idx.symbol.includes('CN=F') && !idx.symbol.includes('NQ=F') && !idx.symbol.includes('ES=F') && !idx.symbol.includes('^HXC') && !idx.symbol.includes('USDCNH=X'));
   }, [indices]);
 
+  // Group main indices by region/country, sorting China (CN & HK) first
+  const groupedIndices = useMemo(() => {
+    const groups = {};
+    mainIndices.forEach(idx => {
+      const region = idx.region;
+      if (!groups[region]) {
+        groups[region] = {
+          region: region,
+          regionName: region === 'CN' ? '🇨🇳 中国 A 股' :
+                      region === 'HK' ? '🇭🇰 中国香港港股' :
+                      region === 'US' ? '🇺🇸 美国股市' :
+                      region === 'JP' ? '🇯🇵 日本股市' :
+                      region === 'UK' ? '🇬🇧 英国股市' :
+                      region === 'DE' ? '🇩🇪 德国股市' :
+                      idx.regionName,
+          items: []
+        };
+      }
+      groups[region].items.push(idx);
+    });
+
+    // Define preferred order of regions
+    const regionOrder = ['CN', 'HK', 'US', 'JP', 'UK', 'DE', 'CMD', 'CRP'];
+    
+    return Object.values(groups).sort((a, b) => {
+      let idxA = regionOrder.indexOf(a.region);
+      let idxB = regionOrder.indexOf(b.region);
+      if (idxA === -1) idxA = 999;
+      if (idxB === -1) idxB = 999;
+      return idxA - idxB;
+    });
+  }, [mainIndices]);
+
   const leadingIndices = useMemo(() => {
     const order = ['CN=F', '^HXC', 'NQ=F', 'USDCNH=X'];
     const filtered = indices.filter(idx => idx.symbol.includes('CN=F') || idx.symbol.includes('NQ=F') || idx.symbol.includes('^HXC') || idx.symbol.includes('USDCNH=X'));
@@ -717,11 +763,18 @@ export default function GlobalMarketPanel() {
         if (!data.indices.some(idx => idx.symbol === selectedSymbol) && data.indices.length > 0) {
           setSelectedSymbol(data.indices[0].symbol);
         }
+
+        if (showRefreshIndicator) {
+          showToast('全球大盘行情已刷新成功！', 'success');
+        }
       } else {
         throw new Error(data.error || '返回的行情数据格式有误');
       }
     } catch (err) {
       setError(err.message);
+      if (showRefreshIndicator) {
+        showToast('行情数据刷新失败，请稍后重试', 'error');
+      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -858,7 +911,7 @@ export default function GlobalMarketPanel() {
           }
           return `
             <div style="font-family: sans-serif; padding: 4px 8px;">
-              <div style="font-size: 10px; color: #94a3b8; font-weight: bold; margin-bottom: 4px;">${labelText}</div>
+              <div style="font-size: 10px; color: #64748b; font-weight: bold; margin-bottom: 4px;">${labelText}</div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: ${lineColor};"></span>
                 <span style="font-size: 13px; font-weight: 800; color: #334155; font-family: monospace;">${Number(pt.value).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</span>
@@ -874,34 +927,29 @@ export default function GlobalMarketPanel() {
         textStyle: { color: '#334155' }
       },
       grid: {
-        left: '2%',
-        right: '2%',
-        top: '6%',
-        bottom: '4%',
-        containLabel: true
+        left: 45,
+        right: 15,
+        top: 25,
+        bottom: 25
       },
       xAxis: {
         type: 'category',
         data: dates,
         boundaryGap: false,
         axisLabel: {
-          fontSize: 9,
-          color: '#94a3b8',
-          fontFamily: 'monospace',
-          maxInterval: 30
+          fontSize: 10,
+          color: '#64748b'
         },
         axisLine: {
-          lineStyle: { color: '#f1f5f9' }
-        },
-        axisTick: { show: false }
+          lineStyle: { color: '#e2e8f0' }
+        }
       },
       yAxis: {
         type: 'value',
         scale: true,
         axisLabel: {
-          fontSize: 9,
-          color: '#94a3b8',
-          fontFamily: 'monospace',
+          fontSize: 10,
+          color: '#64748b',
           formatter: (value) => value.toLocaleString('zh-CN')
         },
         splitLine: {
@@ -911,16 +959,15 @@ export default function GlobalMarketPanel() {
       series: [{
         data: values,
         type: 'line',
-        smooth: true,
-        symbol: 'none',
-        lineStyle: {
-          color: lineColor,
-          width: 2.2
+        smooth: false,
+        showSymbol: false,
+        itemStyle: {
+          color: lineColor
         },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: isPositive ? 'rgba(244, 63, 94, 0.18)' : 'rgba(16, 185, 129, 0.18)' },
-            { offset: 1, color: isPositive ? 'rgba(244, 63, 94, 0.005)' : 'rgba(16, 185, 129, 0.005)' }
+            { offset: 0, color: isPositive ? 'rgba(244, 63, 94, 0.35)' : 'rgba(16, 185, 129, 0.35)' },
+            { offset: 1, color: isPositive ? 'rgba(244, 63, 94, 0.01)' : 'rgba(16, 185, 129, 0.01)' }
           ])
         }
       }]
@@ -1020,7 +1067,7 @@ export default function GlobalMarketPanel() {
                 <span className="text-base">📡</span>
                 <span className="text-xs font-black text-slate-700 tracking-wider">海外市场实时气象站</span>
               </div>
-              <span className="text-[10px] text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200 animate-pulse flex items-center gap-1">
+              <span className="text-10 text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200 animate-pulse flex items-center gap-1">
                 <span className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
                 卫星实时同步中
               </span>
@@ -1033,8 +1080,8 @@ export default function GlobalMarketPanel() {
                 <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${chinaWeather.a50Bg}`}>
                   <div className="flex flex-col gap-1 text-left">
                     <span className="text-xs font-black text-slate-600">A股核心大公司前瞻 (如茅台、银行等)</span>
-                    <span className="text-[10px] text-slate-400 font-bold">(富时中国 A50 指数)</span>
-                    <span className={`text-[13px] font-black mt-1.5 ${chinaWeather.a50Color}`}>{chinaWeather.a50Weather}</span>
+                    <span className="text-10 text-slate-400 font-bold">(富时中国 A50 指数)</span>
+                    <span className={`text-13 font-black mt-1.5 ${chinaWeather.a50Color}`}>{chinaWeather.a50Weather}</span>
                   </div>
                   <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{chinaWeather.a50Emoji}</span>
                 </div>
@@ -1043,8 +1090,8 @@ export default function GlobalMarketPanel() {
                 <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${chinaWeather.hxcBg}`}>
                   <div className="flex flex-col gap-1 text-left">
                     <span className="text-xs font-black text-slate-600">中国科技股前瞻 (如阿里、拼多多等)</span>
-                    <span className="text-[10px] text-slate-400 font-bold">(中概金龙指数 HXC)</span>
-                    <span className={`text-[13px] font-black mt-1.5 ${chinaWeather.hxcColor}`}>{chinaWeather.hxcWeather}</span>
+                    <span className="text-10 text-slate-400 font-bold">(中概金龙指数 HXC)</span>
+                    <span className={`text-13 font-black mt-1.5 ${chinaWeather.hxcColor}`}>{chinaWeather.hxcWeather}</span>
                   </div>
                   <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{chinaWeather.hxcEmoji}</span>
                 </div>
@@ -1056,8 +1103,8 @@ export default function GlobalMarketPanel() {
                 <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${usWeather.nqBg}`}>
                   <div className="flex flex-col gap-1 text-left">
                     <span className="text-xs font-black text-slate-600">美国高科技巨头气温 (如苹果、英伟达等)</span>
-                    <span className="text-[10px] text-slate-400 font-bold">(纳斯达克 100 期货)</span>
-                    <span className={`text-[13px] font-black mt-1.5 ${usWeather.nqColor}`}>{usWeather.nqWeather}</span>
+                    <span className="text-10 text-slate-400 font-bold">(纳斯达克 100 期货)</span>
+                    <span className={`text-13 font-black mt-1.5 ${usWeather.nqColor}`}>{usWeather.nqWeather}</span>
                   </div>
                   <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{usWeather.nqEmoji}</span>
                 </div>
@@ -1066,8 +1113,8 @@ export default function GlobalMarketPanel() {
                 <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${usWeather.esBg}`}>
                   <div className="flex flex-col gap-1 text-left">
                     <span className="text-xs font-black text-slate-600">美国整体大盘气温 (跟踪500家美国大企业)</span>
-                    <span className="text-[10px] text-slate-400 font-bold">(标谱 500 期货)</span>
-                    <span className={`text-[13px] font-black mt-1.5 ${usWeather.esColor}`}>{usWeather.esWeather}</span>
+                    <span className="text-10 text-slate-400 font-bold">(标谱 500 期货)</span>
+                    <span className={`text-13 font-black mt-1.5 ${usWeather.esColor}`}>{usWeather.esWeather}</span>
                   </div>
                   <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{usWeather.esEmoji}</span>
                 </div>
@@ -1081,20 +1128,20 @@ export default function GlobalMarketPanel() {
               <span>💡</span>
               <span>小白快速避坑指南</span>
             </div>
-            <div className="flex flex-col gap-2 text-[10.5px] leading-relaxed font-bold text-slate-500 font-sans">
-              <div className="bg-white p-2.5 rounded-xl border border-slate-150 shadow-3xs">
+            <div className="flex flex-col gap-2 text-10 leading-relaxed font-bold text-slate-500 font-sans">
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-3xs">
                 <span className="text-slate-700 font-extrabold block">📌 问：我持有的哪些基金能用到这个提示？</span>
                 <span className="text-slate-450 block mt-1 font-semibold leading-normal">
                   答：凡是跟踪国内大A股的【沪深300】、【创业板】或者海外美股的【纳斯达克100】、【标普500】走的基金都适用。包括您持仓里的大A基金和美股海外基金。
                 </span>
               </div>
-              <div className="bg-white p-2.5 rounded-xl border border-slate-150 shadow-3xs">
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-3xs">
                 <span className="text-slate-700 font-extrabold block">📌 问：为什么下午3点前暂停扣款能省钱？</span>
                 <span className="text-slate-450 block mt-1 font-semibold leading-normal">
                   答：因为美股跳空大跌会导致明天补跌。今天下午 3:00 前去您的基金账户里【暂停定投】，明天下午就能用便宜 1% 到 2% 的更低净值买入相同的份额，白白省下买入成本！
                 </span>
               </div>
-              <div className="bg-white p-2.5 rounded-xl border border-slate-150 shadow-3xs">
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-3xs">
                 <span className="text-slate-700 font-extrabold block">📌 问：这个投资助手是全自动的吗？为什么有手动调节的？</span>
                 <span className="text-slate-450 block mt-1 font-semibold leading-normal">
                   答：本助手<span className="font-black text-rose-500">100%全自动运行，已自动接入全球实时行情</span>！页面显示的今日走势和操作意见都是系统自动算好的，您不需要手动调任何东西。手动的滑动条和输入框是“专业量化模式”下供高阶玩家模拟测试用的，小白可以直接忽略它，直接看本页的红绿字建议操作即可，超级简单！
@@ -1115,9 +1162,18 @@ export default function GlobalMarketPanel() {
               <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🤖</span>
-                  <span className="text-xs font-black text-slate-750 tracking-wider">智能理财管家早盘建议</span>
+                  <div className="flex flex-col text-left">
+                    <span className="text-xs font-black text-slate-750 tracking-wider">智能理财管家早盘建议</span>
+                    {lastUpdated && (
+                      <span className="text-[9px] text-slate-400 font-bold mt-0.5">
+                        {chinaSimMode 
+                          ? '⚠️ 依据量化沙盒模拟器数据' 
+                          : `依据时间: ${lastUpdated.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 实时行情`}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className={`text-[10px] font-black px-3.5 py-1 rounded-full border ${chinaAdvisorData.bg} ${chinaAdvisorData.color}`}>
+                <span className={`text-10 font-black px-3.5 py-1 rounded-full border ${chinaAdvisorData.bg} ${chinaAdvisorData.color}`}>
                   今日走势: {chinaStatusLabel}
                 </span>
               </div>
@@ -1133,7 +1189,7 @@ export default function GlobalMarketPanel() {
                 <div className="bg-white/95 backdrop-blur-md p-5 rounded-2.5xl border border-slate-200 shadow-sm leading-relaxed flex flex-col gap-4">
                   <div className="flex gap-2.5 items-start">
                     <span className="text-2xl select-none shrink-0 filter drop-shadow-sm">💡</span>
-                    <div className="flex flex-col gap-1 text-[12.5px] font-extrabold text-slate-650 leading-relaxed font-sans">
+                    <div className="flex flex-col gap-1 text-12 font-extrabold text-slate-650 leading-relaxed font-sans">
                       <h4 className="text-xs font-black text-slate-450 uppercase tracking-widest leading-none mb-1 select-none">操作指导意见</h4>
                       {chinaAdvisorData.activeRule === 1 && (
                         <p>
@@ -1168,9 +1224,18 @@ export default function GlobalMarketPanel() {
               <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🤖</span>
-                  <span className="text-xs font-black text-slate-755 tracking-wider">智能理财管家午后建议</span>
+                  <div className="flex flex-col text-left">
+                    <span className="text-xs font-black text-slate-755 tracking-wider">智能理财管家午后建议</span>
+                    {lastUpdated && (
+                      <span className="text-[9px] text-slate-400 font-bold mt-0.5">
+                        {usSimMode 
+                          ? '⚠️ 依据量化沙盒模拟器数据' 
+                          : `依据时间: ${lastUpdated.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 实时行情`}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className={`text-[10px] font-black px-3.5 py-1 rounded-full border ${usAdvisorData.bg} ${usAdvisorData.color}`}>
+                <span className={`text-10 font-black px-3.5 py-1 rounded-full border ${usAdvisorData.bg} ${usAdvisorData.color}`}>
                   今日走势: {usStatusLabel}
                 </span>
               </div>
@@ -1189,7 +1254,7 @@ export default function GlobalMarketPanel() {
                 <div className="bg-white/95 backdrop-blur-md p-5 rounded-2.5xl border border-slate-200 shadow-sm leading-relaxed flex flex-col gap-4">
                   <div className="flex gap-2.5 items-start">
                     <span className="text-2xl select-none shrink-0 filter drop-shadow-sm">💡</span>
-                    <div className="flex flex-col gap-1 text-[12.5px] font-extrabold text-slate-650 leading-relaxed font-sans">
+                    <div className="flex flex-col gap-1 text-12 font-extrabold text-slate-650 leading-relaxed font-sans">
                       <h4 className="text-xs font-black text-slate-450 uppercase tracking-widest leading-none mb-1 select-none">操作指导意见</h4>
                       {usAdvisorData.activeRule === 0 && (
                         <p>
@@ -1300,13 +1365,13 @@ export default function GlobalMarketPanel() {
                 chinaSimMode ? (
                   <button
                     onClick={handleResetChinaRealTime}
-                    className="flex items-center gap-1 text-[10px] font-black text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-full border border-rose-200 cursor-pointer transition-all active:scale-95"
+                    className="flex items-center gap-1 text-10 font-black text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-full border border-rose-200 cursor-pointer transition-all active:scale-95"
                   >
                     <Activity className="w-3 h-3 text-rose-450" />
                     <span>恢复实时数据</span>
                   </button>
                 ) : (
-                  <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  <span className="flex items-center gap-1 text-10 font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span>实时数据链接中</span>
                   </span>
@@ -1315,13 +1380,13 @@ export default function GlobalMarketPanel() {
                 usSimMode ? (
                   <button
                     onClick={handleResetUsRealTime}
-                    className="flex items-center gap-1 text-[10px] font-black text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-full border border-rose-200 cursor-pointer transition-all active:scale-95"
+                    className="flex items-center gap-1 text-10 font-black text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-full border border-rose-200 cursor-pointer transition-all active:scale-95"
                   >
                     <Activity className="w-3 h-3 text-rose-455" />
                     <span>恢复实时数据</span>
                   </button>
                 ) : (
-                  <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  <span className="flex items-center gap-1 text-10 font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span>实时数据链接中</span>
                   </span>
@@ -1405,7 +1470,7 @@ export default function GlobalMarketPanel() {
                 <div className="border-t border-slate-100 pt-3 flex flex-col gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/30">
                   <div className="flex justify-between items-center text-xs font-black text-slate-700">
                     <span>创业板/科创板高敏感度因子</span>
-                    <span className={`font-mono font-extrabold px-2 py-0.5 rounded-lg border text-[11px] font-black ${
+                    <span className={`font-mono font-extrabold px-2 py-0.5 rounded-lg border text-11 font-black ${
                       chinaAdvisorData.growth_sentiment >= 0.5 
                         ? 'text-rose-650 bg-rose-50/70 border-rose-200' 
                         : (chinaAdvisorData.growth_sentiment <= -0.5 ? 'text-emerald-650 bg-emerald-50/70 border-emerald-200' : 'text-slate-500 bg-slate-100 border-slate-200')
@@ -1423,7 +1488,7 @@ export default function GlobalMarketPanel() {
                       }}
                     />
                   </div>
-                  <p className="text-[10px] text-slate-450 leading-relaxed font-bold">
+                  <p className="text-10 text-slate-450 leading-relaxed font-bold">
                     * 该因子由 0.4 × A50期指涨跌幅 + 0.6 × 中概金龙涨跌幅加权计算，对以新能源、半导体、医药为主的科技成长标的集合竞价具有强前瞻指引作用。
                   </p>
                 </div>
@@ -1502,10 +1567,10 @@ export default function GlobalMarketPanel() {
                 </div>
 
                 {/* Macro Data Toggle */}
-                <label className="flex items-center justify-between rounded-2xl border border-slate-150 bg-slate-50 px-4 py-3 text-xs font-black text-slate-700 gap-2 cursor-pointer hover:bg-slate-100/50 transition-all select-none">
+                <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black text-slate-700 gap-2 cursor-pointer hover:bg-slate-100/50 transition-all select-none">
                   <div className="flex flex-col text-left">
                     <span>当晚 20:30 有重磅宏观数据公布</span>
-                    <span className="text-[10px] text-slate-400 font-bold mt-0.5">CPI/非农就业/美联储议息决议等</span>
+                    <span className="text-10 text-slate-400 font-bold mt-0.5">CPI/非农就业/美联储议息决议等</span>
                   </div>
                   <input
                     type="checkbox"
@@ -1519,7 +1584,7 @@ export default function GlobalMarketPanel() {
                 <div className="border-t border-slate-100 pt-3 flex flex-col gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/30">
                   <div className="flex justify-between items-center text-xs font-black text-slate-700">
                     <span>两指偏离度 (偏离度 Spread)</span>
-                    <span className={`font-mono font-extrabold px-2 py-0.5 rounded-lg border text-[11px] font-black ${
+                    <span className={`font-mono font-extrabold px-2 py-0.5 rounded-lg border text-11 font-black ${
                       usAdvisorData.spread > 1.2 
                         ? 'text-amber-655 bg-amber-50/70 border-amber-200 animate-pulse' 
                         : (usAdvisorData.spread < 0.5 ? 'text-emerald-655 bg-emerald-50/70 border-emerald-200' : 'text-slate-500 bg-slate-100 border-slate-200')
@@ -1537,7 +1602,7 @@ export default function GlobalMarketPanel() {
                       }}
                     />
                   </div>
-                  <p className="text-[10px] text-slate-450 leading-relaxed font-bold">
+                  <p className="text-10 text-slate-450 leading-relaxed font-bold">
                     {usAdvisorData.spread > 1.2 
                       ? '⚠️ 两指分歧度过高！科技股与价值大盘出现严重撕裂背离，信号失真，属于无效垃圾时间。' 
                       : (usAdvisorData.spread <= 0.5 ? '✅ 两指同向共振，属于极高确定性的普涨/普跌单边行情。' : 'ℹ️ 两指在日常常规震荡范围内。')}
@@ -1557,80 +1622,80 @@ export default function GlobalMarketPanel() {
             
             {advisorSubTab === 'china' ? (
               // China 4D Matrix
-              <div className="grid grid-cols-2 gap-3 text-center text-[11px] font-bold select-none">
+              <div className="grid grid-cols-2 gap-3 text-center text-11 font-bold select-none">
                 <div className={`p-3 rounded-2xl border transition-all duration-300 ${
                   chinaAdvisorData.activeRule === 2 
                     ? 'border-emerald-500 bg-emerald-50/70 text-emerald-800 ring-2 ring-emerald-500/20 scale-[1.02]' 
-                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                    : 'border-slate-200 bg-slate-50/40 text-slate-455'
                 }`}>
                   <div className="font-black text-xs">🟢 全面共振大涨</div>
-                  <p className="text-[9.5px] mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 >= +0.8% 且 中概金龙 >= +1.5%"}</p>
+                  <p className="text-9 mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 >= +0.8% 且 中概金龙 >= +1.5%"}</p>
                 </div>
 
                 <div className={`p-3 rounded-2xl border transition-all duration-300 ${
                   chinaAdvisorData.activeRule === 1 
                     ? 'border-rose-500 bg-rose-50/70 text-rose-800 ring-2 ring-rose-500/20 scale-[1.02]' 
-                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                    : 'border-slate-200 bg-slate-50/40 text-slate-455'
                 }`}>
                   <div className="font-black text-xs">🔴 全面共振暴跌</div>
-                  <p className="text-[9.5px] mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 <= -0.8% 且 中概金龙 <= -1.5%"}</p>
+                  <p className="text-9 mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 <= -0.8% 且 中概金龙 <= -1.5%"}</p>
                 </div>
 
                 <div className={`p-3 rounded-2xl border transition-all duration-300 ${
                   chinaAdvisorData.activeRule === 3 
                     ? 'border-amber-500 bg-amber-50/70 text-amber-800 ring-2 ring-amber-500/20 scale-[1.02]' 
-                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                    : 'border-slate-200 bg-slate-50/40 text-slate-455'
                 }`}>
                   <div className="font-black text-xs">🟡 二八结构分化</div>
-                  <p className="text-[9.5px] mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 >= +0.5% 且 中概金龙 <= -1.0%"}</p>
+                  <p className="text-9 mt-1 opacity-70 leading-relaxed font-semibold">{"A50期指 >= +0.5% 且 中概金龙 <= -1.0%"}</p>
                 </div>
 
                 <div className={`p-3 rounded-2xl border transition-all duration-300 ${
                   chinaAdvisorData.activeRule === 4 
                     ? 'border-blue-500 bg-blue-50/70 text-blue-800 ring-2 ring-blue-500/20 scale-[1.02]' 
-                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                    : 'border-slate-200 bg-slate-50/40 text-slate-455'
                 }`}>
                   <div className="font-black text-xs">⚪ 震荡横盘市</div>
-                  <p className="text-[9.5px] mt-1 opacity-70 leading-relaxed font-semibold">离岸前瞻指标微弱 呈现方向不明宽幅震荡</p>
+                  <p className="text-9 mt-1 opacity-70 leading-relaxed font-semibold">离岸前瞻指标微弱 呈现方向不明宽幅震荡</p>
                 </div>
               </div>
             ) : (
               // US 4D Matrix
-              <div className="grid grid-cols-3 gap-2.5 text-center text-[10px] font-bold select-none">
+              <div className="grid grid-cols-3 gap-2.5 text-center text-10 font-bold select-none">
                 <div className={`p-2.5 rounded-2xl border transition-all duration-300 ${
                   usAdvisorData.activeRule === 3 
                     ? 'border-emerald-500 bg-emerald-50/70 text-emerald-800 ring-2 ring-emerald-500/20 scale-[1.02]' 
-                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                    : 'border-slate-200 bg-slate-50/40 text-slate-455'
                 }`}>
-                  <div className="font-black text-[11px]">🟢 强趋势多头</div>
-                  <p className="text-[9px] mt-1 opacity-70 leading-normal font-semibold">{"多头共振 且 偏离度 <= 0.6%"}</p>
+                  <div className="font-black text-11">🟢 强趋势多头</div>
+                  <p className="text-9 mt-1 opacity-70 leading-normal font-semibold">{"多头共振 且 偏离度 <= 0.6%"}</p>
                 </div>
 
                 <div className={`p-2.5 rounded-2xl border transition-all duration-300 ${
                   usAdvisorData.activeRule === 2 
                     ? 'border-rose-500 bg-rose-50/70 text-rose-800 ring-2 ring-rose-500/20 scale-[1.02]' 
-                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                    : 'border-slate-200 bg-slate-50/40 text-slate-455'
                 }`}>
-                  <div className="font-black text-[11px]">🔴 强趋势空头</div>
-                  <p className="text-[9px] mt-1 opacity-70 leading-normal font-semibold">{"空头共振 且 偏离度 <= 0.6%"}</p>
+                  <div className="font-black text-11">🔴 强趋势空头</div>
+                  <p className="text-9 mt-1 opacity-70 leading-normal font-semibold">{"空头共振 且 偏离度 <= 0.6%"}</p>
                 </div>
 
                 <div className={`p-2.5 rounded-2xl border transition-all duration-300 ${
                   usAdvisorData.activeRule === 5 
                     ? 'border-amber-500 bg-amber-50/70 text-amber-800 ring-2 ring-amber-500/20 scale-[1.02]' 
-                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                    : 'border-slate-200 bg-slate-50/40 text-slate-455'
                 }`}>
-                  <div className="font-black text-[11px]">🟡 指数背离阱</div>
-                  <p className="text-[9px] mt-1 opacity-70 leading-normal font-semibold">{"同向背离较大 或 偏离度 >= 1.2%"}</p>
+                  <div className="font-black text-11">🟡 指数背离阱</div>
+                  <p className="text-9 mt-1 opacity-70 leading-normal font-semibold">{"同向背离较大 或 偏离度 >= 1.2%"}</p>
                 </div>
 
                 <div className={`col-span-3 p-2.5 rounded-2xl border transition-all duration-300 ${
                   (usAdvisorData.activeRule === 4 || usAdvisorData.activeRule === 1 || usAdvisorData.activeRule === 6 || usAdvisorData.activeRule === 0) 
                     ? 'border-blue-500 bg-blue-50/70 text-blue-800 ring-2 ring-blue-500/20 scale-[1.01]' 
-                    : 'border-slate-150 bg-slate-50/40 text-slate-455'
+                    : 'border-slate-200 bg-slate-50/40 text-slate-455'
                 }`}>
-                  <div className="font-black text-[11px]">⚪ 区间震荡 / 宏观黑天鹅过滤 / 熔断保护</div>
-                  <p className="text-[9px] mt-1 opacity-70 leading-normal font-semibold">波动在 $\pm$0.6% 内，或宏观数据发布，或触发 $-5\%$ 大熔断</p>
+                  <div className="font-black text-11">⚪ 区间震荡 / 宏观黑天鹅过滤 / 熔断保护</div>
+                  <p className="text-9 mt-1 opacity-70 leading-normal font-semibold">波动在 $\pm$0.6% 内，或宏观数据发布，或触发 $-5\%$ 大熔断</p>
                 </div>
               </div>
             )}
@@ -1649,7 +1714,16 @@ export default function GlobalMarketPanel() {
               <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-blue-500" />
-                  <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 09:15 前置早盘决策指令 ({targetDateCN})</span>
+                  <div className="flex flex-col text-left">
+                    <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 09:15 前置早盘决策指令 ({targetDateCN})</span>
+                    {lastUpdated && (
+                      <span className="text-[9px] text-slate-500 font-bold mt-0.5">
+                        {chinaSimMode 
+                          ? '⚠️ 依据量化沙盒模拟器数据' 
+                          : `依据时间: ${lastUpdated.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 实时行情`}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1 rounded-full border ${chinaAdvisorData.bg} ${chinaAdvisorData.color}`}>
@@ -1668,7 +1742,7 @@ export default function GlobalMarketPanel() {
                     <span className="text-base select-none shrink-0 font-black">📊</span>
                     <div>
                       <h4 className="text-xs font-black text-slate-700 leading-none">前瞻预测与开盘逻辑</h4>
-                      <p className="text-[11.5px] text-slate-500 leading-relaxed font-bold mt-1.5">
+                      <p className="text-11 text-slate-500 leading-relaxed font-bold mt-1.5">
                         新加坡富时中国 A50 指数是外资主力博弈中国资产唯一的夜盘及盘前枢纽。早上 9:00 - 9:15 的 15 分钟走势完成了对“昨晚美股表现 + 昨晚国内重磅政策 + 早上消息面”的终极统一定价。当前 A50 盘前涨跌幅为 <span className="font-extrabold font-mono text-slate-700">{chinaA50Input >= 0 ? '+' : ''}{chinaA50Input.toFixed(2)}%</span>，中概金龙指数收盘涨跌幅为 <span className="font-extrabold font-mono text-slate-700">{chinaHxcInput >= 0 ? '+' : ''}{chinaHxcInput.toFixed(2)}%</span>。
                       </p>
                     </div>
@@ -1680,7 +1754,7 @@ export default function GlobalMarketPanel() {
                     <span className="text-base select-none shrink-0 font-black">⚡</span>
                     <div>
                       <h4 className="text-xs font-black text-slate-700 leading-none">量化操作指导建议</h4>
-                      <p className="text-[11.5px] text-slate-650 leading-relaxed font-extrabold mt-1.5">
+                      <p className="text-11 text-slate-650 leading-relaxed font-extrabold mt-1.5">
                         {chinaAdvisorData.action}
                       </p>
                     </div>
@@ -1689,7 +1763,7 @@ export default function GlobalMarketPanel() {
               </div>
 
               {/* Educational info box */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-200/20 text-[10px] text-slate-450 leading-relaxed font-bold">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-200/20 text-10 text-slate-450 leading-relaxed font-bold">
                 <p>
                   💡 <span className="text-slate-650 font-extrabold">场内 ETF 操作:</span> 牛市高开情绪极其亢奋，开盘无脑追高往往会吃“高开低走”的闷棍。建议耐心等待 10:00 获利盘砸出的日内低吸黄金点。
                 </p>
@@ -1706,7 +1780,16 @@ export default function GlobalMarketPanel() {
               <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-blue-500" />
-                  <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 15:00 午后交易决策指令 ({targetDateUS})</span>
+                  <div className="flex flex-col text-left">
+                    <span className="text-xs font-black text-slate-700 tracking-wider">北京时间 15:00 午后交易决策指令 ({targetDateUS})</span>
+                    {lastUpdated && (
+                      <span className="text-[9px] text-slate-500 font-bold mt-0.5">
+                        {usSimMode 
+                          ? '⚠️ 依据量化沙盒模拟器数据' 
+                          : `依据时间: ${lastUpdated.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 实时行情`}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3.5 py-1 rounded-full border ${usAdvisorData.bg} ${usAdvisorData.color}`}>
@@ -1725,7 +1808,7 @@ export default function GlobalMarketPanel() {
                     <span className="text-base select-none shrink-0 font-black">📊</span>
                     <div>
                       <h4 className="text-xs font-black text-slate-700 leading-none">美股盘前趋势推测</h4>
-                      <p className="text-[11.5px] text-slate-500 leading-relaxed font-bold mt-1.5">
+                      <p className="text-11 text-slate-500 leading-relaxed font-bold mt-1.5">
                         在 14:50 核心节点，美股主力机构尚未进场，期货价格反映了全球盘前多空情绪共振。当前微纳指期货涨跌幅为 <span className="font-extrabold font-mono text-slate-700">{usNasdaqInput >= 0 ? '+' : ''}{usNasdaqInput.toFixed(2)}%</span>，微标普期货涨跌幅为 <span className="font-extrabold font-mono text-slate-700">{usSp505Input >= 0 ? '+' : ''}{usSp505Input.toFixed(2)}%</span>，两指偏离度为 <span className="font-extrabold font-mono text-slate-700">{usAdvisorData.spread.toFixed(2)}%</span>。
                       </p>
                     </div>
@@ -1737,7 +1820,7 @@ export default function GlobalMarketPanel() {
                     <span className="text-base select-none shrink-0 font-black">⚡</span>
                     <div>
                       <h4 className="text-xs font-black text-slate-700 leading-none">精准买卖操作决策</h4>
-                      <p className="text-[11.5px] text-slate-650 leading-relaxed font-extrabold mt-1.5">
+                      <p className="text-11 text-slate-650 leading-relaxed font-extrabold mt-1.5">
                         {usAdvisorData.action}
                       </p>
                     </div>
@@ -1746,7 +1829,7 @@ export default function GlobalMarketPanel() {
               </div>
 
               {/* Educational info box */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-200/20 text-[10px] text-slate-450 leading-relaxed font-bold font-sans">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-200/20 text-10 text-slate-450 leading-relaxed font-bold font-sans">
                 <p>
                   💡 <span className="text-slate-650 font-extrabold">QDII 赎回与暂停逻辑:</span> QDII 赎回按照当天（T日）收盘净值确认。由于盘前期货大跌预示今晚 21:30 跳空低开，15:00 前立刻申请卖出或暂停买入，可变相白赚 1%-2% 的份额资产。
                 </p>
@@ -1769,13 +1852,13 @@ export default function GlobalMarketPanel() {
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
                 </span>
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none ml-1">Quant Python Debugger Terminal</span>
+                <span className="text-10 font-black text-slate-500 uppercase tracking-widest leading-none ml-1">Quant Python Debugger Terminal</span>
               </div>
-              <span className="text-[9px] font-bold text-slate-600 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md leading-none">Python v3.11</span>
+              <span className="text-9 font-bold text-slate-600 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md leading-none">Python v3.11</span>
             </div>
 
             {/* Python code output with dynamic line-by-line highlighting */}
-            <div className="text-[11.5px] font-semibold leading-relaxed overflow-x-auto custom-scrollbar whitespace-nowrap text-slate-400 py-1 font-mono">
+            <div className="text-11 font-semibold leading-relaxed overflow-x-auto custom-scrollbar whitespace-nowrap text-slate-400 py-1 font-mono">
               {advisorSubTab === 'china' ? (
                 // China Python Code
                 <div className="flex flex-col gap-0.5 select-text font-mono">
@@ -1860,7 +1943,7 @@ export default function GlobalMarketPanel() {
             </div>
             
             {/* Terminal status bar */}
-            <div className="flex items-center justify-between text-[9px] text-slate-550 border-t border-slate-850 pt-2 font-bold select-none font-mono">
+            <div className="flex items-center justify-between text-9 text-slate-550 border-t border-slate-850 pt-2 font-bold select-none font-mono">
               <span className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>Sandbox Active</span>
@@ -1932,7 +2015,7 @@ export default function GlobalMarketPanel() {
           {/* Actions */}
           <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
             {lastUpdated && (
-              <span className="flex items-center gap-1 text-[10px] md:text-[11px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1.5 sm:py-1 rounded-full border border-slate-200/30">
+              <span className="flex items-center gap-1 text-10 md:text-11 font-bold text-slate-400 bg-slate-50 px-2.5 py-1.5 sm:py-1 rounded-full border border-slate-200/30">
                 <Clock className="w-3 h-3 text-slate-400" />
                 {lastUpdated.toLocaleTimeString('zh-CN')} 更新
               </span>
@@ -1981,66 +2064,83 @@ export default function GlobalMarketPanel() {
             </div>
           ) : marketTab === 'overview' ? (
             /* ================= TAB 1: OVERVIEW CARD GRID ================= */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-200">
-              {mainIndices.map((item) => {
-                const isSelected = item.symbol === selectedSymbol;
-                const isPositive = item.changePercent >= 0;
-                
-                const rateColorClass = isPositive 
-                  ? 'text-rose-600 bg-rose-50 border-rose-100/60' 
-                  : 'text-emerald-600 bg-emerald-50 border-emerald-100/60';
-                
-                const regionBadges = {
-                  'US': '🇺🇸 美国',
-                  'CN': '🇨🇳 中国',
-                  'HK': '🇭🇰 香港',
-                  'JP': '🇯🇵 日本',
-                  'UK': '🇬🇧 英国',
-                  'DE': '🇩🇪 德国'
-                };
-                
-                return (
-                  <div
-                    key={item.symbol}
-                    onClick={() => setSelectedSymbol(item.symbol)}
-                    className={`border rounded-2xl p-4 flex flex-col justify-between bg-gradient-to-br from-white to-slate-50/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer relative group overflow-hidden ${
-                      isSelected 
-                        ? 'border-blue-500 ring-3 ring-blue-500/10 bg-gradient-to-br from-white to-blue-50/20' 
-                        : 'border-slate-200/60'
-                    }`}
-                  >
-                    {/* Header info inside card */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-start">
-                        <span className="text-[10px] font-extrabold text-slate-400 font-mono tracking-wider">{item.symbol}</span>
-                        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2 py-0.5 rounded-full shrink-0">
-                          {regionBadges[item.region] || item.regionName}
-                        </span>
-                      </div>
-                      <h4 className="font-extrabold text-slate-700 text-xs leading-snug group-hover:text-blue-600 transition-colors mt-0.5" title={item.englishName}>
-                        {item.name}
-                      </h4>
-                    </div>
-
-                    {/* Numeric panel inside card */}
-                    <div className="mt-3.5 flex justify-between items-end">
-                      <div className="flex flex-col">
-                        <span className="text-base font-black font-mono text-slate-700 tracking-tight">
-                          {formatIndexPrice(item.currentPrice)}
-                        </span>
-                      </div>
-                      <span className={`inline-flex items-center text-[10px] font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
-                        {isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%
-                      </span>
-                    </div>
-
-                    {/* Pure SVG Sparkline */}
-                    <div className="h-8 mt-2.5 flex items-end">
-                      <Sparkline data={item.sparkline} isPositive={isPositive} />
-                    </div>
+            <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+              {groupedIndices.map((group) => (
+                <div key={group.region} className="flex flex-col gap-3">
+                  {/* Section Title */}
+                  <div className="flex items-center gap-2 border-l-4 border-blue-600 pl-2 text-left">
+                    <span className="text-xs font-black text-slate-800 tracking-wider">
+                      {group.regionName}
+                    </span>
+                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200/50 px-2 py-0.5 rounded-full font-mono">
+                      {group.items.length} 个指数
+                    </span>
                   </div>
-                );
-              })}
+
+                  {/* Section Cards Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {group.items.map((item) => {
+                      const isSelected = item.symbol === selectedSymbol;
+                      const isPositive = item.changePercent >= 0;
+                      
+                      const rateColorClass = isPositive 
+                        ? 'text-rose-600 bg-rose-50 border-rose-100/60' 
+                        : 'text-emerald-600 bg-emerald-50 border-emerald-100/60';
+                      
+                      const regionBadges = {
+                        'US': '🇺🇸 美国',
+                        'CN': '🇨🇳 中国',
+                        'HK': '🇭🇰 香港',
+                        'JP': '🇯🇵 日本',
+                        'UK': '🇬🇧 英国',
+                        'DE': '🇩🇪 德国'
+                      };
+                      
+                      return (
+                        <div
+                          key={item.symbol}
+                          onClick={() => setSelectedSymbol(item.symbol)}
+                          className={`border rounded-2xl p-4 flex flex-col justify-between bg-gradient-to-br from-white to-slate-50/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer relative group overflow-hidden ${
+                            isSelected 
+                              ? 'border-blue-500 ring-3 ring-blue-500/10 bg-gradient-to-br from-white to-blue-50/20' 
+                              : 'border-slate-200/60'
+                          }`}
+                        >
+                          {/* Header info inside card */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-start">
+                              <span className="text-10 font-extrabold text-slate-400 font-mono tracking-wider">{item.symbol}</span>
+                              <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2 py-0.5 rounded-full shrink-0">
+                                {regionBadges[item.region] || item.regionName}
+                              </span>
+                            </div>
+                            <h4 className="font-extrabold text-slate-700 text-xs leading-snug group-hover:text-blue-600 transition-colors mt-0.5 text-left" title={item.englishName}>
+                              {item.name}
+                            </h4>
+                          </div>
+
+                          {/* Numeric panel inside card */}
+                          <div className="mt-3.5 flex justify-between items-end">
+                            <div className="flex flex-col text-left">
+                              <span className="text-base font-black font-mono text-slate-700 tracking-tight">
+                                {formatIndexPrice(item.currentPrice)}
+                              </span>
+                            </div>
+                            <span className={`inline-flex items-center text-10 font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
+                              {isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%
+                            </span>
+                          </div>
+
+                          {/* Pure SVG Sparkline */}
+                          <div className="h-8 mt-2.5 flex items-end">
+                            <Sparkline data={item.sparkline} isPositive={isPositive} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : marketTab === 'predictor' ? (
             /* ================= TAB 2: PREDICTOR & WIND VANE ================= */
@@ -2055,7 +2155,7 @@ export default function GlobalMarketPanel() {
                   
                   <div className="flex items-center gap-1.5 self-start mb-2">
                     <Flame className="w-4 h-4 text-orange-500 animate-pulse" />
-                    <span className="text-[11px] font-black text-slate-450 uppercase tracking-wider">多空情绪温度计</span>
+                    <span className="text-11 font-black text-slate-450 uppercase tracking-wider">多空情绪温度计</span>
                   </div>
                   
                   {/* Gauge Arc representation */}
@@ -2093,7 +2193,7 @@ export default function GlobalMarketPanel() {
                     {/* Text center label */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center select-none">
                       <span className="text-3xl font-black font-mono text-slate-850 tracking-tighter">{sentimentData.score}</span>
-                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full mt-1.5 border border-current leading-none ${sentimentData.color} ${sentimentData.bg}`}>
+                      <span className={`text-10 font-black px-2.5 py-0.5 rounded-full mt-1.5 border border-current leading-none ${sentimentData.color} ${sentimentData.bg}`}>
                         {sentimentData.label}
                       </span>
                     </div>
@@ -2106,9 +2206,16 @@ export default function GlobalMarketPanel() {
                 
                 {/* 1.2 Trend predictions (col-span-7) */}
                 <div className="xl:col-span-7 bg-white border border-slate-200/60 rounded-3xl p-5 flex flex-col gap-4 shadow-2xs">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <TrendingUp className="w-4 h-4 text-blue-500" />
-                    <span className="text-[11px] font-black text-slate-450 uppercase tracking-wider">大盘开盘前瞻预测 (基于当前风向标)</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/60 pb-2 mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-blue-500" />
+                      <span className="text-11 font-black text-slate-450 uppercase tracking-wider">大盘开盘前瞻预测 (基于当前风向标)</span>
+                    </div>
+                    {lastUpdated && (
+                      <span className="text-[9px] text-slate-450 font-bold bg-slate-50 border border-slate-200/50 px-2 py-0.5 rounded-md leading-none self-start sm:self-auto shadow-3xs">
+                        预测更新时间: {lastUpdated.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
                   </div>
                   
                   <div className="flex-1 flex flex-col gap-3">
@@ -2119,18 +2226,18 @@ export default function GlobalMarketPanel() {
                             <span className={`w-1.5 h-1.5 rounded-full ${pred.dot}`} />
                             <div className="flex flex-col text-left">
                               <h4 className="text-xs font-black text-slate-700">{pred.name}</h4>
-                              <span className="text-[9px] text-slate-400 font-bold mt-0.5">预测目标: {pred.targetDateStr}</span>
+                              <span className="text-9 text-slate-400 font-bold mt-0.5">预测目标交易日: {pred.targetDateStr}</span>
                             </div>
                           </div>
                           
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 border rounded-lg ${pred.color}`}>
+                          <span className={`inline-flex items-center gap-1 text-10 font-black px-2 py-0.5 border rounded-lg ${pred.color}`}>
                             {pred.status} ({pred.prob})
                           </span>
                         </div>
                         
                         <div className="flex flex-col gap-1 pl-3.5">
                           {pred.rationales.map((rat, i) => (
-                            <p key={i} className="text-[10.5px] text-slate-450 font-semibold leading-relaxed flex items-start gap-1">
+                            <p key={i} className="text-10 text-slate-450 font-semibold leading-relaxed flex items-start gap-1">
                               <span className="text-slate-350 select-none">•</span>
                               <span>{rat}</span>
                             </p>
@@ -2146,7 +2253,7 @@ export default function GlobalMarketPanel() {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-1.5 mt-1">
                   <Compass className="w-4 h-4 text-blue-500 animate-spin-slow" />
-                  <span className="text-[11px] font-black text-slate-450 uppercase tracking-wider">前瞻核心风向标核心指标</span>
+                  <span className="text-11 font-black text-slate-450 uppercase tracking-wider">前瞻核心风向标核心指标</span>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2182,8 +2289,8 @@ export default function GlobalMarketPanel() {
                         {/* Card header */}
                         <div className="space-y-1">
                           <div className="flex justify-between items-start">
-                            <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md font-mono tracking-wider">{item.symbol}</span>
-                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2.5 py-0.5 rounded-full shrink-0">
+                            <span className="text-10 font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md font-mono tracking-wider">{item.symbol}</span>
+                            <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2.5 py-0.5 rounded-full shrink-0">
                               {item.regionName}
                             </span>
                           </div>
@@ -2199,7 +2306,7 @@ export default function GlobalMarketPanel() {
                               {formatIndexPrice(item.currentPrice)}
                             </span>
                           </div>
-                          <span className={`inline-flex items-center text-[10px] font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
+                          <span className={`inline-flex items-center text-10 font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
                             {isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%
                           </span>
                         </div>
@@ -2211,7 +2318,7 @@ export default function GlobalMarketPanel() {
                         
                         {/* Meaning instruction */}
                         <div className="mt-3.5 border-t border-slate-100 pt-2.5">
-                          <p className="text-[10px] text-slate-450 font-semibold leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-200/20">
+                          <p className="text-10 text-slate-450 font-semibold leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-200/20">
                             <span className="font-black text-slate-550 mr-1">🔍 前瞻指引:</span>
                             {meaningText}
                           </p>
@@ -2226,36 +2333,36 @@ export default function GlobalMarketPanel() {
               <div className="bg-slate-50 border border-slate-200/40 rounded-3xl p-4.5">
                 <div className="flex items-center gap-1.5 mb-3">
                   <BookOpen className="w-4 h-4 text-blue-500" />
-                  <span className="text-[11px] font-black text-slate-550 uppercase tracking-wider">风向标全天监测时间轴 (Pro 技巧)</span>
+                  <span className="text-11 font-black text-slate-550 uppercase tracking-wider">风向标全天监测时间轴 (Pro 技巧)</span>
                 </div>
                 
                 <div className="flex flex-col gap-3 md:grid md:grid-cols-3 md:gap-4">
                   <div className="bg-white p-3 rounded-2xl border border-slate-200/30 flex flex-col gap-1 shadow-3xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">09:00 - 09:25</span>
-                      <span className="text-[9px] font-black text-rose-500">A股盘前开盘</span>
+                      <span className="text-10 font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">09:00 - 09:25</span>
+                      <span className="text-9 font-black text-rose-500">A股盘前开盘</span>
                     </div>
-                    <p className="text-[10px] text-slate-450 font-bold leading-relaxed mt-1">
+                    <p className="text-10 text-slate-450 font-bold leading-relaxed mt-1">
                       盯紧 <span className="text-slate-650 font-black">富时A50期货</span>。这是新加坡提前开市的风向标，能高概率预测 09:25 A股大盘集合竞价的高低开方向。
                     </p>
                   </div>
                   
                   <div className="bg-white p-3 rounded-2xl border border-slate-200/30 flex flex-col gap-1 shadow-3xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">09:30 - 15:00</span>
-                      <span className="text-[9px] font-black text-blue-500">盘中交易时段</span>
+                      <span className="text-10 font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">09:30 - 15:00</span>
+                      <span className="text-9 font-black text-blue-500">盘中交易时段</span>
                     </div>
-                    <p className="text-[10px] text-slate-450 font-bold leading-relaxed mt-1">
+                    <p className="text-10 text-slate-450 font-bold leading-relaxed mt-1">
                       重点观察 <span className="text-slate-650 font-black">纳指期货 (NQ)</span> 与汇率。若纳指期指盘中拉升，通常会提振港股及A股科技龙头，催化午后拉升反弹。
                     </p>
                   </div>
                   
                   <div className="bg-white p-3 rounded-2xl border border-slate-200/30 flex flex-col gap-1 shadow-3xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">21:30 - 04:00</span>
-                      <span className="text-[9px] font-black text-amber-600">美股美东时间</span>
+                      <span className="text-10 font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">21:30 - 04:00</span>
+                      <span className="text-9 font-black text-amber-600">美股美东时间</span>
                     </div>
-                    <p className="text-[10px] text-slate-450 font-bold leading-relaxed mt-1">
+                    <p className="text-10 text-slate-450 font-bold leading-relaxed mt-1">
                       盯死 <span className="text-slate-650 font-black">中概金龙指数 (^HXC)</span>。其在美股市场的最终收盘涨跌，直接主导第二天港股与A股开盘情绪的冰火两重天。
                     </p>
                   </div>
@@ -2278,7 +2385,7 @@ export default function GlobalMarketPanel() {
             {/* Top Index title & Current level */}
             <div className="flex flex-col gap-1.5 shrink-0 border-b border-slate-100 pb-3.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md font-mono tracking-wide">
+                <span className="text-10 font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md font-mono tracking-wide">
                   {activeIndex.symbol}
                 </span>
                 <span className="text-xs text-slate-400 font-bold">{activeIndex.regionName}</span>
@@ -2289,7 +2396,7 @@ export default function GlobalMarketPanel() {
                   <h3 className="font-black text-slate-800 text-base md:text-lg tracking-tight leading-none">
                     {activeIndex.name}
                   </h3>
-                  <p className="text-[10px] text-slate-450 font-bold mt-1 uppercase tracking-wider">{activeIndex.englishName}</p>
+                  <p className="text-10 text-slate-450 font-bold mt-1 uppercase tracking-wider">{activeIndex.englishName}</p>
                 </div>
                 
                 <div className="text-right">
@@ -2300,7 +2407,7 @@ export default function GlobalMarketPanel() {
                     <span className={`text-xs font-mono font-bold leading-none ${activeIndex.change >= 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                       {activeIndex.change >= 0 ? '+' : ''}{activeIndex.change.toFixed(2)}
                     </span>
-                    <span className={`inline-flex items-center text-[10px] font-mono font-black px-1.5 py-0.2 border rounded-md leading-none ${
+                    <span className={`inline-flex items-center text-10 font-mono font-black px-1.5 py-0.2 border rounded-md leading-none ${
                       activeIndex.changePercent >= 0 ? 'text-rose-600 bg-rose-50/50 border-rose-100' : 'text-emerald-600 bg-emerald-50/50 border-emerald-100'
                     }`}>
                       {activeIndex.changePercent >= 0 ? '+' : ''}{activeIndex.changePercent.toFixed(2)}%
@@ -2312,14 +2419,14 @@ export default function GlobalMarketPanel() {
 
             {/* Middle Controls (Period selector) */}
             <div className="flex items-center justify-between shrink-0">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">历史趋势大图</span>
+              <span className="text-10 font-black uppercase tracking-widest text-slate-400">历史趋势大图</span>
               
               <div className="flex gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 w-fit shrink-0 select-none">
                 {['1D', '1M', '3M', '6M', '1Y'].map(p => (
                   <button
                     key={p}
                     onClick={() => setPeriod(p)}
-                    className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all cursor-pointer ${
+                    className={`px-3 py-1 text-10 font-black rounded-lg transition-all cursor-pointer ${
                       period === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-650'
                     }`}
                   >
@@ -2331,17 +2438,17 @@ export default function GlobalMarketPanel() {
 
             {/* Detailed Stats Panel */}
             {activeStats && (
-              <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-150/50 shrink-0 font-mono select-none">
+              <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/50 shrink-0 font-mono select-none">
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">最高价格</span>
+                  <span className="text-9 font-bold text-slate-400 uppercase tracking-wider">最高价格</span>
                   <span className="text-xs font-black text-slate-700 mt-0.5">{formatIndexPrice(activeStats.high)}</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">最低价格</span>
+                  <span className="text-9 font-bold text-slate-400 uppercase tracking-wider">最低价格</span>
                   <span className="text-xs font-black text-slate-700 mt-0.5">{formatIndexPrice(activeStats.low)}</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">区间涨跌</span>
+                  <span className="text-9 font-bold text-slate-400 uppercase tracking-wider">区间涨跌</span>
                   <span className={`text-xs font-black mt-0.5 ${activeStats.periodChangePercent >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                     {activeStats.periodChangePercent >= 0 ? '+' : ''}{activeStats.periodChangePercent.toFixed(2)}%
                   </span>
@@ -2350,7 +2457,7 @@ export default function GlobalMarketPanel() {
             )}
 
             {/* ECharts Area Chart Container */}
-            <div className="flex-1 bg-white border border-slate-150/40 rounded-2xl p-2 relative overflow-hidden min-h-[220px] md:min-h-0 flex flex-col justify-center shadow-inner">
+            <div className="flex-1 bg-white border border-slate-200/40 rounded-2xl p-2 relative overflow-hidden min-h-[220px] md:min-h-0 flex flex-col justify-center shadow-inner">
               {detailLoading ? (
                 <div className="absolute inset-0 bg-white/70 backdrop-blur-3xs flex items-center justify-center z-10 select-none">
                   <div className="flex flex-col items-center gap-2">
@@ -2383,6 +2490,36 @@ export default function GlobalMarketPanel() {
       </div>
       )}
 
+      {/* Local Toast Notification */}
+      {toast.show && (
+        <div 
+          style={{ zIndex: 100, boxShadow: '0 15px 40px rgba(0, 0, 0, 0.06)' }}
+          className={`fixed top-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 px-4.5 py-3 rounded-2xl border bg-white/90 backdrop-blur-md animate-market-toast ${
+            toast.type === 'error' 
+              ? 'border-rose-150 text-rose-800' 
+              : 'border-emerald-150 text-emerald-850'
+          }`}
+        >
+          {toast.type === 'error' ? (
+            <AlertCircle className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+          ) : (
+            <CheckCircle className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
+          )}
+          <span className="font-extrabold text-xs tracking-wide">{toast.message}</span>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes market-toast-in-out {
+          0% { transform: translate(-50%, -40px); opacity: 0; }
+          12% { transform: translate(-50%, 0); opacity: 1; }
+          88% { transform: translate(-50%, 0); opacity: 1; }
+          100% { transform: translate(-50%, -40px); opacity: 0; }
+        }
+        .animate-market-toast {
+          animation: market-toast-in-out 3.0s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
     </div>
   );
 }

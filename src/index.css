@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+@utility text-8 {
+  font-size: 8px;
+}
+@utility text-9 {
+  font-size: 9px;
+}
+@utility text-10 {
+  font-size: 10px;
+}
+@utility text-11 {
+  font-size: 11px;
+}
+@utility text-12 {
+  font-size: 12px;
+}
+@utility text-13 {
+  font-size: 13px;
+}
+@utility text-14 {
+  font-size: 14px;
+}
+@utility text-15 {
+  font-size: 15px;
+}
+@utility text-16 {
+  font-size: 16px;
+}
+
 /* 彻底解决切换 Tab 页面抖动与滚动条布局抖动问题 */
 html,
 body,

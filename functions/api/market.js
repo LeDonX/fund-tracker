@@ -2,9 +2,6 @@
 // Route: GET /api/market OR GET /api/market?symbol=^GSPC&range=1y
 
 const INDICES = [
-  { symbol: "^GSPC", name: "标普500指数", englishName: "S&P 500", region: "US", regionName: "美国" },
-  { symbol: "^IXIC", name: "纳斯达克指数", englishName: "NASDAQ", region: "US", regionName: "美国" },
-  { symbol: "^DJI", name: "道琼斯指数", englishName: "Dow Jones", region: "US", regionName: "美国" },
   { symbol: "000001.SS", name: "上证综合指数", englishName: "Shanghai Composite", region: "CN", regionName: "中国" },
   { symbol: "399001.SZ", name: "深证成份指数", englishName: "Shenzhen Component", region: "CN", regionName: "中国" },
   { symbol: "000300.SS", name: "沪深300指数", englishName: "CSI 300 Index", region: "CN", regionName: "中国" },
@@ -14,6 +11,9 @@ const INDICES = [
   { symbol: "000016.SS", name: "上证50指数", englishName: "SSE 50 Index", region: "CN", regionName: "中国" },
   { symbol: "^HSI", name: "恒生指数", englishName: "Hang Seng Index", region: "HK", regionName: "中国香港" },
   { symbol: "^HSTECH", name: "恒生科技指数", englishName: "Hang Seng Tech", region: "HK", regionName: "中国香港" },
+  { symbol: "^GSPC", name: "标普500指数", englishName: "S&P 500", region: "US", regionName: "美国" },
+  { symbol: "^IXIC", name: "纳斯达克指数", englishName: "NASDAQ", region: "US", regionName: "美国" },
+  { symbol: "^DJI", name: "道琼斯指数", englishName: "Dow Jones", region: "US", regionName: "美国" },
   { symbol: "^N225", name: "日经225指数", englishName: "Nikkei 225", region: "JP", regionName: "日本" },
   { symbol: "^FTSE", name: "富时100指数", englishName: "FTSE 100", region: "UK", regionName: "英国" },
   { symbol: "^GDAXI", name: "德国DAX30指数", englishName: "DAX Index", region: "DE", regionName: "德国" },
@@ -22,7 +22,7 @@ const INDICES = [
   { symbol: "BTC-USD", name: "比特币现货", englishName: "Bitcoin USD", region: "CRP", regionName: "₿ 加密" },
   { symbol: "CN=F", name: "富时中国A50期指", englishName: "FTSE China A50 Futures", region: "FUT", regionName: "期货", isLeading: true },
   { symbol: "NQ=F", name: "纳斯达克100期指", englishName: "Nasdaq 100 Futures", region: "FUT", regionName: "期货", isLeading: true },
-  { symbol: "ES=F", name: "标普500期指", englishName: "S&P 500 Futures", region: "FUT", regionName: "期货", isLeading: true },
+  { symbol: "ES=F", name: "标谱500期指", englishName: "S&P 500 Futures", region: "FUT", regionName: "期货", isLeading: true },
   { symbol: "^HXC", name: "纳斯达克金龙中国指数", englishName: "Nasdaq Golden Dragon", region: "US", regionName: "美国", isLeading: true },
   { symbol: "USDCNH=X", name: "离岸人民币汇率", englishName: "USD/CNH Exchange Rate", region: "FX", regionName: "外汇", isLeading: true }
 ];
@@ -84,7 +84,7 @@ function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realT
   
   const timestamps = [];
   const closePrices = [];
-  const now = Date.now();
+  const now = range === "1d" ? Date.now() - 30 * 60 * 1000 : Date.now();
   let currentPrice = config.base;
   
   // We generate backward from now
@@ -173,15 +173,33 @@ function cleanYahooData(result) {
   };
 }
 
-const SINA_MAP = {
+const SINA_INDEX_MAP = {
+  "000001.SS": "s_sh000001",
+  "399001.SZ": "s_sz399001",
+  "000300.SS": "s_sh000300",
+  "399006.SZ": "s_sz399006",
+  "000688.SS": "s_sh000688",
+  "000905.SS": "s_sh000905",
+  "000016.SS": "s_sh000016",
+  "^HSI": "rt_hkHSI",
+  "^HSTECH": "rt_hkHSTECH",
+  "^GSPC": "int_sp500",
+  "^IXIC": "int_nasdaq",
+  "^DJI": "int_dji",
+  "^N225": "int_nikkei",
+  "^FTSE": "int_ftse",
+  "^GDAXI": "int_dax",
+  "GC=F": "hf_GC",
+  "CL=F": "hf_CL",
   "CN=F": "hf_CHA50CFD",
   "NQ=F": "hf_NQ",
   "ES=F": "hf_ES",
+  "^HXC": "gb_hxc",
   "USDCNH=X": "fx_susdcnh"
 };
 
-async function fetchSinaRealtime(symbol) {
-  const sinaSym = SINA_MAP[symbol];
+async function fetchSinaRealtimeForSymbol(symbol) {
+  const sinaSym = SINA_INDEX_MAP[symbol];
   if (!sinaSym) return null;
   
   try {
@@ -207,29 +225,64 @@ async function fetchSinaRealtime(symbol) {
     
     const dataStr = match[1];
     const parts = dataStr.split(',');
-    if (parts.length < 10) return null;
+    if (parts.length < 3) return null;
     
     let price = 0;
+    let change = 0;
+    let changePercent = 0;
     let prevClose = 0;
     
-    if (symbol === 'USDCNH=X') {
-      // CNH Forex: [1] currentPrice, [3] previousClose
+    if (sinaSym.startsWith("s_sh") || sinaSym.startsWith("s_sz")) {
+      // China indices: [1] price, [2] change, [3] changePercent
+      price = parseFloat(parts[1]);
+      change = parseFloat(parts[2]);
+      changePercent = parseFloat(parts[3]);
+      prevClose = price - change;
+    } else if (sinaSym.startsWith("int_")) {
+      // Global indices: [1] price, [2] change, [3] changePercent
+      price = parseFloat(parts[1]);
+      change = parseFloat(parts[2]);
+      changePercent = parseFloat(parts[3]);
+      prevClose = price - change;
+    } else if (sinaSym.startsWith("rt_hk")) {
+      // HK indices: [6] price, [7] change, [8] changePercent
+      price = parseFloat(parts[6]);
+      change = parseFloat(parts[7]);
+      changePercent = parseFloat(parts[8]);
+      prevClose = price - change;
+    } else if (sinaSym.startsWith("gb_")) {
+      // US stock / indices: [1] price, [2] changePercent, [4] change
+      price = parseFloat(parts[1]);
+      change = parseFloat(parts[4]);
+      changePercent = parseFloat(parts[2]);
+      prevClose = price - change;
+    } else if (sinaSym.startsWith("fx_")) {
+      // Forex CNH: [1] price, [3] prevClose
       price = parseFloat(parts[1]);
       prevClose = parseFloat(parts[3]);
-    } else {
-      // Index Futures: [0] currentPrice, [7] previousClose (settlement)
+      change = price - prevClose;
+      changePercent = (change / prevClose) * 105; // standard scaling or percentage
+      changePercent = Number(((change / prevClose) * 100).toFixed(4));
+    } else if (sinaSym.startsWith("hf_")) {
+      // Futures: [0] price, [7] prevClose
       price = parseFloat(parts[0]);
       prevClose = parseFloat(parts[7]);
+      change = price - prevClose;
+      changePercent = Number(((change / prevClose) * 100).toFixed(4));
+    } else {
+      return null;
     }
     
-    if (Number.isNaN(price) || Number.isNaN(prevClose) || prevClose <= 0) return null;
+    if (Number.isNaN(price) || price <= 0 || Number.isNaN(prevClose) || prevClose <= 0) return null;
     
     return {
       price,
-      prevClose
+      prevClose,
+      change,
+      changePercent
     };
   } catch (err) {
-    console.error(`Sina real-time fetch failed for ${symbol}:`, err.message);
+    console.error(`Sina real-time fetch failed for ${symbol} (${sinaSym}):`, err.message);
     return null;
   }
 }
@@ -278,8 +331,8 @@ async function getIndexData(symbol, range = "1y", interval = "1d") {
   }
   
   // ================= DUAL-SOURCE REAL-TIME OVERWRITE =================
-  if (SINA_MAP[symbol]) {
-    const sinaQuote = await fetchSinaRealtime(symbol);
+  if (SINA_INDEX_MAP[symbol]) {
+    const sinaQuote = await fetchSinaRealtimeForSymbol(symbol);
     if (sinaQuote) {
       console.log(`Successfully patched ${symbol} with real-time Sina quote: Price = ${sinaQuote.price}, PrevClose = ${sinaQuote.prevClose}`);
       
@@ -329,14 +382,22 @@ export async function onRequestGet(context) {
       const closes = indexResult.indicators?.quote?.[0]?.close || [];
       const history = [];
       
+      // If 1d range, shift timestamps forward by 30 minutes (1800 seconds) to compensate for feed lag
+      const shiftSeconds = (range === "1d") ? 30 * 60 : 0;
+      
       for (let i = 0; i < timestamps.length; i++) {
-        const d = new Date(timestamps[i] * 1000);
+        const d = new Date((timestamps[i] + shiftSeconds) * 1000);
         // For intraday (1d), return full ISO string, otherwise YYYY-MM-DD
         const dateStr = range === "1d" ? d.toISOString() : d.toISOString().split('T')[0];
         history.push({
           date: dateStr,
           value: closes[i]
         });
+      }
+      
+      if (range === "1d" && history.length > 0) {
+        // Force the last point's timestamp to exactly Now to align with the current real-time quote
+        history[history.length - 1].date = new Date().toISOString();
       }
       
       const currentPrice = indexResult.meta?.regularMarketPrice || closes[closes.length - 1] || 0;

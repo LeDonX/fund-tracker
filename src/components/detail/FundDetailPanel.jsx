@@ -84,8 +84,8 @@ function ChartRenderer({ option }) {
 function DashboardMetric({ label, value, valNode, colSpan = 1 }) {
   return (
     <div className={`bg-gradient-to-br from-white to-slate-50/50 rounded-xl p-3 flex flex-col justify-center border border-slate-200/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all hover:shadow-md col-span-${colSpan}`}>
-      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</div>
-      <div className="mt-1.5 font-mono font-extrabold text-slate-700 text-[15px] truncate">
+      <div className="text-10 font-bold text-slate-400 uppercase tracking-wider">{label}</div>
+      <div className="mt-1.5 font-mono font-extrabold text-slate-700 text-15 truncate">
         {valNode || value || '--'}
       </div>
     </div>
@@ -320,9 +320,9 @@ export default function FundDetailPanel({
         {/* Header */}
         <div className="shrink-0 h-14 md:h-16 border-b border-slate-200/80 bg-slate-50/80 px-4 md:px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
-            <span className="rounded-md bg-blue-100 text-blue-800 px-2 py-0.5 md:px-2.5 md:py-1 text-[10px] md:text-xs font-bold tracking-wide shrink-0">{detailModel.code}</span>
+            <span className="rounded-md bg-blue-100 text-blue-800 px-2 py-0.5 md:px-2.5 md:py-1 text-10 md:text-xs font-bold tracking-wide shrink-0">{detailModel.code}</span>
             <h2 className="text-base md:text-xl font-black text-slate-800 tracking-tight truncate max-w-[280px] sm:max-w-[480px] md:max-w-[700px] lg:max-w-[900px] xl:max-w-none" title={detailModel.name}>{detailModel.name}</h2>
-            {isLoading && <span className="text-[10px] text-slate-400 animate-pulse shrink-0">刷新中...</span>}
+            {isLoading && <span className="text-10 text-slate-400 animate-pulse shrink-0">刷新中...</span>}
           </div>
           <button onClick={onClose} className="rounded-full hover:bg-slate-200 p-2 text-slate-400 transition-colors shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -336,7 +336,7 @@ export default function FundDetailPanel({
           <div className="col-span-1 md:col-span-3 flex flex-col gap-4 h-auto md:h-full shrink-0 md:overflow-hidden">
             <div className="flex items-center justify-between shrink-0">
               <h3 className="text-sm font-black tracking-widest text-slate-800 uppercase">核心指标</h3>
-              <span className="text-[10px] text-slate-400 font-medium px-2 py-0.5 bg-slate-100 rounded-full">{detailModel.valuationSource}</span>
+              <span className="text-10 text-slate-400 font-medium px-2 py-0.5 bg-slate-100 rounded-full">{detailModel.valuationSource}</span>
             </div>
             
             <div className="grid grid-cols-2 gap-3 content-start shrink-0 md:flex-1 md:overflow-y-auto custom-scrollbar">
@@ -388,7 +388,7 @@ export default function FundDetailPanel({
                     <button
                       key={period}
                       onClick={() => setPerfPeriod(period)}
-                      className={`px-2.5 py-0.5 text-[10px] md:text-[11px] font-bold rounded-full transition-colors shrink-0 ${perfPeriod === period ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                      className={`px-2.5 py-0.5 text-10 md:text-11 font-bold rounded-full transition-colors shrink-0 ${perfPeriod === period ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                     >
                       {pLabels[period]}
                     </button>
@@ -411,7 +411,7 @@ export default function FundDetailPanel({
             <div className="h-[260px] md:h-1/2 flex flex-col gap-3 shrink-0 md:overflow-hidden">
               <h3 className="text-sm font-black tracking-widest text-slate-800 uppercase shrink-0">持仓情况</h3>
               <div className="flex-1 overflow-hidden flex flex-col border border-slate-200/60 rounded-xl bg-white">
-                <div className="grid grid-cols-3 bg-slate-50 border-b border-slate-200/60 p-2 text-[10px] font-bold text-slate-400 tracking-wider">
+                <div className="grid grid-cols-3 bg-slate-50 border-b border-slate-200/60 p-2 text-10 font-bold text-slate-400 tracking-wider">
                   <div className="pl-1">股票名称</div>
                   <div className="text-right">占比</div>
                   <div className="text-right pr-1">估算涨幅</div>
@@ -421,10 +421,10 @@ export default function FundDetailPanel({
                     detailModel.holdings.slice(0, 10).map((h, i) => {
                       const cleanCode = h.code.replace('1.', '').replace('0.', '').replace('100.', '');
                       return (
-                        <div key={i} className="grid grid-cols-3 p-1.5 text-[11px] hover:bg-slate-50 rounded-md transition-colors items-center">
+                        <div key={i} className="grid grid-cols-3 p-1.5 text-11 hover:bg-slate-50 rounded-md transition-colors items-center">
                           <div className="font-bold text-slate-700 truncate" title={h.name}>
                             {h.name}
-                            <div className="text-[9px] text-slate-400 font-normal leading-none mt-0.5">{cleanCode}</div>
+                            <div className="text-9 text-slate-400 font-normal leading-none mt-0.5">{cleanCode}</div>
                           </div>
                           <div className="text-right font-mono font-medium text-slate-500">{formatPlainNumber(h.percent, '%')}</div>
                           <div className="text-right font-mono font-bold">
@@ -455,17 +455,17 @@ export default function FundDetailPanel({
             <div className="h-[220px] md:h-1/2 flex flex-col gap-3 shrink-0 md:overflow-hidden pb-4 md:pb-0">
               <div className="flex items-center justify-between shrink-0">
                 <h3 className="text-sm font-black tracking-widest text-slate-800 uppercase">行业分布</h3>
-                <span className="text-[9px] text-blue-600 font-bold border border-blue-200 bg-blue-50 px-1.5 rounded uppercase">官方数据</span>
+                <span className="text-9 text-blue-600 font-bold border border-blue-200 bg-blue-50 px-1.5 rounded uppercase">官方数据</span>
               </div>
               <div className="flex-1 border border-slate-200/60 rounded-xl overflow-y-auto custom-scrollbar md:overflow-hidden bg-slate-50/30 flex flex-col justify-center px-4 py-3 gap-3">
                 {industryData.length > 0 ? (
                   industryData.slice(0, 5).map((item, idx) => (
                     <div key={idx} className="flex items-center gap-3">
-                      <div className="w-16 shrink-0 text-[11px] font-bold text-slate-700 truncate" title={item.name}>{item.name}</div>
+                      <div className="w-16 shrink-0 text-11 font-bold text-slate-700 truncate" title={item.name}>{item.name}</div>
                       <div className="flex-1 h-3 bg-blue-100/50 rounded-sm overflow-hidden">
                         <div className="h-full bg-blue-500 rounded-sm" style={{ width: `${item.value}%` }}></div>
                       </div>
-                      <div className="w-12 shrink-0 text-right text-[11px] font-mono font-bold text-slate-600">{item.value.toFixed(2)}%</div>
+                      <div className="w-12 shrink-0 text-right text-11 font-mono font-bold text-slate-600">{item.value.toFixed(2)}%</div>
                     </div>
                   ))
                 ) : (

@@ -568,7 +568,7 @@ export default function OcrSyncModal({
                   仅需将支付宝的交易记录列表截图（支持多笔交易）上传到这里，系统将自动识别基金名、买入/卖出类型、金额与发生日期。
                 </p>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-800 text-[10px] font-bold rounded-full animate-pulse">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-800 text-10 font-bold rounded-full animate-pulse">
                 <Camera className="w-3.5 h-3.5 text-indigo-600" />
                 <span>100% 纯本地、离线物理文字识读与智能对齐</span>
               </div>
@@ -601,7 +601,7 @@ export default function OcrSyncModal({
           <form onSubmit={handleSubmit} className="space-y-6">
             
             {/* Info Summary and Reset Option */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 bg-slate-50 rounded-2xl border border-slate-150 gap-4 text-xs font-bold shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 bg-slate-50 rounded-2xl border border-slate-200 gap-4 text-xs font-bold shadow-sm">
               <div className="flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-blue-500" />
                 <span className="text-slate-700">识别成功！共解析出 {rows.length} 笔交易记录。请确认以下数据。</span>
@@ -620,7 +620,7 @@ export default function OcrSyncModal({
               <div className="overflow-x-auto overflow-y-auto max-h-[380px] custom-scrollbar relative">
                 <table className="w-full text-left border-collapse table-fixed min-w-[850px]">
                   <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-xs z-20 shadow-xs">
-                    <tr className="border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider">
+                    <tr className="border-b border-slate-200 text-11 font-black uppercase text-slate-500 tracking-wider whitespace-nowrap">
                       <th className="py-3.5 px-4 w-12 text-center">#</th>
                       <th className="py-3.5 px-4 w-52">基金代码 / 代码搜索</th>
                       <th className="py-3.5 px-4 w-64">识别出的基金名称</th>
@@ -664,14 +664,14 @@ export default function OcrSyncModal({
                                 </div>
                                 
                                 {isSearching && (
-                                  <div className="flex items-center justify-center py-4 text-[10px] text-slate-400 gap-1.5 font-semibold">
+                                  <div className="flex items-center justify-center py-4 text-10 text-slate-400 gap-1.5 font-semibold">
                                     <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
                                     <span>云端搜索中...</span>
                                   </div>
                                 )}
                                 
                                 {!isSearching && searchResults.length === 0 && searchQuery.length >= 2 && (
-                                  <div className="py-4 text-center text-[10px] text-slate-400 font-semibold">
+                                  <div className="py-4 text-center text-10 text-slate-400 font-semibold">
                                     未找到匹配基金，请重试
                                   </div>
                                 )}
@@ -683,10 +683,10 @@ export default function OcrSyncModal({
                                         key={result.code}
                                         type="button"
                                         onClick={() => selectSearchResult(row.id, result)}
-                                        className="w-full text-left px-2.5 py-2 hover:bg-blue-50 text-[11px] font-bold text-slate-700 flex justify-between items-center transition-colors"
+                                        className="w-full text-left px-2.5 py-2 hover:bg-blue-50 text-11 font-bold text-slate-700 flex justify-between items-center transition-colors"
                                       >
                                         <span className="truncate max-w-[180px]">{result.name}</span>
-                                        <span className="font-mono text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{result.code}</span>
+                                        <span className="font-mono text-10 text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{result.code}</span>
                                       </button>
                                     ))}
                                   </div>
@@ -729,22 +729,22 @@ export default function OcrSyncModal({
                               <div className="flex items-center gap-2">
                                 {/* Status badge */}
                                 {row.status === 'existing' && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                                  <span className="inline-flex items-center gap-0.5 text-9 font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
                                     已持有持仓
                                   </span>
                                 )}
                                 {row.status === 'new' && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                                  <span className="inline-flex items-center gap-0.5 text-9 font-black text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
                                     新设自选/持有
                                   </span>
                                 )}
                                 {row.status === 'unmapped' && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                  <span className="inline-flex items-center gap-0.5 text-9 font-black text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
                                     待绑定代码
                                   </span>
                                 )}
                                 {row.originalName && row.originalName !== row.name && (
-                                  <span className="text-[9px] text-slate-400 font-medium">原图: {row.originalName}</span>
+                                  <span className="text-9 text-slate-400 font-medium">原图: {row.originalName}</span>
                                 )}
                               </div>
                             </div>
@@ -797,7 +797,7 @@ export default function OcrSyncModal({
                               placeholder="YYYY-MM-DD HH:mm:ss"
                               value={row.tradeDate}
                               onChange={(e) => handleRowChange(row.id, 'tradeDate', e.target.value)}
-                              className="w-full px-2 py-1 border border-slate-200 rounded-lg font-mono text-[11px] font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                              className="w-full px-2 py-1 border border-slate-200 rounded-lg font-mono text-11 font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                           </td>
 

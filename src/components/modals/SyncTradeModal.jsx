@@ -161,7 +161,7 @@ export default function SyncTradeModal({
             <label htmlFor="sync-fee" className="block text-xs font-bold text-slate-600 mb-1.5 flex items-center justify-between">
               <span>交易手续费 (元)</span>
               {selectedType === '买入' && syncForm.feeRate && (
-                <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
+                <span className="text-10 text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
                   折算费率: {syncForm.feeRate}
                 </span>
               )}
@@ -203,7 +203,7 @@ export default function SyncTradeModal({
             >
               <Calendar className="w-4 h-4 text-blue-500" />
               <span>15:00 前</span>
-              <span className="text-[9px] opacity-75 font-medium">按所选日期价格折算</span>
+              <span className="text-9 opacity-75 font-medium">按所选日期价格折算</span>
             </button>
             <button
               type="button"
@@ -212,7 +212,7 @@ export default function SyncTradeModal({
             >
               <Calendar className="w-4 h-4 text-indigo-500" />
               <span>15:00 后</span>
-              <span className="text-[9px] opacity-75 font-medium">按下一个工作日价格折算</span>
+              <span className="text-9 opacity-75 font-medium">按下一个工作日价格折算</span>
             </button>
           </div>
         </div>

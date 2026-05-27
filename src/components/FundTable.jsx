@@ -134,7 +134,7 @@ export default function FundTable({
     const isSorted = sortField === field;
     const isAsc = sortDirection === 'asc';
 
-    let thClass = "p-4 font-semibold text-slate-600 cursor-pointer select-none transition-all duration-200 group ";
+    let thClass = "p-4 font-semibold text-slate-600 cursor-pointer select-none transition-all duration-200 group whitespace-nowrap ";
     if (alignment === 'right') {
       thClass += "text-right";
     } else if (alignment === 'center') {
@@ -263,12 +263,12 @@ export default function FundTable({
                     )}
                     <Wallet className="w-4.5 h-4.5 text-indigo-500/80" />
                     <span className="font-bold text-slate-700 text-sm tracking-tight truncate max-w-[120px]">{sector}</span>
-                    <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-full shrink-0">
+                    <span className="text-10 font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-full shrink-0">
                       {data.funds.length} 支
                     </span>
                   </button>
                   
-                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] pl-6 xs:pl-0 shrink-0">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-11 pl-6 xs:pl-0 shrink-0">
                     <span className="text-slate-500 font-medium">
                       金额: <span className="font-bold text-slate-800">{formatCurrencyAmount(data.sectorAmount)}</span>
                     </span>
@@ -332,20 +332,20 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenFundDetail(fund)}
-                          className="text-left font-semibold text-slate-800 hover:text-blue-700 text-[14.5px] flex items-center gap-1.5 w-full truncate"
+                          className="text-left font-semibold text-slate-800 hover:text-blue-700 text-14 flex items-center gap-1.5 w-full truncate"
                         >
                           <span className="truncate">{fund.name}</span>
                           {fund.netValueDate && !isFundActiveToday(fund) && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-50/70 text-amber-700 border border-amber-200/50 select-none shrink-0 scale-90 origin-left">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-9 font-bold bg-amber-50/70 text-amber-700 border border-amber-200/50 select-none shrink-0 scale-90 origin-left">
                               {fund.netValueDate.slice(5)}
                             </span>
                           )}
                         </button>
-                        <span className="text-[10px] text-slate-400 font-semibold font-mono">{fund.code}</span>
+                        <span className="text-10 text-slate-400 font-semibold font-mono">{fund.code}</span>
                       </div>
                       
                       {fund.valuationSource === 'official' && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 select-none shrink-0 scale-90 origin-right">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-10 font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 select-none shrink-0 scale-90 origin-right">
                           已更新
                         </span>
                       )}
@@ -354,34 +354,34 @@ export default function FundTable({
                     {/* Metrics grid */}
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-2.5 bg-slate-50/60 p-2.5 rounded-xl border border-slate-200/30">
                       <div className="flex flex-col">
-                        <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">持有金额</span>
+                        <span className="text-9 text-slate-400 font-bold uppercase tracking-wider">持有金额</span>
                         <span className="text-xs font-black text-slate-700 font-mono mt-0.5">{formatCurrencyAmount(fund.amount)}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">{dailyProfitColumnLabel}</span>
+                        <span className="text-9 text-slate-400 font-bold uppercase tracking-wider">{dailyProfitColumnLabel}</span>
                         <span className="text-xs font-black font-mono mt-0.5 flex flex-wrap items-center gap-1.5">
                           <FormatNumber value={fund.dailyProfit} isCurrency={true} />
-                          <span className="text-[9.5px] font-semibold text-slate-400">
+                          <span className="text-9 font-semibold text-slate-400">
                             (<FormatNumber value={fund.dailyRate} isPercent={true} />)
                           </span>
                           {fund.netValueDate && !isFundActiveToday(fund) && (
-                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100/60 border border-slate-200/50 px-1 py-0.2 rounded select-none shrink-0" title={`非今日收益 (${fund.netValueDate})`}>
+                            <span className="text-9 font-bold text-slate-400 bg-slate-100/60 border border-slate-200/50 px-1 py-0.2 rounded select-none shrink-0" title={`非今日收益 (${fund.netValueDate})`}>
                               {fund.netValueDate.slice(5)}
                             </span>
                           )}
                         </span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">持有总收益</span>
+                        <span className="text-9 text-slate-400 font-bold uppercase tracking-wider">持有总收益</span>
                         <span className="text-xs font-black font-mono mt-0.5">
                           <FormatNumber value={fund.totalProfit} isCurrency={true} />
-                          <span className="text-[9.5px] ml-1 font-semibold text-slate-400">
+                          <span className="text-9 ml-1 font-semibold text-slate-400">
                             (<FormatNumber value={fund.totalRate} isPercent={true} />)
                           </span>
                         </span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">本周/本月收益</span>
+                        <span className="text-9 text-slate-400 font-bold uppercase tracking-wider">本周/本月收益</span>
                         <span className="text-xs font-black font-mono mt-0.5 flex flex-wrap gap-1 items-center">
                           <FormatNumber value={fund.weeklyProfit} isCurrency={true} />
                           <span className="text-slate-300">/</span>
@@ -455,7 +455,7 @@ export default function FundTable({
               {renderSortableHeader('totalProfit', '持有总收益')}
               {renderSortableHeader('weeklyProfit', '本周收益')}
               {renderSortableHeader('monthlyProfit', '本月收益')}
-              <th className="p-4 font-semibold text-slate-600 text-center bg-slate-50/40">操作</th>
+              <th className="p-4 font-semibold text-slate-600 text-center bg-slate-50/40 whitespace-nowrap">操作</th>
             </tr>
           </thead>
           {orderedGroups.map(({ sector, data }) => {
@@ -492,7 +492,7 @@ export default function FundTable({
                           )}
                           <Wallet className="w-4.5 h-4.5 text-indigo-500/80" />
                           <span className="font-bold text-slate-700 text-sm tracking-tight">{sector}</span>
-                          <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50/80 border border-indigo-100 px-2 py-0.5 rounded-full">
+                          <span className="text-11 font-semibold text-indigo-700 bg-indigo-50/80 border border-indigo-100 px-2 py-0.5 rounded-full">
                             {data.funds.length} 支
                           </span>
                         </button>
@@ -535,11 +535,11 @@ export default function FundTable({
                             </div>
                           )}
                           <span className="text-slate-500 font-medium">
-                            板块持有金额: <span className="font-bold text-slate-800">{formatCurrencyAmount(data.sectorAmount)}{data.hasIncompleteAmount && <span className="ml-0.5 text-amber-500/70 text-[10px] font-bold cursor-help" title="该板块部分基金数据加载中">*</span>}</span>
+                            板块持有金额: <span className="font-bold text-slate-800">{formatCurrencyAmount(data.sectorAmount)}{data.hasIncompleteAmount && <span className="ml-0.5 text-amber-500/70 text-10 font-bold cursor-help" title="该板块部分基金数据加载中">*</span>}</span>
                           </span>
                           <span className="text-slate-400">|</span>
                           <span className="text-slate-500 font-medium">
-                            {groupDailyLabel}: <span className="font-bold text-base"><FormatNumber value={data.sectorDailyProfit} isCurrency={true} />{data.hasIncompleteDaily && <span className="ml-0.5 text-amber-500/70 text-[10px] font-bold cursor-help" title="该板块部分基金数据加载中">*</span>}</span>
+                            {groupDailyLabel}: <span className="font-bold text-base"><FormatNumber value={data.sectorDailyProfit} isCurrency={true} />{data.hasIncompleteDaily && <span className="ml-0.5 text-amber-500/70 text-10 font-bold cursor-help" title="该板块部分基金数据加载中">*</span>}</span>
                           </span>
                         </div>
                       </div>
@@ -568,15 +568,15 @@ export default function FundTable({
                         className="text-left group/btn"
                         data-testid={`open-fund-detail-${fund.code}`}
                       >
-                        <div className="flex items-center gap-1.5 font-semibold text-slate-800 transition-colors group-hover/btn:text-blue-700 text-[14.5px]">
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-800 transition-colors group-hover/btn:text-blue-700 text-14">
                           <span>{fund.name}</span>
                           {fund.valuationSource === 'official' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 select-none scale-[0.9] origin-left shrink-0">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-10 font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 select-none scale-[0.9] origin-left shrink-0">
                               已更新
                             </span>
                           )}
                           {fund.netValueDate && !isFundActiveToday(fund) && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50/70 text-amber-700 border border-amber-200/50 select-none scale-[0.9] origin-left shrink-0" title={`非今日数据 (净值日期: ${fund.netValueDate})`}>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-10 font-bold bg-amber-50/70 text-amber-700 border border-amber-200/50 select-none scale-[0.9] origin-left shrink-0" title={`非今日数据 (净值日期: ${fund.netValueDate})`}>
                               {fund.netValueDate.slice(5)}
                             </span>
                           )}
@@ -587,24 +587,24 @@ export default function FundTable({
                         {toNumber(fund.shares) > 0 && ` · ${toNumber(fund.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份`}
                       </div>
                     </td>
-                    <td className="p-4 text-right font-bold text-slate-700 text-[14.5px] font-mono">
+                    <td className="p-4 text-right font-bold text-slate-700 text-14 font-mono">
                       {formatCurrencyAmount(fund.amount)}
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex flex-col items-end">
                         <FormatNumber value={fund.dailyRate} isPercent={true} />
                         {fund.netValueDate && !isFundActiveToday(fund) && (
-                          <span className="text-[9px] font-semibold text-slate-400 mt-0.5" title={`估值日期为 ${fund.netValueDate}`}>
+                          <span className="text-9 font-semibold text-slate-400 mt-0.5" title={`估值日期为 ${fund.netValueDate}`}>
                             {fund.netValueDate.slice(5)}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="p-4 text-right bg-blue-50/20 font-extrabold text-[15.5px] border-r border-blue-50/10">
+                    <td className="p-4 text-right bg-blue-50/20 font-extrabold text-15 border-r border-blue-50/10">
                       <div className="flex flex-col items-end">
                         <FormatNumber value={fund.dailyProfit} isCurrency={true} />
                         {fund.netValueDate && !isFundActiveToday(fund) && (
-                          <span className="text-[9px] font-semibold text-slate-400 mt-0.5" title={`收益日期为 ${fund.netValueDate}`}>
+                          <span className="text-9 font-semibold text-slate-400 mt-0.5" title={`收益日期为 ${fund.netValueDate}`}>
                             {fund.netValueDate.slice(5)}
                           </span>
                         )}
@@ -627,7 +627,7 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenFundDetail(fund)}
-                          className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] font-bold text-slate-600 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
+                          className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-px text-10 font-bold text-slate-600 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
                           title="查看基金详情"
                           data-testid={`detail-entry-${fund.code}`}
                         >
@@ -637,7 +637,7 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenSyncTrade(fund)}
-                          className="rounded-md border border-indigo-100 bg-indigo-50/40 px-1.5 py-px text-[10px] font-bold text-indigo-600 transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
+                          className="rounded-md border border-indigo-100 bg-indigo-50/40 px-1.5 py-px text-10 font-bold text-indigo-600 transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
                           title="同步交易 (快速加仓/减仓)"
                         >
                           <ArrowRightLeft className="w-3 h-3 text-indigo-400" />
@@ -646,7 +646,7 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenHistory(fund)}
-                          className="rounded-md border border-purple-100 bg-purple-50/40 px-1.5 py-px text-[10px] font-bold text-purple-600 transition-all hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
+                          className="rounded-md border border-purple-100 bg-purple-50/40 px-1.5 py-px text-10 font-bold text-purple-600 transition-all hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
                           title="交易流水记录"
                         >
                           <History className="w-3.5 h-3.5 text-purple-400" />
@@ -655,7 +655,7 @@ export default function FundTable({
                         <button
                           type="button"
                           onClick={() => handleOpenSettings(fund)}
-                          className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] font-bold text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
+                          className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-px text-10 font-bold text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700 active:scale-[0.97] flex items-center gap-0.5 cursor-pointer leading-tight"
                           title="持仓设置"
                         >
                           <Settings className="w-3.5 h-3.5 text-slate-400" />

@@ -79,7 +79,7 @@ export default function AddFundModal({
             {fundLookup.status === 'success' && (
               <div className="bg-slate-50 border border-slate-100 rounded-lg p-2 mt-1.5 text-xs text-slate-600 flex items-center justify-between">
                 <span>基金名称：<strong className="text-slate-800 font-bold">{fundLookup.quote?.name}</strong></span>
-                <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold">¥{refNetValue.toFixed(4)}</span>
+                <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-10 font-bold">¥{refNetValue.toFixed(4)}</span>
               </div>
             )}
           </div>
@@ -137,7 +137,7 @@ export default function AddFundModal({
                   >
                     <Calendar className="w-4 h-4 text-blue-500" />
                     <span>15点前 (今日成交)</span>
-                    <span className="text-[9px] opacity-75 font-medium mt-1">
+                    <span className="text-9 opacity-75 font-medium mt-1">
                       今日收盘价成交，今日收益为0
                     </span>
                   </button>
@@ -148,7 +148,7 @@ export default function AddFundModal({
                   >
                     <Calendar className="w-4 h-4 text-emerald-500" />
                     <span>15点后 (明后日结算)</span>
-                    <span className="text-[9px] opacity-75 font-medium mt-1">
+                    <span className="text-9 opacity-75 font-medium mt-1">
                       下一交易日收盘成交，暂无今日收益
                     </span>
                   </button>
@@ -166,7 +166,7 @@ export default function AddFundModal({
                   >
                     <Calendar className="w-4 h-4 text-blue-500" />
                     <span>否 (未包含)</span>
-                    <span className="text-[9px] opacity-75 font-medium mt-1">
+                    <span className="text-9 opacity-75 font-medium mt-1">
                       输入为昨日市值，今日收益额外累加
                     </span>
                   </button>
@@ -177,7 +177,7 @@ export default function AddFundModal({
                   >
                     <Calendar className="w-4 h-4 text-emerald-500" />
                     <span>是 (已包含)</span>
-                    <span className="text-[9px] opacity-75 font-medium mt-1">
+                    <span className="text-9 opacity-75 font-medium mt-1">
                       输入已是最新市值，已计入今日盈亏
                     </span>
                   </button>
@@ -186,7 +186,7 @@ export default function AddFundModal({
             )}
 
             {/* 5. 动态表单输入 */}
-            <div className="space-y-4 bg-slate-50/60 border border-slate-150 p-4 rounded-2xl">
+            <div className="space-y-4 bg-slate-50/60 border border-slate-200 p-4 rounded-2xl">
               {entryMode === 'newBuy' ? (
                 /* --- 新买入模式表单 --- */
                 <div>
@@ -202,7 +202,7 @@ export default function AddFundModal({
                     placeholder="请输入最终买入扣款金额"
                     className="add-fund-number-input w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-slate-800 bg-white"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">资金从银行卡扣除的申购确认金额</p>
+                  <p className="text-10 text-slate-400 mt-1">资金从银行卡扣除的申购确认金额</p>
                 </div>
               ) : (
                 /* --- 添加已持有模式表单 --- */
@@ -220,7 +220,7 @@ export default function AddFundModal({
                       placeholder="即当前持有市值"
                       className="add-fund-number-input w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-slate-800 bg-white"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">输入金额对应的总市值</p>
+                    <p className="text-10 text-slate-400 mt-1">输入金额对应的总市值</p>
                   </div>
                   <div>
                     <label htmlFor="fund-profit-exist" className="block text-xs font-extrabold text-slate-600 mb-1.5">当前累计收益 (元)</label>
@@ -234,7 +234,7 @@ export default function AddFundModal({
                       placeholder="累计持有收益"
                       className="add-fund-number-input w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-slate-800 bg-white"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">即总盈利（亏损填负数）</p>
+                    <p className="text-10 text-slate-400 mt-1">即总盈利（亏损填负数）</p>
                   </div>
                 </div>
               )}
@@ -268,7 +268,7 @@ export default function AddFundModal({
                           ¥{(derivedShares * refNetValue).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
-                      <div className="flex justify-between text-[10px] text-slate-400">
+                      <div className="flex justify-between text-10 text-slate-400">
                         <span>今日预估盈亏:</span>
                         <span className="font-semibold text-slate-500">
                           ¥{(entryMode === 'newBuy' ? 0 : derivedShares * (refNetValue - lastNetValue)).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -276,7 +276,7 @@ export default function AddFundModal({
                       </div>
                     </>
                   ) : (
-                    <div className="text-[10px] text-slate-400 py-1">
+                    <div className="text-10 text-slate-400 py-1">
                       (暂无该基金的最新有效净值，保存后刷新即可自动计算并对齐份额)
                     </div>
                   )}
@@ -292,16 +292,16 @@ export default function AddFundModal({
               <button
                 type="button"
                 onClick={() => setShowAdvanced(prev => !prev)}
-                className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-slate-600 transition-colors py-1.5 group"
+                className="flex items-center gap-1.5 text-11 font-bold text-slate-400 hover:text-slate-600 transition-colors py-1.5 group"
               >
                 {showAdvanced ? <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />}
                 <span>高级选填 · 收益校准</span>
               </button>
               {showAdvanced && (
-                <div className="mt-1 bg-slate-50/60 border border-slate-150 p-4 rounded-2xl space-y-3">
+                <div className="mt-1 bg-slate-50/60 border border-slate-200 p-4 rounded-2xl space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="fund-weekly-profit" className="block text-[10px] font-bold text-slate-500 mb-1">本周收益 (元)</label>
+                      <label htmlFor="fund-weekly-profit" className="block text-10 font-bold text-slate-500 mb-1">本周收益 (元)</label>
                       <input
                         id="fund-weekly-profit"
                         type="number"
@@ -313,7 +313,7 @@ export default function AddFundModal({
                       />
                     </div>
                     <div>
-                      <label htmlFor="fund-monthly-profit" className="block text-[10px] font-bold text-slate-500 mb-1">本月收益 (元)</label>
+                      <label htmlFor="fund-monthly-profit" className="block text-10 font-bold text-slate-500 mb-1">本月收益 (元)</label>
                       <input
                         id="fund-monthly-profit"
                         type="number"
@@ -325,7 +325,7 @@ export default function AddFundModal({
                       />
                     </div>
                   </div>
-                  <p className="text-[9px] text-slate-400 leading-relaxed">
+                  <p className="text-9 text-slate-400 leading-relaxed">
                     如需手动校准本周或本月的持仓收益，可在此录入。该值不会被系统自动刷新覆盖。
                   </p>
                 </div>

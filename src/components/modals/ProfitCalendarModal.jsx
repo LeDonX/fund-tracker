@@ -441,25 +441,21 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
           return html;
         }
       },
-      grid: { top: 12, left: 2, right: 2, bottom: 15, containLabel: true },
+      grid: { left: 45, right: 15, top: 25, bottom: 25 },
       xAxis: {
         type: 'category',
         data: xAxisData,
         boundaryGap: false,
-        axisLine: { show: false },
-        axisTick: { show: false },
+        axisLine: { lineStyle: { color: '#e2e8f0' } },
         axisLabel: { 
-          color: '#94a3b8', 
-          fontSize: 8.5, 
-          fontFamily: 'monospace',
+          color: '#64748b', 
+          fontSize: 10, 
           interval: (idx) => idx % 60 === 0 || idx === xAxisData.length - 1 
         }
       },
       yAxis: {
         type: 'value',
-        axisLine: { show: false },
-        axisTick: { show: false },
-        axisLabel: { color: '#94a3b8', fontSize: 8.5, formatter: '{value}%' },
+        axisLabel: { color: '#64748b', fontSize: 10, formatter: '{value}%' },
         splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } }
       },
       series: [
@@ -468,20 +464,12 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
           type: 'line',
           data: userSeriesData,
           showSymbol: false,
-          smooth: true,
-          lineStyle: { 
-            width: 2.5, 
-            color: themeColor,
-            shadowColor: 'rgba(37, 99, 235, 0.25)',
-            shadowBlur: 8,
-            shadowOffsetY: 3
-          },
+          smooth: false,
           itemStyle: { color: themeColor },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(37, 99, 235, 0.22)' },
-              { offset: 0.5, color: 'rgba(37, 99, 235, 0.08)' },
-              { offset: 1, color: 'rgba(37, 99, 235, 0)' }
+              { offset: 0, color: 'rgba(37, 99, 235, 0.35)' },
+              { offset: 1, color: 'rgba(37, 99, 235, 0.01)' }
             ])
           }
         },
@@ -490,8 +478,8 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
           type: 'line',
           data: indexSeriesData,
           showSymbol: false,
-          smooth: true,
-          lineStyle: { width: 1.5, color: indexColor, type: 'dashed' },
+          smooth: false,
+          lineStyle: { color: indexColor, type: 'dashed' },
           itemStyle: { color: indexColor }
         } : null
       ].filter(Boolean)
@@ -641,19 +629,17 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
         bottom: 0,
         itemWidth: 8,
         itemHeight: 8,
-        textStyle: { fontSize: 9.5, fontWeight: 'bold', color: '#64748b' }
+        textStyle: { fontSize: 10, color: '#64748b' }
       },
-      grid: { top: 16, left: 2, right: 2, bottom: 20, containLabel: true },
+      grid: { left: 45, right: 15, top: 25, bottom: 35 },
       xAxis: {
         type: 'category',
         data: xAxisData,
         boundaryGap: false,
-        axisLine: { show: false },
-        axisTick: { show: false },
+        axisLine: { lineStyle: { color: '#e2e8f0' } },
         axisLabel: {
-          color: '#94a3b8',
-          fontSize: 8.5,
-          fontFamily: 'monospace',
+          color: '#64748b',
+          fontSize: 10,
           interval: (idx) => idx % Math.max(Math.floor(xAxisData.length / 5), 1) === 0 || idx === xAxisData.length - 1,
           formatter: (value) => {
             if (typeof value === 'string' && value.length === 10) {
@@ -670,9 +656,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
       },
       yAxis: {
         type: 'value',
-        axisLine: { show: false },
-        axisTick: { show: false },
-        axisLabel: { color: '#94a3b8', fontSize: 8.5, formatter: '{value}%' },
+        axisLabel: { color: '#64748b', fontSize: 10, formatter: '{value}%' },
         splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } }
       },
       series: [
@@ -681,20 +665,12 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
           type: 'line',
           data: userSeriesData,
           showSymbol: false,
-          smooth: true,
-          lineStyle: { 
-            width: 2.8, 
-            color: themeColor,
-            shadowColor: 'rgba(37, 99, 235, 0.25)',
-            shadowBlur: 10,
-            shadowOffsetY: 4
-          },
+          smooth: false,
           itemStyle: { color: themeColor },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(37, 99, 235, 0.22)' },
-              { offset: 0.5, color: 'rgba(37, 99, 235, 0.08)' },
-              { offset: 1, color: 'rgba(37, 99, 235, 0)' }
+              { offset: 0, color: 'rgba(37, 99, 235, 0.35)' },
+              { offset: 1, color: 'rgba(37, 99, 235, 0.01)' }
             ])
           }
         },
@@ -703,8 +679,8 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
           type: 'line',
           data: indexSeriesData,
           showSymbol: false,
-          smooth: true,
-          lineStyle: { width: 1.5, color: indexColor, type: 'dashed' },
+          smooth: false,
+          lineStyle: { color: indexColor, type: 'dashed' },
           itemStyle: { color: indexColor }
         } : null
       ].filter(Boolean)
@@ -810,7 +786,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
 
   const getBgColorClass = (val) => {
     if (val === null || val === undefined) return 'bg-white/65 hover:bg-slate-50/85 border-slate-100 text-slate-400';
-    if (val === 0) return 'bg-slate-50/50 hover:bg-slate-100/60 border-slate-150 text-slate-500';
+    if (val === 0) return 'bg-slate-50/50 hover:bg-slate-100/60 border-slate-200 text-slate-500';
     return val > 0 
       ? 'bg-gradient-to-br from-rose-50/70 to-orange-50/50 hover:from-rose-100/70 hover:to-orange-100/50 border-rose-100 text-rose-600 font-extrabold shadow-3xs shadow-rose-50/30' 
       : 'bg-gradient-to-br from-emerald-50/70 to-teal-50/50 hover:from-emerald-100/70 hover:to-teal-100/50 border-emerald-100 text-emerald-600 font-extrabold shadow-3xs shadow-emerald-50/30';
@@ -880,14 +856,14 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
   const renderBenchmarkSelector = () => {
     return (
       <div className="flex items-center gap-2 select-none shrink-0">
-        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">对比基准</span>
-        <div className="flex bg-slate-50 p-0.5 rounded-lg border border-slate-150">
+        <span className="text-10 font-semibold text-slate-400 uppercase tracking-wider">对比基准</span>
+        <div className="flex bg-slate-50 p-0.5 rounded-lg border border-slate-200">
           {BENCHMARKS.map(b => (
             <button
               key={b.id}
               type="button"
               onClick={() => setBenchmark(b.id)}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all duration-200 cursor-pointer outline-none border ${
+              className={`px-2 py-0.5 rounded-md text-10 font-semibold transition-all duration-200 cursor-pointer outline-none border ${
                 benchmark === b.id 
                   ? 'bg-white text-blue-600 shadow-3xs border-slate-200/50 font-bold' 
                   : 'text-slate-450 hover:text-slate-700 border-transparent'
@@ -920,7 +896,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
             </div>
             <div className="relative w-full h-24 sm:h-28 overflow-hidden">
               {loadingChart && (
-                <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center text-[9px] font-extrabold text-slate-400 gap-1 rounded-xl">
+                <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center text-9 font-extrabold text-slate-400 gap-1 rounded-xl">
                   <span className="w-2.5 h-2.5 bg-blue-500 animate-spin" />
                   正在载入分时走势...
                 </div>
@@ -953,10 +929,10 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
                   </button>
                 </div>
               </div>
-              <span className="text-[9px] text-slate-400 font-bold bg-slate-50 border border-slate-200 px-2 py-0.5 rounded leading-none">工作日月历</span>
+              <span className="text-9 text-slate-400 font-bold bg-slate-50 border border-slate-200 px-2 py-0.5 rounded leading-none">工作日月历</span>
             </div>
 
-            <div className="grid grid-cols-5 gap-1 text-center font-black text-slate-400 text-[10px] py-0.5 border-b border-slate-100/50">
+            <div className="grid grid-cols-5 gap-1 text-center font-black text-slate-400 text-10 py-0.5 border-b border-slate-100/50">
               {weekdayHeaders.map(h => (
                 <div key={h}>{h}</div>
               ))}
@@ -982,11 +958,11 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
                     } ${
                       isSelected 
                         ? 'scale-[1.03] shadow-md border-blue-500 ring-2 ring-blue-500/20 ring-offset-1 bg-white' 
-                        : 'border-slate-150 hover:border-slate-300 hover:scale-[1.01] hover:shadow-2xs'
+                        : 'border-slate-200 hover:border-slate-300 hover:scale-[1.01] hover:shadow-2xs'
                     }`}
                   >
                     <div className="w-full flex justify-between items-center leading-none">
-                      <span className="text-[8.5px] sm:text-[9.5px] font-bold text-slate-400/80 font-sans">
+                      <span className="text-8 sm:text-9 font-bold text-slate-400/80 font-sans">
                         {cell.dayNum}
                       </span>
                       {hasData && (
@@ -996,11 +972,11 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
 
                     <div className="flex-1 flex items-center justify-center w-full mt-0.5 text-center">
                       {hasData ? (
-                        <span className="text-[10px] sm:text-[11.5px] font-black font-mono tracking-tighter leading-none">
+                        <span className="text-10 sm:text-11 font-black font-mono tracking-tighter leading-none">
                           {cell.profit > 0 ? '+' : ''}{cell.profit.toFixed(0)}
                         </span>
                       ) : (
-                        <span className="text-[8.5px] font-sans font-bold text-slate-350 leading-none">--</span>
+                        <span className="text-8 font-sans font-bold text-slate-350 leading-none">--</span>
                       )}
                     </div>
                   </button>
@@ -1017,12 +993,12 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
               基金损益排行
             </span>
             <div className="text-right shrink-0 flex items-center gap-1.5">
-              <span className="text-[9px] text-slate-400 font-bold bg-slate-50 border border-slate-200/60 px-1.5 py-0.5 rounded font-mono">
+              <span className="text-9 text-slate-400 font-bold bg-slate-50 border border-slate-200/60 px-1.5 py-0.5 rounded font-mono">
                 {selectedDateStr.slice(5)}
               </span>
-              <span className={`text-[12.5px] font-black font-mono leading-none ${getAmountColorClass(selectedDayTotal)}`}>
+              <span className={`text-12 font-black font-mono leading-none ${getAmountColorClass(selectedDayTotal)}`}>
                 <span>{formatAmount(selectedDayTotal)}</span>
-                <span className="text-[9px] font-bold ml-0.5">元</span>
+                <span className="text-9 font-bold ml-0.5">元</span>
               </span>
             </div>
           </div>
@@ -1037,16 +1013,16 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
                     className="flex items-center justify-between bg-gradient-to-r from-slate-50/80 to-white/90 hover:from-slate-100/70 hover:to-slate-50 border border-slate-200/35 hover:border-slate-300/40 p-2.5 rounded-xl shadow-4xs hover:translate-x-0.5 hover:shadow-3xs transition-all duration-200"
                   >
                     <div className="min-w-0 pr-2">
-                      <h4 className="text-[10.5px] font-black text-slate-700 truncate leading-tight" title={item.name}>{item.name}</h4>
-                      <span className="text-[8px] font-mono text-slate-450 font-black tracking-wider leading-none mt-0.5 block">{item.code}</span>
+                      <h4 className="text-10 font-black text-slate-700 truncate leading-tight" title={item.name}>{item.name}</h4>
+                      <span className="text-8 font-mono text-slate-450 font-black tracking-wider leading-none mt-0.5 block">{item.code}</span>
                     </div>
                     <div className="shrink-0 flex items-center">
-                      <span className={`px-2 py-1 rounded-lg text-[10.5px] font-black font-mono tracking-tight ${
+                      <span className={`px-2 py-1 rounded-lg text-10 font-black font-mono tracking-tight ${
                         isProfit 
                           ? 'bg-rose-50/60 text-rose-600 border border-rose-100/50' 
                           : item.profit < 0 
                             ? 'bg-emerald-50/60 text-emerald-600 border border-emerald-100/50' 
-                            : 'bg-slate-50 text-slate-550 border border-slate-150'
+                            : 'bg-slate-50 text-slate-550 border border-slate-200'
                       }`}>
                         {formatAmount(item.profit)}
                       </span>
@@ -1057,7 +1033,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center text-center py-10 text-slate-400 font-semibold select-none flex-1">
-              <p className="text-[10px]">该日期无个股损益数据</p>
+              <p className="text-10">该日期无个股损益数据</p>
             </div>
           )}
         </div>
@@ -1083,7 +1059,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
           </div>
           <div className="relative w-full h-40 sm:h-44 overflow-hidden">
             {loadingChart && (
-              <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center text-[9px] font-extrabold text-slate-400 gap-1 rounded-xl">
+              <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center text-9 font-extrabold text-slate-400 gap-1 rounded-xl">
                 <span className="w-3 h-3 rounded-full border-2 border-slate-350 border-t-blue-500 animate-spin" />
                 正在对齐指数曲线...
               </div>
@@ -1122,11 +1098,11 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
               className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-3xs flex flex-col md:flex-row md:items-center justify-between gap-2.5"
             >
               <div className="min-w-44 shrink-0">
-                <span className="text-[9px] font-extrabold text-blue-655 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+                <span className="text-9 font-extrabold text-blue-655 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
                   第 {filteredWeeks.length - idx} 周
                 </span>
                 <h4 className="text-xs font-black text-slate-700 mt-1 font-mono">{week.periodStr}</h4>
-                <span className="text-[9px] text-slate-400 font-bold block mt-0.5">
+                <span className="text-9 text-slate-400 font-bold block mt-0.5">
                   交易表现：波动交易 {week.daysCount} 天 | 盈利 {week.profitDays} 天
                 </span>
               </div>
@@ -1141,9 +1117,9 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
                 </div>
               </div>
               <div className="flex items-baseline md:flex-col items-end gap-1.5 shrink-0 self-end md:self-center">
-                <span className={`text-[12.5px] sm:text-sm font-black font-mono ${getAmountColorClass(week.totalProfit)}`}>
+                <span className={`text-12 sm:text-sm font-black font-mono ${getAmountColorClass(week.totalProfit)}`}>
                   <span>{formatAmount(week.totalProfit)}</span>
-                  <span className="text-[10px] font-bold ml-0.5">元</span>
+                  <span className="text-10 font-bold ml-0.5">元</span>
                 </span>
               </div>
             </div>
@@ -1179,11 +1155,11 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
               className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-3xs flex flex-col md:flex-row md:items-center justify-between gap-2.5"
             >
               <div className="min-w-44 shrink-0">
-                <span className="text-[9px] font-extrabold text-indigo-650 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
+                <span className="text-9 font-extrabold text-indigo-650 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
                   {month.year} 年
                 </span>
                 <h4 className="text-xs font-black text-slate-800 mt-1">{month.monthLabel} 收益汇总</h4>
-                <span className="text-[9px] text-slate-450 font-bold mt-0.5 block leading-none">
+                <span className="text-9 text-slate-450 font-bold mt-0.5 block leading-none">
                   交易天数 {month.daysCount} | 盈利 {month.profitDays}天 | 胜率 <span className={winRatio >= 50 ? 'text-rose-500 font-bold' : 'text-slate-500 font-bold'}>{winRatio}%</span>
                 </span>
               </div>
@@ -1198,9 +1174,9 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
                 </div>
               </div>
               <div className="flex items-baseline md:flex-col items-end gap-1.5 shrink-0 self-end md:self-center">
-                <span className={`text-[12.5px] sm:text-sm font-black font-mono ${getAmountColorClass(month.totalProfit)}`}>
+                <span className={`text-12 sm:text-sm font-black font-mono ${getAmountColorClass(month.totalProfit)}`}>
                   <span>{formatAmount(month.totalProfit)}</span>
-                  <span className="text-[10px] font-bold ml-0.5">元</span>
+                  <span className="text-10 font-bold ml-0.5">元</span>
                 </span>
               </div>
             </div>
@@ -1232,7 +1208,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div>
                   <h3 className="text-xs font-black text-slate-800">{yStats.year} 年度投资复盘</h3>
-                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                  <p className="text-9 text-slate-400 font-bold mt-0.5">
                     全年共记录 {yStats.daysCount} 工作日，胜率 {winRatio}%
                   </p>
                 </div>
@@ -1246,30 +1222,30 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div className="bg-slate-50 border border-slate-100 rounded-xl p-2">
-                  <span className="text-[9px] text-slate-400 font-bold block">日均盈亏</span>
-                  <span className={`text-[11px] font-extrabold font-mono mt-0.5 block ${getAmountColorClass(yStats.avgProfit)}`}>
+                  <span className="text-9 text-slate-400 font-bold block">日均盈亏</span>
+                  <span className={`text-11 font-extrabold font-mono mt-0.5 block ${getAmountColorClass(yStats.avgProfit)}`}>
                     {formatAmount(yStats.avgProfit)}元
                   </span>
                 </div>
                 <div className="bg-slate-50 border border-slate-100 rounded-xl p-2">
-                  <span className="text-[9px] text-slate-400 font-bold block">年度胜率</span>
-                  <span className="text-[11px] font-black text-slate-700 mt-0.5 block font-mono">
+                  <span className="text-9 text-slate-400 font-bold block">年度胜率</span>
+                  <span className="text-11 font-black text-slate-700 mt-0.5 block font-mono">
                     {winRatio}%
                   </span>
                 </div>
                 <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-2.5">
-                  <span className="text-[9px] text-rose-600 font-bold block truncate">单日最强</span>
+                  <span className="text-9 text-rose-600 font-bold block truncate">单日最强</span>
                   <span className="text-xs font-black text-rose-600 font-mono mt-0.5 block truncate">
                     {yStats.bestDay ? `+${yStats.bestDay.profit.toFixed(0)}` : '--'}
                   </span>
-                  <span className="text-[8px] text-rose-450 block truncate font-mono mt-0.5">{yStats.bestDay?.date ?? ''}</span>
+                  <span className="text-8 text-rose-450 block truncate font-mono mt-0.5">{yStats.bestDay?.date ?? ''}</span>
                 </div>
                 <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-2.5">
-                  <span className="text-[9px] text-emerald-600 font-bold block truncate">单日最深</span>
+                  <span className="text-9 text-emerald-600 font-bold block truncate">单日最深</span>
                   <span className="text-xs font-black text-emerald-600 font-mono mt-0.5 block truncate">
                     {yStats.worstDay ? `${yStats.worstDay.profit.toFixed(0)}` : '--'}
                   </span>
-                  <span className="text-[8px] text-emerald-450 block truncate font-mono mt-0.5">{yStats.worstDay?.date ?? ''}</span>
+                  <span className="text-8 text-emerald-450 block truncate font-mono mt-0.5">{yStats.worstDay?.date ?? ''}</span>
                 </div>
               </div>
             </div>
@@ -1298,13 +1274,13 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
               全历史投资复盘总结
             </h3>
-            <p className="text-[10px] text-slate-400 font-medium mt-1">
+            <p className="text-10 text-slate-400 font-medium mt-1">
               累计记录 <span className="text-slate-200 font-semibold font-mono">{allTimeStats.daysCount}</span> 交易日 | 
               胜率 <span className={`font-semibold font-mono ${Number(winRatio) >= 50 ? 'text-rose-400' : 'text-slate-350'}`}>{winRatio}%</span>
             </p>
           </div>
           <div className="text-right">
-            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">累计总收益率</span>
+            <span className="text-9 text-slate-400 font-bold uppercase tracking-wider block">累计总收益率</span>
             <span className={`text-base sm:text-lg font-black font-mono mt-1 inline-block leading-none ${isProfit ? 'text-rose-400' : 'text-emerald-400'}`}>
               {isProfit ? '+' : ''}{allTimeStats.yieldRate.toFixed(2)}%
             </span>
@@ -1316,35 +1292,35 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
           {/* Card 1: 累计收益 */}
           <div className="bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10 rounded-xl p-3 flex flex-col justify-between transition-all duration-300 shadow-sm group">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">累计收益</span>
+              <span className="text-10 sm:text-xs text-slate-400 font-medium">累计收益</span>
               <TrendingUp className={`w-3.5 h-3.5 ${isProfit ? 'text-rose-450' : 'text-emerald-400'}`} />
             </div>
             <div className="mt-2.5">
               <span className={`text-sm sm:text-base font-black font-mono ${isProfit ? 'text-rose-400' : 'text-emerald-400'}`}>
                 {formatAmount(allTimeStats.totalProfit)}
               </span>
-              <span className="text-[9px] text-slate-500 font-medium ml-0.5">元</span>
+              <span className="text-9 text-slate-500 font-medium ml-0.5">元</span>
             </div>
           </div>
 
           {/* Card 2: 日均盈亏 */}
           <div className="bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10 rounded-xl p-3 flex flex-col justify-between transition-all duration-300 shadow-sm group">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">日均盈亏</span>
+              <span className="text-10 sm:text-xs text-slate-400 font-medium">日均盈亏</span>
               <Activity className="w-3.5 h-3.5 text-blue-400" />
             </div>
             <div className="mt-2.5">
               <span className={`text-sm sm:text-base font-black font-mono ${isAvgProfitPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
                 {formatAmount(allTimeStats.avgProfit)}
               </span>
-              <span className="text-[9px] text-slate-500 font-medium ml-0.5">元</span>
+              <span className="text-9 text-slate-500 font-medium ml-0.5">元</span>
             </div>
           </div>
 
           {/* Card 3: 最强单日 */}
           <div className="bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10 rounded-xl p-3 flex flex-col justify-between transition-all duration-300 shadow-sm group">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">最强单日</span>
+              <span className="text-10 sm:text-xs text-slate-400 font-medium">最强单日</span>
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
             </div>
             <div className="mt-2.5">
@@ -1352,7 +1328,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
                 {allTimeStats.bestDay ? `+${allTimeStats.bestDay.profit.toFixed(0)}` : '--'}
               </span>
               {allTimeStats.bestDay && (
-                <span className="text-[8px] text-slate-500 font-mono mt-0.5 block leading-none">{allTimeStats.bestDay.date}</span>
+                <span className="text-8 text-slate-500 font-mono mt-0.5 block leading-none">{allTimeStats.bestDay.date}</span>
               )}
             </div>
           </div>
@@ -1360,7 +1336,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
           {/* Card 4: 最深单日 */}
           <div className="bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10 rounded-xl p-3 flex flex-col justify-between transition-all duration-300 shadow-sm group">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">最深单日</span>
+              <span className="text-10 sm:text-xs text-slate-400 font-medium">最深单日</span>
               <TrendingDown className="w-3.5 h-3.5 text-emerald-400" />
             </div>
             <div className="mt-2.5">
@@ -1368,7 +1344,7 @@ export default function ProfitCalendarModal({ isOpen, onClose, dailyProfits = []
                 {allTimeStats.worstDay ? `${allTimeStats.worstDay.profit.toFixed(0)}` : '--'}
               </span>
               {allTimeStats.worstDay && (
-                <span className="text-[8px] text-slate-500 font-mono mt-0.5 block leading-none">{allTimeStats.worstDay.date}</span>
+                <span className="text-8 text-slate-500 font-mono mt-0.5 block leading-none">{allTimeStats.worstDay.date}</span>
               )}
             </div>
           </div>

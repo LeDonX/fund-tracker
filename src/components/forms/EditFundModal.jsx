@@ -32,7 +32,7 @@ export default function EditFundModal({
         {/* 1. 基金核心标题 */}
         <div className="border-b border-slate-100 pb-2 mb-3">
           <h3 className="text-sm font-extrabold text-slate-800 truncate">{editForm.name || '基金配置'}</h3>
-          <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+          <p className="text-10 text-slate-400 font-mono mt-0.5">
             代码: {editForm.code} · 分组: {editForm.sector || '默认板块'}
           </p>
         </div>
@@ -82,7 +82,7 @@ export default function EditFundModal({
               </span>
             </div>
             {!isCostValid && (
-              <p className="mt-1.5 text-[11px] font-bold text-rose-600 font-sans">⚠️ 错误：持有金额小于累计收益，成本本金不可为负！</p>
+              <p className="mt-1.5 text-11 font-bold text-rose-600 font-sans">⚠️ 错误：持有金额小于累计收益，成本本金不可为负！</p>
             )}
           </div>
         )}
@@ -90,7 +90,7 @@ export default function EditFundModal({
         {/* 4. 历史收益数据手动对齐 */}
         <div className="grid grid-cols-2 gap-3.5 pt-1">
           <div>
-            <label htmlFor="edit-weekly-profit" className="block text-[10px] font-bold text-slate-400 mb-1">本周收益 (元, 选填)</label>
+            <label htmlFor="edit-weekly-profit" className="block text-10 font-bold text-slate-400 mb-1">本周收益 (元, 选填)</label>
             <input
               id="edit-weekly-profit"
               type="number"
@@ -102,7 +102,7 @@ export default function EditFundModal({
             />
           </div>
           <div>
-            <label htmlFor="edit-monthly-profit" className="block text-[10px] font-bold text-slate-400 mb-1">本月收益 (元, 选填)</label>
+            <label htmlFor="edit-monthly-profit" className="block text-10 font-bold text-slate-400 mb-1">本月收益 (元, 选填)</label>
             <input
               id="edit-monthly-profit"
               type="number"
@@ -136,7 +136,7 @@ export default function EditFundModal({
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-4 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-150 disabled:text-slate-400 disabled:cursor-not-allowed rounded-lg font-bold transition-all shadow-sm hover:shadow cursor-pointer"
+              className="px-4 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-lg font-bold transition-all shadow-sm hover:shadow cursor-pointer"
             >
               确认保存
             </button>
