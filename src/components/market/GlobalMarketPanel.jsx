@@ -2087,7 +2087,7 @@ export default function GlobalMarketPanel() {
         </div>
 
         {/* Card Grid Container */}
-        <div className="flex-1 md:overflow-y-auto custom-scrollbar p-2.5 -m-2.5">
+        <div className="flex-1 md:overflow-y-auto custom-scrollbar p-2.5">
           {loading ? (
             /* Loading skeletons */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
