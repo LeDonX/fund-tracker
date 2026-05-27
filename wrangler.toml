@@ -18,3 +18,4 @@ database_id = "a7d058ff-99aa-4e63-a4db-33737b38b906"              # Change to yo
 [vars]
 # You can define global environment variables here, like a custom JWT secret for local dev:
 # JWT_SECRET = "your-custom-jwt-secret-key-goes-here"
+GEMINI_API_KEY = "AIzaSyC-q82x9r_j_W-Z_5CasVxjw7wrfdblcVI"

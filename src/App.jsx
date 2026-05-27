@@ -49,6 +49,7 @@ import FundTable from './components/FundTable';
 import AddFundModal from './components/forms/AddFundModal';
 import EditFundModal from './components/forms/EditFundModal';
 import GlobalMarketPanel from './components/market/GlobalMarketPanel';
+import SidebarMarketTrends from './components/market/SidebarMarketTrends';
 import {
   buildDetailCacheEntry,
   buildFundDetailModel,
@@ -460,14 +461,55 @@ const applyOfficialNetValueToFund = (fund, officialSnapshot) => {
     return fund;
   }
 
-  return {
+  const updatedFund = {
     ...fund,
     officialCurrentNetValue: officialSnapshot.currentNetValue,
     officialLastNetValue: officialSnapshot.lastNetValue,
     officialDailyRate: officialSnapshot.dailyRate,
     officialNetValueDate: officialSnapshot.netValueDate,
     officialPreviousNetValueDate: officialSnapshot.previousNetValueDate || '',
-    };
+  };
+
+  // 当正式净值更新后，同步更新持有金额及相关收益数据，确保存储数据与官方净值一致
+  const shares = Math.max(0, toNumber(fund.shares));
+  if (shares > 0 && officialSnapshot.currentNetValue > 0) {
+    const officialCurrentNV = officialSnapshot.currentNetValue;
+    let officialLastNV = toNumber(officialSnapshot.lastNetValue);
+    let officialRate = officialSnapshot.dailyRate;
+
+    // 结算日期判定：若官方净值日期严格小于记账起算成交日，强制前置收益及涨幅为 0
+    const holdingStartDate = fund.holdingStartDate;
+    if (holdingStartDate && officialSnapshot.netValueDate && officialSnapshot.netValueDate < holdingStartDate) {
+      officialLastNV = officialCurrentNV;
+      officialRate = 0;
+    }
+
+    const newAmount = roundAmount(shares * officialCurrentNV);
+    const costAmount = fund.costAmount !== undefined ? Math.max(0, toNumber(fund.costAmount)) : undefined;
+    const dailyProfit = officialLastNV > 0
+      ? roundAmount(shares * (officialCurrentNV - officialLastNV))
+      : (Number.isFinite(officialRate) && officialRate !== -100 && newAmount > 0
+        ? roundAmount((newAmount * officialRate) / (100 + officialRate))
+        : fund.dailyProfit);
+    const totalProfit = costAmount !== undefined ? roundAmount(newAmount - costAmount) : fund.totalProfit;
+    const totalRate = costAmount !== undefined && costAmount > 0
+      ? ((newAmount - costAmount) / costAmount) * 100
+      : (costAmount === 0 ? 0 : fund.totalRate);
+
+    updatedFund.amount = newAmount;
+    updatedFund.dailyProfit = dailyProfit;
+    updatedFund.dailyRate = Number.isFinite(officialRate) ? officialRate
+      : (officialCurrentNV > 0 && officialLastNV > 0
+        ? ((officialCurrentNV - officialLastNV) / officialLastNV) * 100
+        : fund.dailyRate);
+    updatedFund.totalProfit = totalProfit;
+    updatedFund.totalRate = totalRate;
+    updatedFund.currentNetValue = officialCurrentNV;
+    updatedFund.lastNetValue = officialLastNV > 0 ? officialLastNV : fund.lastNetValue;
+    updatedFund.netValueDate = officialSnapshot.netValueDate;
+  }
+
+  return updatedFund;
 };
 
 const hasUsableOfficialSnapshot = (fund) => {
@@ -4050,7 +4092,7 @@ export default function FundTrackerApp() {
       const sectorFunds = CURATED_MARKET_FUNDS.filter(f => f.sectorId === selectedMarketSector);
 
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
           {sectorFunds.map(item => {
             const quote = searchQuotes[item.code];
             const isExisting = funds.some(f => String(f.code || '').trim() === item.code);
@@ -4174,7 +4216,7 @@ export default function FundTrackerApp() {
       <div className="flex-1 bg-white rounded-2xl md:rounded-3xl shadow-md border border-slate-200/60 flex flex-col min-h-[300px] overflow-hidden">
         {/* 搜索控制台 */}
         <div className="p-4 md:p-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
-          <div className="relative max-w-xl">
+          <div className="relative w-full max-w-xl md:max-w-2xl xl:max-w-3xl">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
               <Search className="w-4.5 h-4.5" />
             </div>
@@ -4313,7 +4355,7 @@ export default function FundTrackerApp() {
             ) : (
               <div>
                 {/* 桌面端：卡片网格展示 */}
-                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-in fade-in duration-200">
+                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 animate-in fade-in duration-200">
                   {displayResults.map(item => {
                     const quote = searchQuotes[item.code];
                     const isExisting = funds.some(f => String(f.code || '').trim() === item.code);
@@ -4577,6 +4619,9 @@ export default function FundTrackerApp() {
           </button>
         </div>
 
+        {/* 侧边栏三个实时大盘分时走势图 */}
+        <SidebarMarketTrends setActiveTab={setActiveTab} />
+
         {/* 侧边栏底部：登录与同步状态 + 系统参数按钮 (常驻侧边栏并排为一行 - 极致空间利用) */}
         <div className="mt-auto flex items-center gap-2 border-t border-slate-200/50 pt-4 select-none">
           {/* 登录与账号状态 */}
@@ -4709,7 +4754,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 主面板展现区 */}
-        <div className="flex-1 overflow-auto custom-scrollbar mt-12 md:mt-0 pb-20 md:pb-0">
+        <div className={`flex-1 custom-scrollbar mt-12 md:mt-0 pb-20 md:pb-0 ${activeTab === 'market' ? 'overflow-hidden flex flex-col min-h-0' : 'overflow-auto'}`}>
           {activeTab === 'portfolio' ? (
             <FundTable
                 groupTableRef={groupTableRef}

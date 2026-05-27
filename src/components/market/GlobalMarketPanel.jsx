@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as echarts from 'echarts';
-import { Globe, RefreshCw, AlertCircle, TrendingUp, TrendingDown, Clock, Compass, Gauge, Flame, BookOpen, ArrowUpRight, ArrowDownRight, Info, HelpCircle, Cpu, Sliders, Play, ShieldAlert, CheckCircle, Activity } from 'lucide-react';
+import { Globe, RefreshCw, AlertCircle, TrendingUp, TrendingDown, Clock, Compass, Gauge, Flame, BookOpen, ArrowUpRight, ArrowDownRight, Info, HelpCircle, Cpu, Sliders, Play, ShieldAlert, CheckCircle, Activity, Pin } from 'lucide-react';
 
 // Light-weight pure SVG sparkline component for grid cards
 function Sparkline({ data, isPositive }) {
@@ -152,7 +152,55 @@ export default function GlobalMarketPanel() {
     }, 3000);
   }, []);
   
-  const [selectedSymbol, setSelectedSymbol] = useState('^GSPC');
+  const [selectedSymbol, setSelectedSymbol] = useState(() => {
+    return localStorage.getItem('selected_market_symbol') || '^GSPC';
+  });
+
+  const [pinnedSymbols, setPinnedSymbols] = useState(() => {
+    try {
+      const stored = localStorage.getItem('sidebar_market_pinned_symbols');
+      return stored ? JSON.parse(stored) : ['000001.SS', '399006.SZ', '^IXIC'];
+    } catch {
+      return ['000001.SS', '399006.SZ', '^IXIC'];
+    }
+  });
+
+  const handleTogglePin = useCallback((symbol, e) => {
+    e.stopPropagation();
+    setPinnedSymbols(current => {
+      let next;
+      if (current.includes(symbol)) {
+        next = current.filter(sym => sym !== symbol);
+        showToast('已从侧边栏取消固定展示', 'success');
+      } else {
+        if (current.length >= 3) {
+          showToast('最多只能选择 3 个指数在侧边栏显示，请先取消其他指数', 'error');
+          return current;
+        }
+        next = [...current, symbol];
+        showToast('已成功固定到侧边栏展示', 'success');
+      }
+      localStorage.setItem('sidebar_market_pinned_symbols', JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent('sidebarPinnedSymbolsChanged', { detail: next }));
+      return next;
+    });
+  }, [showToast]);
+
+  useEffect(() => {
+    if (selectedSymbol) {
+      localStorage.setItem('selected_market_symbol', selectedSymbol);
+    }
+  }, [selectedSymbol]);
+
+  useEffect(() => {
+    const handleSymbolChanged = (e) => {
+      if (typeof e.detail === 'string') {
+        setSelectedSymbol(e.detail);
+      }
+    };
+    window.addEventListener('selectedMarketSymbolChanged', handleSymbolChanged);
+    return () => window.removeEventListener('selectedMarketSymbolChanged', handleSymbolChanged);
+  }, []);
   const [detailHistory, setDetailHistory] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
@@ -2035,7 +2083,7 @@ export default function GlobalMarketPanel() {
         <div className="flex-1 md:overflow-y-auto custom-scrollbar p-2.5 -m-2.5">
           {loading ? (
             /* Loading skeletons */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
                 <div key={i} className="bg-white border border-slate-100 rounded-2xl p-4.5 h-[120px] animate-pulse flex flex-col justify-between">
                   <div className="flex justify-between items-center">
@@ -2078,7 +2126,7 @@ export default function GlobalMarketPanel() {
                   </div>
 
                   {/* Section Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                     {group.items.map((item) => {
                       const isSelected = item.symbol === selectedSymbol;
                       const isPositive = item.changePercent >= 0;
@@ -2108,11 +2156,32 @@ export default function GlobalMarketPanel() {
                         >
                           {/* Header info inside card */}
                           <div className="space-y-1">
-                            <div className="flex justify-between items-start">
+                            <div className="flex justify-between items-center gap-1">
                               <span className="text-10 font-extrabold text-slate-400 font-mono tracking-wider">{item.symbol}</span>
-                              <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2 py-0.5 rounded-full shrink-0">
-                                {regionBadges[item.region] || item.regionName}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {pinnedSymbols.includes(item.symbol) ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleTogglePin(item.symbol, e)}
+                                    className="p-1 rounded-md bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer shadow-3xs transition-all hover:bg-blue-100/60 flex items-center justify-center"
+                                    title="从侧边栏取消固定"
+                                  >
+                                    <Pin className="w-3 h-3 fill-current rotate-45" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleTogglePin(item.symbol, e)}
+                                    className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 border border-transparent hover:border-slate-200/60 cursor-pointer opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                                    title="固定到侧边栏"
+                                  >
+                                    <Pin className="w-3 h-3" />
+                                  </button>
+                                )}
+                                <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2 py-0.5 rounded-full shrink-0 select-none">
+                                  {regionBadges[item.region] || item.regionName}
+                                </span>
+                              </div>
                             </div>
                             <h4 className="font-extrabold text-slate-700 text-xs leading-snug group-hover:text-blue-600 transition-colors mt-0.5 text-left" title={item.englishName}>
                               {item.name}
