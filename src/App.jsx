@@ -5020,7 +5020,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 主面板展现区 */}
-        <div className={`flex-1 custom-scrollbar mt-12 md:mt-0 pb-24 md:pb-28 ${activeTab === 'market' ? 'overflow-hidden flex flex-col min-h-0' : 'overflow-auto'}`}>
+        <div className="flex-1 custom-scrollbar mt-12 md:mt-0 flex flex-col min-h-0 overflow-hidden">
           {activeTab === 'portfolio' ? (
             <FundTable
                 groupTableRef={groupTableRef}
