@@ -148,6 +148,23 @@ const formatExportFileStamp = (value = new Date()) => {
 // ============================================================================
 const SCRIPT_TIMEOUT_MS = 8000;
 
+function getTodayDateKey() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = `${today.getMonth() + 1}`.padStart(2, '0');
+  const day = `${today.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayDateTimeString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = `${today.getMonth() + 1}`.padStart(2, '0');
+  const day = `${today.getDate()}`.padStart(2, '0');
+  const time = today.toLocaleTimeString('zh-CN', { hour12: false });
+  return `${year}-${month}-${day} ${time}`;
+}
+
 const toNumber = (value) => {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -470,6 +487,15 @@ const applyOfficialNetValueToFund = (fund, officialSnapshot) => {
     officialPreviousNetValueDate: officialSnapshot.previousNetValueDate || '',
   };
 
+  const isTodayValuation = typeof fund.lastValuationTime === 'string' && fund.lastValuationTime.startsWith(getTodayDateKey());
+  const shouldOverwriteWithOfficial = !fund.netValueDate || 
+    officialSnapshot.netValueDate > fund.netValueDate || 
+    (officialSnapshot.netValueDate === fund.netValueDate && !isTodayValuation);
+
+  if (!shouldOverwriteWithOfficial) {
+    return updatedFund;
+  }
+
   // 当正式净值更新后，同步更新持有金额及相关收益数据，确保存储数据与官方净值一致
   const shares = Math.max(0, toNumber(fund.shares));
   if (shares > 0 && officialSnapshot.currentNetValue > 0) {
@@ -517,6 +543,37 @@ const hasUsableOfficialSnapshot = (fund) => {
 };
 
 const buildBaseValuationFund = (fund) => {
+  if (fund.quoteSource === 'estimate' && toNumber(fund.estimatedNetValue) > 0) {
+    const shares = Math.max(0, toNumber(fund.shares));
+    const hasTrackedShares = shares > 0;
+    const confirmedAmount = Math.max(0, toNumber(fund.amount));
+    const confirmedCost = fund.costAmount !== undefined ? Math.max(0, toNumber(fund.costAmount)) : undefined;
+    const confirmedTotalProfit = confirmedAmount - (confirmedCost ?? 0);
+    const confirmedTotalRate = (confirmedCost && confirmedCost > 0) ? (confirmedTotalProfit / confirmedCost) * 100 : 0;
+
+    const estimatedNetValue = toNumber(fund.estimatedNetValue);
+    const estimatedDailyRate = toNumber(fund.estimatedDailyRate);
+
+    let dailyProfit = 0;
+    // 估算当日收益 = 份额 * (估算净值 - 昨收确权净值)
+    if (hasTrackedShares && estimatedNetValue > 0 && fund.currentNetValue > 0) {
+      dailyProfit = shares * (estimatedNetValue - fund.currentNetValue);
+    } else if (Number.isFinite(estimatedDailyRate)) {
+      dailyProfit = (confirmedAmount * estimatedDailyRate) / 100;
+    }
+
+    return {
+      ...fund,
+      amount: confirmedAmount,
+      costAmount: confirmedCost,
+      totalProfit: roundAmount(confirmedTotalProfit),
+      totalRate: confirmedTotalRate,
+      dailyRate: estimatedDailyRate,
+      dailyProfit: roundAmount(dailyProfit),
+      valuationSource: 'estimate',
+    };
+  }
+
   return buildFundSnapshot(fund, {
     currentNetValue: fund.currentNetValue,
     lastNetValue: fund.lastNetValue,
@@ -578,13 +635,20 @@ const shouldPreferOfficialValuation = (fund) => {
   const quoteSource = inferStoredQuoteSource(fund);
   const quoteNetValueDate = typeof fund.netValueDate === 'string' ? fund.netValueDate : '';
   const officialNetValueDate = typeof fund.officialNetValueDate === 'string' ? fund.officialNetValueDate : '';
+  const isTodayValuation = typeof fund.lastValuationTime === 'string' && fund.lastValuationTime.startsWith(getTodayDateKey());
 
   if (quoteSource === 'estimate') {
+    if (isTodayValuation) {
+      return Boolean(quoteNetValueDate && officialNetValueDate && officialNetValueDate > quoteNetValueDate);
+    }
     return Boolean(quoteNetValueDate && officialNetValueDate && officialNetValueDate >= quoteNetValueDate);
   }
 
   if (quoteSource === 'quote') {
     if (quoteNetValueDate && officialNetValueDate) {
+      if (isTodayValuation) {
+        return officialNetValueDate > quoteNetValueDate;
+      }
       return officialNetValueDate >= quoteNetValueDate;
     }
 
@@ -595,6 +659,9 @@ const shouldPreferOfficialValuation = (fund) => {
     return true;
   }
 
+  if (isTodayValuation) {
+    return Boolean(officialNetValueDate && officialNetValueDate > quoteNetValueDate);
+  }
   return Boolean(officialNetValueDate && officialNetValueDate >= quoteNetValueDate);
 };
 
@@ -650,6 +717,23 @@ const deriveSharesFromDisplayedAmount = (fund, amount = fund.amount) => {
 };
 
 const reconcileFundWithQuote = (fund, quote) => {
+  const quoteSrc = getQuoteSourceFromQuote(quote);
+
+  if (quoteSrc === 'estimate') {
+    // 盘中估算：不覆盖持久化资产确权数据，只缓存临时估值信息用于实时收益计算
+    return {
+      ...fund,
+      name: quote.name || fund.name,
+      code: quote.code || fund.code,
+      estimatedNetValue: toNumber(quote.estimatedNetValue),
+      estimatedDailyRate: toNumber(quote.dailyRate),
+      estimatedUpdateTime: quote.updateTime || '',
+      estimatedNetValueDate: quote.netValueDate || '',
+      quoteSource: 'estimate',
+    };
+  }
+
+  // 确权历史净值：继续走 buildFundSnapshot，计算并持久化持有金额等数据
   const referenceNetValue = getQuoteReferenceNetValue(quote);
   const fallbackMarketValue = Math.max(0, toNumber(fund.amount));
   const shouldBootstrapShares = Boolean(fund.bootstrapSharesFromAmount);
@@ -666,7 +750,7 @@ const reconcileFundWithQuote = (fund, quote) => {
     currentNetValue: referenceNetValue,
     lastNetValue: quote.lastNetValue,
     dailyRate: quote.dailyRate,
-    quoteSource: getQuoteSourceFromQuote(quote),
+    quoteSource: 'quote',
     lastValuationTime: quote.updateTime || fund.lastValuationTime || '',
     netValueDate: quote.netValueDate || fund.netValueDate || '',
     bootstrapSharesFromAmount: false,
@@ -771,7 +855,7 @@ const adjustQDIIValuation = (fund, quote, marketData) => {
     dailyRate: adjustedRate,
     estimatedNetValue,
     quoteSource: 'estimate',
-    updateTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+    updateTime: getTodayDateTimeString(),
     netValueDate: new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')
   };
 };
@@ -806,14 +890,6 @@ const mergeFundsWithSources = (fundsToMerge, quoteMap, officialMap, marketData) 
 
 let tiantianQuoteQueue = Promise.resolve();
 let eastmoneyOfficialQueue = Promise.resolve();
-
-const getTodayDateKey = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = `${today.getMonth() + 1}`.padStart(2, '0');
-  const day = `${today.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 const addOneDay = (dateStr) => {
   const d = new Date(dateStr + 'T00:00:00');
@@ -883,7 +959,7 @@ const loadTiantianFundQuote = (fundCode) => {
             lastNetValue: lastPrice / (1 + changePercent / 100),
             estimatedNetValue: lastPrice,
             dailyRate: changePercent,
-            updateTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+            updateTime: getTodayDateTimeString(),
             netValueDate: new Date().toLocaleDateString('zh-CN').replace(/\//g, '-'),
             quoteSource: 'estimate',
           });
@@ -1520,9 +1596,9 @@ const alignFundSharesAndCost = async (fund, nextShares, nextCostAmount, fallback
   });
 };
 
-const applyTradeToFund = (fund, trade, quote, tradeDate) => {
+const applyTradeToFund = (fund, trade, quote, tradeDate, customReferenceNetValue) => {
   const normalizedFund = quote ? reconcileFundWithQuote(fund, quote) : { ...fund, quoteSource: inferStoredQuoteSource(fund) };
-  const referenceNetValue = getDisplayedReferenceNetValue(normalizedFund);
+  const referenceNetValue = customReferenceNetValue > 0 ? customReferenceNetValue : getDisplayedReferenceNetValue(normalizedFund);
   const currentShares = Math.max(0, toNumber(normalizedFund.shares) || deriveSharesFromDisplayedAmount(normalizedFund) || 0);
   const tradeImpact = buildTradeImpact({
     fund: normalizedFund,
@@ -2251,6 +2327,7 @@ export default function FundTrackerApp() {
   });
   const hasAutoRefreshedRef = useRef(false);
   const fundLookupRequestRef = useRef(0);
+  const syncFundLookupRequestRef = useRef(0);
   const groupTableRef = useRef(null);
   const importFileInputRef = useRef(null);
 
@@ -2278,6 +2355,7 @@ export default function FundTrackerApp() {
   const [groupForm, setGroupForm] = useState({ mode: 'create', originalName: '', name: '' });
   const [fundForm, setFundForm] = useState(() => createEmptyFundForm(UNGROUPED_SECTOR));
   const [fundLookup, setFundLookup] = useState(createEmptyFundLookup);
+  const [syncFundLookup, setSyncFundLookup] = useState(createEmptyFundLookup);
   const [syncForm, setSyncForm] = useState(() => ({
     code: '',
     type: '买入',
@@ -2285,6 +2363,8 @@ export default function FundTrackerApp() {
     tradeDate: getTodayDateKey(),
     confirmTime: 'before15',
     amount: '',
+    netValueType: 'yesterday',
+    customNetValue: '',
   }));
   const [editForm, setEditForm] = useState({ id: null, name: '', code: '', sector: '', amount: '', weeklyProfit: '', monthlyProfit: '' });
   const [importState, setImportState] = useState({
@@ -2298,6 +2378,7 @@ export default function FundTrackerApp() {
 
   const entryMode = fundForm.entryMode || 'newBuy';
   const normalizedFundCode = String(fundForm.code || '').trim();
+  const normalizedSyncFundCode = String(syncForm.code || '').trim();
   const normalizedFundSector = String(fundForm.sector || '').trim();
   
   const holdingAmountValue = String(fundForm.amount || '').trim() !== '' ? Number.parseFloat(fundForm.amount) : Number.NaN;
@@ -2353,6 +2434,16 @@ export default function FundTrackerApp() {
   const handleCloseImportModal = () => {
     resetImportState();
     closeModal('import');
+  };
+
+  const handleSyncFormChange = (nextFormOrFn) => {
+    setSyncForm((current) => {
+      const nextForm = typeof nextFormOrFn === 'function' ? nextFormOrFn(current) : nextFormOrFn;
+      if (String(nextForm?.code || '').trim() !== String(current?.code || '').trim()) {
+        syncFundLookupRequestRef.current += 1;
+      }
+      return nextForm;
+    });
   };
 
   const handleFundCodeChange = (value) => {
@@ -2602,7 +2693,7 @@ export default function FundTrackerApp() {
 
   // 监听当日盈亏状态和隐私设置，实时同步更新网页标题和 Favicon 页签图标
   useEffect(() => {
-    const baseTitle = '智能基金追踪';
+    const baseTitle = '智能追踪';
 
     // 1. 动态更新网页标题 (Title) - 仅当开启时显示涨跌金额，否则为默认标题
     if (showTabProfit && totalDailyProfit !== null && totalDailyProfit !== undefined && Number.isFinite(totalDailyProfit)) {
@@ -3148,6 +3239,110 @@ export default function FundTrackerApp() {
     };
   }, [modals.fund, normalizedFundCode]);
 
+  useEffect(() => {
+    if (!modals.sync || !/^\d{6}$/.test(normalizedSyncFundCode)) {
+      setSyncFundLookup(createEmptyFundLookup());
+      return;
+    }
+
+    const requestId = syncFundLookupRequestRef.current;
+
+    const timerId = window.setTimeout(async () => {
+      try {
+        setSyncFundLookup({
+          status: 'loading',
+          message: `正在查询 ${normalizedSyncFundCode} 的最新行情与估值...`,
+          quote: null,
+        });
+
+        const quote = await enqueueTiantianFundQuote(normalizedSyncFundCode);
+        const resolvedCode = String(quote?.code || '').trim();
+        const resolvedName = String(quote?.name || '').trim();
+        const referenceNetValue = getQuoteReferenceNetValue(quote);
+
+        if (syncFundLookupRequestRef.current !== requestId) {
+          return;
+        }
+
+        if (resolvedCode && resolvedCode !== normalizedSyncFundCode) {
+          setSyncFundLookup({
+            status: 'error',
+            message: '查询结果与当前基金代码不匹配，请重新输入后再试。',
+            quote: null,
+          });
+          return;
+        }
+
+        if (!resolvedName || referenceNetValue <= 0) {
+          setSyncFundLookup({
+            status: 'error',
+            message: '已查到代码，但缺少可用基金名称或净值/估值。',
+            quote: null,
+          });
+          return;
+        }
+
+        setSyncFundLookup({
+          status: 'success',
+          message: `基金已匹配：${resolvedName}`,
+          quote,
+        });
+      } catch (error) {
+        if (syncFundLookupRequestRef.current !== requestId) {
+          return;
+        }
+
+        // Double fallback
+        try {
+          const [officialHistory, fundName] = await Promise.all([
+            loadEastmoneyOfficialHistory(normalizedSyncFundCode),
+            loadFundNameFromPingzhongData(normalizedSyncFundCode).catch(() => '')
+          ]);
+
+          if (syncFundLookupRequestRef.current !== requestId) {
+            return;
+          }
+
+          if (officialHistory && officialHistory.currentNetValue > 0) {
+            const quote = {
+              code: normalizedSyncFundCode,
+              name: fundName || ('公募基金 ' + normalizedSyncFundCode),
+              lastNetValue: officialHistory.currentNetValue,
+              estimatedNetValue: 0,
+              dailyRate: officialHistory.dailyRate || 0,
+              updateTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+              netValueDate: officialHistory.netValueDate || '',
+              quoteSource: 'quote',
+            };
+
+            setSyncFundLookup({
+              status: 'success',
+              message: `基金已通过基本面匹配：${quote.name}`,
+              quote,
+            });
+            return;
+          }
+        } catch (fallbackErr) {
+          console.warn('同步查询多源兜底获取也失败：', fallbackErr);
+        }
+
+        if (syncFundLookupRequestRef.current !== requestId) {
+          return;
+        }
+
+        setSyncFundLookup({
+          status: 'error',
+          message: error?.message || '基金查询失败，请检查代码或网络。',
+          quote: null,
+        });
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [modals.sync, normalizedSyncFundCode]);
+
   const handleAddFund = async (e) => {
     e.preventDefault();
 
@@ -3304,6 +3499,9 @@ export default function FundTrackerApp() {
     const cacheEntry = detailCacheEntries[fund.code];
     let fundRateStr = cacheEntry?.fundRate || '';
 
+    syncFundLookupRequestRef.current += 1;
+    setSyncFundLookup(createEmptyFundLookup());
+
     setSyncForm({
       code: fund.code,
       type: '买入',
@@ -3312,6 +3510,8 @@ export default function FundTrackerApp() {
       confirmTime: 'before15',
       amount: '',
       feeRate: fundRateStr,
+      netValueType: 'yesterday',
+      customNetValue: '',
     });
     openModal('sync');
 
@@ -3433,8 +3633,22 @@ export default function FundTrackerApp() {
     }
 
     const tradeReferenceFund = quote ? reconcileFundWithQuote(targetFund, quote) : { ...targetFund, quoteSource: inferStoredQuoteSource(targetFund) };
-    const lastNetValue = toNumber(tradeReferenceFund.lastNetValue);
-    const referenceNetValue = lastNetValue > 0 ? lastNetValue : getDisplayedReferenceNetValue(tradeReferenceFund);
+    const lastNetValueVal = toNumber(tradeReferenceFund.lastNetValue) || toNumber(tradeReferenceFund.currentNetValue) || 0;
+    const estimatedNetValueVal = toNumber(quote?.estimatedNetValue) || toNumber(tradeReferenceFund.estimatedNetValue) || 0;
+
+    let referenceNetValue = lastNetValueVal > 0 ? lastNetValueVal : getDisplayedReferenceNetValue(tradeReferenceFund);
+    const selectedNetValueType = syncForm.netValueType || 'yesterday';
+
+    if (selectedNetValueType === 'yesterday') {
+      referenceNetValue = lastNetValueVal > 0 ? lastNetValueVal : getDisplayedReferenceNetValue(tradeReferenceFund);
+    } else if (selectedNetValueType === 'estimated') {
+      referenceNetValue = estimatedNetValueVal > 0 ? estimatedNetValueVal : (lastNetValueVal > 0 ? lastNetValueVal : getDisplayedReferenceNetValue(tradeReferenceFund));
+    } else if (selectedNetValueType === 'custom') {
+      const customVal = Number.parseFloat(syncForm.customNetValue);
+      if (Number.isFinite(customVal) && customVal > 0) {
+        referenceNetValue = customVal;
+      }
+    }
 
     if (referenceNetValue <= 0) {
       alert('暂时无法获取这只基金的可用净值，无法按份额口径同步交易，请先刷新数据后再试。');
@@ -3472,7 +3686,7 @@ export default function FundTrackerApp() {
       tradeImpact,
     });
 
-    const updatedFund = applyTradeToFund(targetFund, tradePayload, quote, finalTradeDate);
+    const updatedFund = applyTradeToFund(targetFund, tradePayload, quote, finalTradeDate, referenceNetValue);
 
     if (isAuthenticated) {
       try {
@@ -3536,6 +3750,8 @@ export default function FundTrackerApp() {
       tradeDate: getTodayDateKey(),
       confirmTime: 'before15',
       amount: '',
+      netValueType: 'yesterday',
+      customNetValue: '',
     });
   };
 
@@ -3986,6 +4202,9 @@ export default function FundTrackerApp() {
     const quote = searchQuotes[code];
     let fundRateStr = quote?.fundRate || '';
 
+    syncFundLookupRequestRef.current += 1;
+    setSyncFundLookup(createEmptyFundLookup());
+
     setSyncForm({
       code: code,
       type: '买入',
@@ -3995,6 +4214,8 @@ export default function FundTrackerApp() {
       amount: '',
       feeRate: fundRateStr,
       sector: sectors[0] || '未分组',
+      netValueType: 'yesterday',
+      customNetValue: '',
     });
     openModal('sync');
   };
@@ -4575,7 +4796,7 @@ export default function FundTrackerApp() {
   return (
     <div className="h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800 overflow-hidden">
       {/* 1. 左侧悬浮玻璃侧边栏 (Desktop Only) */}
-      <aside className="hidden md:flex w-72 flex-col bg-white/80 backdrop-blur-md border-r border-slate-200/50 p-5 z-30 shrink-0 gap-5 select-none relative">
+      <aside className="hidden md:flex w-72 flex-col bg-white/80 backdrop-blur-md border-r border-slate-200/50 p-5 z-30 shrink-0 gap-5 select-none relative overflow-y-auto custom-scrollbar">
         {/* Brand/Logo */}
         <div className="flex items-center gap-2">
           {totalDailyProfit > 0 ? (
@@ -4799,7 +5020,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 主面板展现区 */}
-        <div className={`flex-1 custom-scrollbar mt-12 md:mt-0 pb-20 md:pb-0 ${activeTab === 'market' ? 'overflow-hidden flex flex-col min-h-0' : 'overflow-auto'}`}>
+        <div className={`flex-1 custom-scrollbar mt-12 md:mt-0 pb-24 md:pb-28 ${activeTab === 'market' ? 'overflow-hidden flex flex-col min-h-0' : 'overflow-auto'}`}>
           {activeTab === 'portfolio' ? (
             <FundTable
                 groupTableRef={groupTableRef}
@@ -4823,7 +5044,7 @@ export default function FundTrackerApp() {
                 todayStr={todayStr}
               />
           ) : activeTab === 'market' ? (
-            <GlobalMarketPanel />
+            <GlobalMarketPanel funds={funds} />
           ) : (
             renderSearchTab()
           )}
@@ -4966,9 +5187,10 @@ export default function FundTrackerApp() {
         onClose={() => closeModal('sync')}
         onSubmit={handleSyncTrade}
         syncForm={syncForm}
-        onChange={setSyncForm}
+        onChange={handleSyncFormChange}
         sectors={sectors}
         funds={funds}
+        syncFundLookup={syncFundLookup}
       />
 
       <OcrSyncModal

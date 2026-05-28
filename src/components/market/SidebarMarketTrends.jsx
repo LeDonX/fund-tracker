@@ -27,6 +27,64 @@ const INDICES_SHORT_NAMES = {
   "USDCNH=X": "离岸汇率"
 };
 
+// Helper to generate the full day timeline of "HH:MM" strings for alignment
+function getFullDayTimeline(symbol, isOneMinute = false) {
+  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
+  const hkIndices = ["^HSI", "^HSTECH"];
+  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
+  const jpIndices = ["^N225"];
+  const ukIndices = ["^FTSE"];
+  const deIndices = ["^GDAXI"];
+
+  const minutes = [];
+  const addMinutes = (startH, startM, endH, endM, step) => {
+    let h = startH;
+    let m = startM;
+    while (h < endH || (h === endH && m <= endM)) {
+      minutes.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      m += step;
+      if (m >= 60) {
+        h += Math.floor(m / 60);
+        m = m % 60;
+      }
+    }
+  };
+
+  const step = isOneMinute ? 1 : 5;
+
+  if (cnIndices.includes(symbol)) {
+    addMinutes(9, 30, 11, 30, step);
+    addMinutes(13, 0, 15, 0, step);
+    return minutes;
+  }
+  if (hkIndices.includes(symbol)) {
+    addMinutes(9, 30, 12, 0, step);
+    addMinutes(13, 0, 16, 0, step);
+    return minutes;
+  }
+  if (usIndices.includes(symbol)) {
+    addMinutes(9, 30, 16, 0, step);
+    return minutes;
+  }
+  if (jpIndices.includes(symbol)) {
+    addMinutes(9, 0, 11, 30, step);
+    addMinutes(12, 30, 15, 0, step);
+    return minutes;
+  }
+  if (ukIndices.includes(symbol)) {
+    addMinutes(8, 0, 16, 30, step);
+    return minutes;
+  }
+  if (deIndices.includes(symbol)) {
+    addMinutes(9, 0, 17, 30, step);
+    return minutes;
+  }
+
+  // 24h fallback at 15m intervals
+  addMinutes(0, 0, 23, 45, 15);
+  return minutes;
+}
+
 // Compact SVG sparkline component for sidebar rows
 function SidebarSparkline({ data, isPositive, symbol }) {
   if (!data || data.length <= 1) return null;
@@ -39,9 +97,18 @@ function SidebarSparkline({ data, isPositive, symbol }) {
   const width = 240;
   const height = 32;
   const padding = 1;
+
+  const isOneMinute = data.length > 80;
+  const fullTimeline = getFullDayTimeline(symbol, isOneMinute);
   
   const points = data.map((d, index) => {
-    const x = (index / (data.length - 1)) * (width - padding * 2) + padding;
+    let x;
+    const timeIndex = d.time ? fullTimeline.indexOf(d.time) : -1;
+    if (timeIndex !== -1) {
+      x = (timeIndex / (fullTimeline.length - 1)) * (width - padding * 2) + padding;
+    } else {
+      x = (index / (data.length - 1)) * (width - padding * 2) + padding;
+    }
     const y = height - ((d.value - min) / range) * (height - padding * 2) - padding;
     return `${x},${y}`;
   }).join(' ');
@@ -51,7 +118,14 @@ function SidebarSparkline({ data, isPositive, symbol }) {
   const cleanSym = symbol ? symbol.replace(/[^a-zA-Z0-9]/g, '') : Math.random().toString(36).substr(2, 5);
   const gradId = `sidebar-sparkline-grad-${isPositive ? 'up' : 'down'}-${cleanSym}`;
   
-  const fillPoints = `0,${height} ${points} ${width},${height}`;
+  // Align gradient drop precisely with the start and end of the drawn line
+  const firstTimeIndex = data[0]?.time ? fullTimeline.indexOf(data[0].time) : -1;
+  const firstX = firstTimeIndex !== -1 ? (firstTimeIndex / (fullTimeline.length - 1)) * (width - padding * 2) + padding : padding;
+  
+  const lastTimeIndex = data[data.length - 1]?.time ? fullTimeline.indexOf(data[data.length - 1].time) : -1;
+  const lastX = lastTimeIndex !== -1 ? (lastTimeIndex / (fullTimeline.length - 1)) * (width - padding * 2) + padding : width - padding;
+
+  const fillPoints = `${firstX},${height} ${points} ${lastX},${height}`;
   
   return (
     <svg className="w-full h-8 overflow-visible pointer-events-none" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
@@ -62,7 +136,7 @@ function SidebarSparkline({ data, isPositive, symbol }) {
         </linearGradient>
       </defs>
       <polygon points={fillPoints} fill={`url(#${gradId})`} />
-      <polyline fill="none" stroke={strokeColor} strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" points={points} />
+      <polyline fill="none" stroke={strokeColor} strokeWidth="1.25" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" points={points} />
     </svg>
   );
 }

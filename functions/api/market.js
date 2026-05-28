@@ -24,7 +24,18 @@ const INDICES = [
   { symbol: "NQ=F", name: "纳斯达克100期指", englishName: "Nasdaq 100 Futures", region: "FUT", regionName: "期货", isLeading: true },
   { symbol: "ES=F", name: "标谱500期指", englishName: "S&P 500 Futures", region: "FUT", regionName: "期货", isLeading: true },
   { symbol: "^HXC", name: "纳斯达克金龙中国指数", englishName: "Nasdaq Golden Dragon", region: "US", regionName: "美国", isLeading: true },
-  { symbol: "USDCNH=X", name: "离岸人民币汇率", englishName: "USD/CNH Exchange Rate", region: "FX", regionName: "外汇", isLeading: true }
+  { symbol: "USDCNH=X", name: "离岸人民币汇率", englishName: "USD/CNH Exchange Rate", region: "FX", regionName: "外汇", isLeading: true },
+  // 热门行业板块 ETF (代理行业板块)
+  { symbol: "512480.SS", name: "半导体芯片ETF", englishName: "Semiconductor ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "512690.SS", name: "消费白酒ETF", englishName: "Consumer ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "512170.SS", name: "医疗健康ETF", englishName: "Healthcare ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "515790.SS", name: "新能源光伏ETF", englishName: "Solar & New Energy ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "512880.SS", name: "证券券商ETF", englishName: "Brokerage ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "512660.SS", name: "国防军工ETF", englishName: "Military ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "512800.SS", name: "银行金融ETF", englishName: "Banking ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "515060.SS", name: "房地产ETF", englishName: "Real Estate ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "515980.SS", name: "人工智能ETF", englishName: "AI ETF", region: "SEC", regionName: "行业板块" },
+  { symbol: "515220.SS", name: "煤炭红利ETF", englishName: "Coal & Dividend ETF", region: "SEC", regionName: "行业板块" }
 ];
 
 // Fallback config for high-fidelity dynamic simulations
@@ -51,12 +62,22 @@ const BASE_CONFIGS = {
   "NQ=F": { base: 18800.00, drift: 0.0004, volatility: 0.0070 },
   "ES=F": { base: 5310.00, drift: 0.0003, volatility: 0.0080 },
   "^HXC": { base: 6200.00, drift: 0.0002, volatility: 0.0110 },
-  "USDCNH=X": { base: 7.2500, drift: -0.00005, volatility: 0.0015 }
+  "USDCNH=X": { base: 7.2500, drift: -0.00005, volatility: 0.0015 },
+  "512480.SS": { base: 1.2500, drift: 0.0001, volatility: 0.0150 },
+  "512690.SS": { base: 0.8500, drift: 0.0001, volatility: 0.0100 },
+  "512170.SS": { base: 0.3800, drift: 0.0001, volatility: 0.0120 },
+  "515790.SS": { base: 0.9800, drift: 0.0001, volatility: 0.0160 },
+  "512880.SS": { base: 0.9200, drift: 0.0001, volatility: 0.0180 },
+  "512660.SS": { base: 1.3500, drift: 0.0001, volatility: 0.0130 },
+  "512800.SS": { base: 1.1500, drift: 0.0001, volatility: 0.0080 },
+  "515060.SS": { base: 0.6500, drift: 0.0001, volatility: 0.0195 },
+  "515980.SS": { base: 0.8200, drift: 0.0001, volatility: 0.0165 },
+  "515220.SS": { base: 1.4500, drift: 0.0001, volatility: 0.0110 }
 };
 
 // Get timezone-aware market schedules
 function getMarketSchedule(symbol) {
-  if (["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"].includes(symbol)) {
+  if (["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"].includes(symbol) || symbol.endsWith(".SS") || symbol.endsWith(".SZ")) {
     return {
       timeZone: 'Asia/Shanghai',
       sessions: [
@@ -192,7 +213,18 @@ const TENCENT_SYMBOL_MAP = {
   "000905.SS": "sh000905",
   "000016.SS": "sh000016",
   "^HSI": "hkHSI",
-  "^HSTECH": "hkHSTECH"
+  "^HSTECH": "hkHSTECH",
+  // 热门行业板块 ETF (代理行业板块) 映射到腾讯代码
+  "512480.SS": "sh512480",
+  "512690.SS": "sh512690",
+  "512170.SS": "sh512170",
+  "515790.SS": "sh515790",
+  "512880.SS": "sh512880",
+  "512660.SS": "sh512660",
+  "512800.SS": "sh512800",
+  "515060.SS": "sh515060",
+  "515980.SS": "sh515980",
+  "515220.SS": "sh515220"
 };
 
 // Parser for Tencent minute API data format
@@ -404,7 +436,18 @@ const SINA_INDEX_MAP = {
   "NQ=F": "hf_NQ",
   "ES=F": "hf_ES",
   "^HXC": "gb_hxc",
-  "USDCNH=X": "fx_susdcnh"
+  "USDCNH=X": "fx_susdcnh",
+  // 热门行业板块 ETF (代理行业板块) 映射到新浪代码 (以s_sh开头适配指数格式)
+  "512480.SS": "s_sh512480",
+  "512690.SS": "s_sh512690",
+  "512170.SS": "s_sh512170",
+  "515790.SS": "s_sh515790",
+  "512880.SS": "s_sh512880",
+  "512660.SS": "s_sh512660",
+  "512800.SS": "s_sh512800",
+  "515060.SS": "s_sh515060",
+  "515980.SS": "s_sh515980",
+  "515220.SS": "s_sh515220"
 };
 
 async function fetchSinaRealtimeForSymbol(symbol) {

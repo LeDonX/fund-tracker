@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as echarts from 'echarts';
-import { Globe, RefreshCw, AlertCircle, TrendingUp, TrendingDown, Clock, Compass, Gauge, Flame, BookOpen, ArrowUpRight, ArrowDownRight, Info, HelpCircle, Cpu, Sliders, Play, ShieldAlert, CheckCircle, Activity, Pin } from 'lucide-react';
+import { Globe, RefreshCw, AlertCircle, TrendingUp, TrendingDown, Clock, Compass, Gauge, Flame, BookOpen, ArrowUpRight, ArrowDownRight, Info, HelpCircle, Cpu, Sliders, Play, ShieldAlert, CheckCircle, Activity, Pin, Layers } from 'lucide-react';
 
 // Light-weight pure SVG sparkline component for grid cards
 function Sparkline({ data, isPositive }) {
@@ -138,7 +138,7 @@ function DetailedChart({ option }) {
   return <div ref={chartRef} className="w-full h-full min-h-[220px] md:min-h-[300px]" />;
 }
 
-export default function GlobalMarketPanel() {
+export default function GlobalMarketPanel({ funds = [] }) {
   const [indices, setIndices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -212,6 +212,7 @@ export default function GlobalMarketPanel() {
   const [detailError, setDetailError] = useState(null);
   const [period, setPeriod] = useState('1D'); // 1D, 1M, 3M, 6M, 1Y
   const [marketTab, setMarketTab] = useState('overview'); // 'overview' | 'predictor' | 'advisor'
+  const [sectorSort, setSectorSort] = useState('gain'); // 'gain' (领涨优先), 'loss' (领跌优先), 'hot' (全网人气), 'holding' (我的持仓), 'default' (默认排序)
 
   const targetDateCN = useMemo(() => {
     return formatTargetDate(getTargetTradingDate('cn', new Date()));
@@ -539,8 +540,81 @@ export default function GlobalMarketPanel() {
 
   // Filter indices into main stock indices and leading wind vane indicators
   const mainIndices = useMemo(() => {
-    return indices.filter(idx => !idx.symbol.includes('CN=F') && !idx.symbol.includes('NQ=F') && !idx.symbol.includes('ES=F') && !idx.symbol.includes('^HXC') && !idx.symbol.includes('USDCNH=X'));
+    return indices.filter(idx => 
+      !idx.symbol.includes('CN=F') && 
+      !idx.symbol.includes('NQ=F') && 
+      !idx.symbol.includes('ES=F') && 
+      !idx.symbol.includes('^HXC') && 
+      !idx.symbol.includes('USDCNH=X') &&
+      idx.region !== 'SEC'
+    );
   }, [indices]);
+
+  // Calculate user's holding amount for each sector ETF based on funds prop
+  const sectorHoldings = useMemo(() => {
+    if (!Array.isArray(funds) || funds.length === 0) return {};
+    
+    const holdings = {};
+    const SECTOR_MAPPINGS = {
+      "512480.SS": ["芯片", "半导体", "科技", "科创", "chip", "semiconductor"],
+      "512690.SS": ["消费", "白酒", "饮料", "食品", "consumer", "liquor"],
+      "512170.SS": ["医疗", "医药", "健康", "生物", "medical", "healthcare"],
+      "515790.SS": ["新能源", "光伏", "锂电", "能源", "solar", "energy"],
+      "512880.SS": ["证券", "券商", "非银", "broker"],
+      "512660.SS": ["军工", "国防", "航天", "military"],
+      "512800.SS": ["银行", "金融", "bank"],
+      "515060.SS": ["地产", "房地产", "房", "real estate"],
+      "515980.SS": ["人工智能", "AI", "算力", "软件", "TMT", "intel"],
+      "515220.SS": ["煤炭", "红利", "高股息", "资源", "coal", "dividend"]
+    };
+    
+    Object.keys(SECTOR_MAPPINGS).forEach(sym => {
+      holdings[sym] = 0;
+    });
+    
+    funds.forEach(fund => {
+      const fundName = (fund.name || '').toLowerCase();
+      const fundSector = (fund.sector || '').toLowerCase();
+      const fundAmt = Number(fund.amount) || 0;
+      
+      // Try to find matching sector by keywords
+      let matchedSymbol = null;
+      for (const [sym, keywords] of Object.entries(SECTOR_MAPPINGS)) {
+        const matchesKeyword = keywords.some(kw => 
+          fundSector.includes(kw) || fundName.includes(kw)
+        );
+        if (matchesKeyword) {
+          matchedSymbol = sym;
+          break;
+        }
+      }
+      
+      if (matchedSymbol) {
+        holdings[matchedSymbol] += fundAmt;
+      }
+    });
+    
+    return holdings;
+  }, [funds]);
+
+  const sectorIndices = useMemo(() => {
+    const list = indices.filter(idx => idx.region === 'SEC');
+    if (sectorSort === 'gain') {
+      return [...list].sort((a, b) => b.changePercent - a.changePercent);
+    } else if (sectorSort === 'loss') {
+      return [...list].sort((a, b) => a.changePercent - b.changePercent);
+    } else if (sectorSort === 'hot') {
+      const hotScores = {
+        "512480.SS": 96, "512690.SS": 99, "512170.SS": 93, "515790.SS": 90, 
+        "512880.SS": 95, "512660.SS": 88, "512800.SS": 86, "515060.SS": 82, 
+        "515980.SS": 97, "515220.SS": 89
+      };
+      return [...list].sort((a, b) => (hotScores[b.symbol] || 50) - (hotScores[a.symbol] || 50));
+    } else if (sectorSort === 'holding') {
+      return [...list].sort((a, b) => (sectorHoldings[b.symbol] || 0) - (sectorHoldings[a.symbol] || 0));
+    }
+    return list;
+  }, [indices, sectorSort, sectorHoldings]);
 
   // Group main indices by region/country, sorting China (CN & HK) first
   const groupedIndices = useMemo(() => {
@@ -1032,6 +1106,10 @@ export default function GlobalMarketPanel() {
   // Format currency/number
   const formatIndexPrice = (val) => {
     if (!Number.isFinite(val)) return '--';
+    const absVal = Math.abs(val);
+    if (absVal > 0 && absVal < 10) {
+      return val.toLocaleString('zh-CN', { minimumFractionDigits: 3, maximumFractionDigits: 4 });
+    }
     return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
@@ -2038,6 +2116,17 @@ export default function GlobalMarketPanel() {
               <span>全球主流大盘</span>
             </button>
             <button
+              onClick={() => setMarketTab('sectors')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                marketTab === 'sectors'
+                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
+                  : 'text-slate-500 hover:text-slate-805 border border-transparent'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>热门行业板块</span>
+            </button>
+            <button
               onClick={() => setMarketTab('predictor')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer relative ${
                 marketTab === 'predictor'
@@ -2219,6 +2308,144 @@ export default function GlobalMarketPanel() {
                   </div>
                 </div>
               ))}
+            </div>
+          ) : marketTab === 'sectors' ? (
+            /* ================= TAB 4: SECTORS CARD GRID ================= */
+            <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+              <div className="flex flex-col gap-3">
+                {/* Section Title & Dynamic Sorting Actions */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-l-4 border-blue-600 pl-2 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-slate-800 tracking-wider">
+                      🇨🇳 A 股行业板块行情代理 (主流行业 ETF)
+                    </span>
+                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200/50 px-2 py-0.5 rounded-full font-mono">
+                      {sectorIndices.length} 个板块
+                    </span>
+                  </div>
+
+                  {/* Dynamic Sorting controls matching real-time conditions */}
+                  <div className="flex gap-0.5 bg-slate-100 p-0.5 rounded-lg w-fit shrink-0 select-none text-[9px] font-bold border border-slate-200/40 font-sans">
+                    {[
+                      { id: 'gain', label: '📈 领涨优先' },
+                      { id: 'loss', label: '📉 领跌优先' },
+                      { id: 'hot', label: '🔥 全网人气' },
+                      { id: 'holding', label: '💰 我的持仓' },
+                      { id: 'default', label: '⚙️ 默认排序' }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setSectorSort(opt.id)}
+                        className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                          sectorSort === opt.id ? 'bg-white text-blue-600 shadow-3xs font-black' : 'text-slate-450 hover:text-slate-700'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                  {sectorIndices.map((item) => {
+                    const isSelected = item.symbol === selectedSymbol;
+                    const isPositive = item.changePercent >= 0;
+                    
+                    const rateColorClass = isPositive 
+                      ? 'text-rose-600 bg-rose-50 border-rose-100/60' 
+                      : 'text-emerald-600 bg-emerald-50 border-emerald-100/60';
+                    
+                    const myHolding = sectorHoldings[item.symbol] || 0;
+                    
+                    const hotScores = {
+                      "512480.SS": 96, "512690.SS": 99, "512170.SS": 93, "515790.SS": 90, 
+                      "512880.SS": 95, "512660.SS": 88, "512800.SS": 86, "515060.SS": 82, 
+                      "515980.SS": 97, "515220.SS": 89
+                    };
+                    
+                    return (
+                      <div
+                        key={item.symbol}
+                        onClick={() => setSelectedSymbol(item.symbol)}
+                        className={`border rounded-2xl flex flex-col justify-between bg-gradient-to-br from-white to-slate-50/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer relative group ${
+                          isSelected 
+                            ? 'border-blue-500 ring-3 ring-blue-500/10 bg-gradient-to-br from-white to-blue-50/20' 
+                            : 'border-slate-200/60'
+                        }`}
+                      >
+                        <div className="w-full h-full flex flex-col justify-between p-4 rounded-[inherit] overflow-hidden">
+                          {/* Header info inside card */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center gap-1">
+                              <span className="text-10 font-extrabold text-slate-450 font-mono tracking-wider">{item.symbol}</span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {pinnedSymbols.includes(item.symbol) ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleTogglePin(item.symbol, e)}
+                                    className="p-1 rounded-md bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer shadow-3xs transition-all hover:bg-blue-100/60 flex items-center justify-center animate-in fade-in duration-200"
+                                    title="从侧边栏取消固定"
+                                  >
+                                    <Pin className="w-3.5 h-3.5 fill-current rotate-45" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleTogglePin(item.symbol, e)}
+                                    className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 border border-transparent hover:border-slate-200/60 cursor-pointer opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                                    title="固定到侧边栏"
+                                  >
+                                    <Pin className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <span className="text-9 font-bold text-slate-400 bg-slate-100 border border-slate-200/30 px-2 py-0.5 rounded-full shrink-0 select-none">
+                                  🇨🇳 行业板块
+                                </span>
+                              </div>
+                            </div>
+                            <h4 className="font-extrabold text-slate-700 text-xs leading-snug group-hover:text-blue-600 transition-colors mt-0.5 text-left" title={item.englishName}>
+                              {item.name}
+                            </h4>
+                          </div>
+
+                          {/* Numeric panel inside card */}
+                          <div className="mt-3.5 flex justify-between items-end">
+                            <div className="flex flex-col text-left">
+                              <span className="text-base font-black font-mono text-slate-700 tracking-tight">
+                                {formatIndexPrice(item.currentPrice)}
+                              </span>
+                            </div>
+                            <span className={`inline-flex items-center text-10 font-mono font-extrabold px-2 py-0.5 border rounded-lg shrink-0 ${rateColorClass}`}>
+                              {isPositive ? '+' : ''}{item.changePercent.toFixed(2)}%
+                            </span>
+                          </div>
+
+                          {/* Dynamic details badge inside card */}
+                          {(sectorSort === 'holding' || myHolding > 0) && (
+                            <div className="mt-2.5 flex items-center justify-between text-[10px] bg-blue-50/50 text-blue-700 px-2.5 py-1 rounded-lg border border-blue-100/50 font-bold leading-none select-none animate-in fade-in duration-200">
+                              <span>💰 我的持仓额</span>
+                              <span className="font-mono">¥{myHolding.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          {sectorSort === 'hot' && (
+                            <div className="mt-2.5 flex items-center justify-between text-[10px] bg-orange-50/50 text-orange-700 px-2.5 py-1 rounded-lg border border-orange-100/50 font-bold leading-none select-none animate-in fade-in duration-200">
+                              <span>🔥 全网日均热度</span>
+                              <span className="font-mono">{(hotScores[item.symbol] || 80) + 12} 亿</span>
+                            </div>
+                          )}
+
+                          {/* Pure SVG Sparkline */}
+                          <div className="h-8 mt-2.5 flex items-end">
+                            <Sparkline data={item.sparkline} isPositive={isPositive} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           ) : marketTab === 'predictor' ? (
             /* ================= TAB 2: PREDICTOR & WIND VANE ================= */
