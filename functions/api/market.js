@@ -597,7 +597,7 @@ async function fetchEastmoneySectors() {
     return list.map(item => {
       const rawPrice = parseFloat(item.f2);
       const price = isNaN(rawPrice) ? 0 : rawPrice / 100;
-      const changePercent = parseFloat(item.f3) || 0;
+      const changePercent = (parseFloat(item.f3) || 0) / 100;
       const change = parseFloat(item.f4) / 100 || 0;
       const netInflow = parseFloat(item.f62) || 0;
       

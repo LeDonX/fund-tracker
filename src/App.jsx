@@ -4820,7 +4820,7 @@ export default function FundTrackerApp() {
       {/* 1. 左侧悬浮玻璃侧边栏 (Desktop Only) */}
       <aside className="hidden md:flex w-72 flex-col bg-white/80 backdrop-blur-md border-r border-slate-200/50 p-5 z-30 shrink-0 gap-5 select-none relative overflow-y-auto custom-scrollbar">
         {/* Brand/Logo */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {totalDailyProfit > 0 ? (
             <TrendingUp className="text-rose-500 w-5 h-5 filter drop-shadow-[0_2px_8px_rgba(251,113,133,0.35)] animate-pulse" />
           ) : totalDailyProfit < 0 ? (
@@ -4835,7 +4835,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 资产汇总卡片 (Portfolio Summary inside Sidebar - Always Shown & High Space Efficiency) */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white p-3.5 rounded-xl shadow-md border border-slate-700/25 relative overflow-hidden select-none">
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white p-3.5 rounded-xl shadow-md border border-slate-700/25 relative overflow-hidden select-none shrink-0">
           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
           <div className="grid grid-cols-2 gap-3 relative z-10 divide-x divide-slate-800/60">
             {/* Column 1: Total Assets */}
@@ -4865,7 +4865,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 导航菜单 Tabs */}
-        <div className="flex flex-col gap-1 select-none">
+        <div className="flex flex-col gap-1 select-none shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('portfolio')}
@@ -4905,7 +4905,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 侧边栏底部区域 (走势图 + 账号与参数配置) */}
-        <div className="mt-auto flex flex-col gap-3.5 border-t border-slate-200/50 pt-4 select-none">
+        <div className="mt-auto flex flex-col gap-3.5 border-t border-slate-200/50 pt-4 select-none shrink-0">
           {/* 侧边栏三个实时大盘分时走势图 */}
           <SidebarMarketTrends setActiveTab={setActiveTab} />
 
