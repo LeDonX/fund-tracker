@@ -335,18 +335,13 @@ export default function FundTable({
                           className="text-left font-semibold text-slate-800 hover:text-blue-700 text-14 flex items-center gap-1.5 w-full truncate"
                         >
                           <span className="truncate">{fund.name}</span>
-                          {fund.netValueDate && !isFundActiveToday(fund) && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-9 font-bold bg-amber-50/70 text-amber-700 border border-amber-200/50 select-none shrink-0 scale-90 origin-left">
-                              {fund.netValueDate.slice(5)}
-                            </span>
-                          )}
                         </button>
                         <span className="text-10 text-slate-400 font-semibold font-mono">{fund.code}</span>
                       </div>
                       
-                      {fund.valuationSource === 'official' && (
+                      {fund.valuationSource === 'official' && fund.netValueDate === actualTodayStr && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-10 font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 select-none shrink-0 scale-90 origin-right">
-                          已更新
+                          已更新 {fund.netValueDate.slice(5)}
                         </span>
                       )}
                     </div>
@@ -364,11 +359,6 @@ export default function FundTable({
                           <span className="text-9 font-semibold text-slate-400">
                             (<FormatNumber value={fund.dailyRate} isPercent={true} />)
                           </span>
-                          {fund.netValueDate && !isFundActiveToday(fund) && (
-                            <span className="text-9 font-bold text-slate-400 bg-slate-100/60 border border-slate-200/50 px-1 py-0.2 rounded select-none shrink-0" title={`非今日收益 (${fund.netValueDate})`}>
-                              {fund.netValueDate.slice(5)}
-                            </span>
-                          )}
                         </span>
                       </div>
                       <div className="flex flex-col">
@@ -570,14 +560,9 @@ export default function FundTable({
                       >
                         <div className="flex items-center gap-1.5 font-semibold text-slate-800 transition-colors group-hover/btn:text-blue-700 text-14">
                           <span>{fund.name}</span>
-                          {fund.valuationSource === 'official' && (
+                          {fund.valuationSource === 'official' && fund.netValueDate === actualTodayStr && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-10 font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 select-none scale-[0.9] origin-left shrink-0">
-                              已更新
-                            </span>
-                          )}
-                          {fund.netValueDate && !isFundActiveToday(fund) && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-10 font-bold bg-amber-50/70 text-amber-700 border border-amber-200/50 select-none scale-[0.9] origin-left shrink-0" title={`非今日数据 (净值日期: ${fund.netValueDate})`}>
-                              {fund.netValueDate.slice(5)}
+                              已更新 {fund.netValueDate.slice(5)}
                             </span>
                           )}
                         </div>
@@ -593,21 +578,11 @@ export default function FundTable({
                     <td className="p-4 text-right">
                       <div className="flex flex-col items-end">
                         <FormatNumber value={fund.dailyRate} isPercent={true} />
-                        {fund.netValueDate && !isFundActiveToday(fund) && (
-                          <span className="text-9 font-semibold text-slate-400 mt-0.5" title={`估值日期为 ${fund.netValueDate}`}>
-                            {fund.netValueDate.slice(5)}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="p-4 text-right bg-blue-50/20 font-extrabold text-15 border-r border-blue-50/10">
                       <div className="flex flex-col items-end">
                         <FormatNumber value={fund.dailyProfit} isCurrency={true} />
-                        {fund.netValueDate && !isFundActiveToday(fund) && (
-                          <span className="text-9 font-semibold text-slate-400 mt-0.5" title={`收益日期为 ${fund.netValueDate}`}>
-                            {fund.netValueDate.slice(5)}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="p-4 text-right">

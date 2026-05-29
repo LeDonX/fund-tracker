@@ -278,11 +278,52 @@ export default function GlobalMarketPanel({ funds = [] }) {
     }
   };
 
+  // Get timezone-aware market phase for Asia/Shanghai (A-shares)
+  const marketPhase = useMemo(() => {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Shanghai',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      weekday: 'short'
+    });
+    const parts = formatter.formatToParts(now);
+    let hour = 0;
+    let minute = 0;
+    let weekday = '';
+    for (const part of parts) {
+      if (part.type === 'hour') hour = parseInt(part.value, 10);
+      if (part.type === 'minute') minute = parseInt(part.value, 10);
+      if (part.type === 'weekday') weekday = part.value;
+    }
+    const timeVal = hour * 100 + minute;
+    const isWeekend = weekday === 'Sat' || weekday === 'Sun';
+
+    if (isWeekend) return 'post';
+    if (timeVal < 930) return 'pre';
+    if (timeVal <= 1500) return 'trading';
+    return 'post';
+  }, []);
+
   // China / A-shares advisor signal processing
   const chinaAdvisorData = useMemo(() => {
+    // Find cash market indices
+    const shIndex = indices.find(idx => idx.symbol === '000001.SS');
+    const cyIndex = indices.find(idx => idx.symbol === '399006.SZ');
+    const shChg = shIndex ? shIndex.changePercent : 0.0;
+    const cyChg = cyIndex ? cyIndex.changePercent : 0.0;
+
     const f_a50_morning = chinaA50Input;
     const hxc_last_night = chinaHxcInput;
-    const growth_sentiment = 0.4 * f_a50_morning + 0.6 * hxc_last_night;
+
+    const useCashMarket = marketPhase === 'trading' || marketPhase === 'post';
+
+    // Core indicators: Use actual cash market during/after session, futures during pre-market
+    const traditionalChg = useCashMarket ? shChg : f_a50_morning;
+    const growthChg = useCashMarket ? cyChg : hxc_last_night;
+
+    const growth_sentiment = 0.4 * traditionalChg + 0.6 * growthChg;
     
     let activeRule = -1;
     let signal = "";
@@ -294,11 +335,27 @@ export default function GlobalMarketPanel({ funds = [] }) {
     let indicator = "";
     let cardGradient = "";
     
-    // 决策 1：全面共振暴跌
-    if (f_a50_morning <= -0.8 && hxc_last_night <= -1.5) {
+    const isCrash = useCashMarket
+      ? (traditionalChg <= -0.6 && growthChg <= -1.2)
+      : (traditionalChg <= -0.8 && growthChg <= -1.5);
+
+    const isRise = useCashMarket
+      ? (traditionalChg >= 0.6 && growthChg >= 1.2)
+      : (traditionalChg >= 0.8 && growthChg >= 1.5);
+
+    const isDivergence = useCashMarket
+      ? (traditionalChg >= 0.4 && growthChg <= -0.8)
+      : (traditionalChg >= 0.5 && growthChg <= -1.0);
+
+    // 决策 1：全面共振暴跌 / 现货市场遭遇大崩盘
+    if (isCrash) {
       activeRule = 1;
-      signal = "🔴 [严重警报] 大A与创业板今早将大幅低开！";
-      action = "今日场外基金禁止加仓。场内ETF若想减仓，静待9:45左右的反抽高点，切勿在9:30开盘第一分钟割肉。";
+      signal = useCashMarket
+        ? "🔴 [严重警报] 大A与创业板今日遭遇放量暴跌！"
+        : "🔴 [严重警报] 大A与创业板今早将大幅低开！";
+      action = useCashMarket
+        ? "今日收盘已成大面积绿盘回调。对于场外基金，若您在 15:00 前已主动暂停扣款则成功避坑；若未操作，今晚净值将承受较大跌幅。切勿在晚间盲目割肉，静待技术性反弹。"
+        : "今日场外基金建议暂停定投。场内ETF若想减仓，静待9:45左右的反抽高点，切勿在9:30开盘第一分钟割肉。";
       label = "共振暴跌";
       color = "text-rose-600";
       bg = "bg-rose-50/90";
@@ -306,11 +363,15 @@ export default function GlobalMarketPanel({ funds = [] }) {
       indicator = "bg-rose-500 animate-pulse";
       cardGradient = "from-red-500/10 via-rose-500/5 to-transparent";
     }
-    // 决策 2：全面共振大涨
-    else if (f_a50_morning >= 0.8 && hxc_last_night >= 1.5) {
+    // 决策 2：全面共振大涨 / 现货全线飙升
+    else if (isRise) {
       activeRule = 2;
-      signal = "🟢 [多头逼空] 大A与创业板今早将大幅高开！";
-      action = "情绪极其亢奋。场内ETF切勿开盘无脑追高（谨防高开低走）；场外基金如需建仓，可在下午14:30观察是否抱团封死阳线再做决定。";
+      signal = useCashMarket
+        ? "🟢 [多头逼空] 大A与创业板今日大获全胜，红盘高歌！"
+        : "🟢 [多头逼空] 大A与创业板今早将大幅高开！";
+      action = useCashMarket
+        ? "情绪极其亢奋，收盘大阳线确定。持有底仓的投资者应坚定持有，让利润奔跑；切勿在收盘后盲目追高，等待合理回调再加仓。"
+        : "情绪极其亢奋。场内ETF切勿开盘无脑追高（谨防高开低走）；场外基金如需建仓，可在下午14:30观察是否抱团封死阳线再做决定。";
       label = "多头逼空";
       color = "text-emerald-600";
       bg = "bg-emerald-50/90";
@@ -319,10 +380,14 @@ export default function GlobalMarketPanel({ funds = [] }) {
       cardGradient = "from-emerald-500/10 via-teal-500/5 to-transparent";
     }
     // 决策 3：存量博弈，结构分化
-    else if (f_a50_morning >= 0.5 && hxc_last_night <= -1.0) {
+    else if (isDivergence) {
       activeRule = 3;
-      signal = "🟡 [二八分化] 传统蓝筹护盘，创业板承压！";
-      action = "今天国家队可能会拉中字头、银行（A50强），但新能源、半导体等创业板权重（受中概拖累）会走弱。个股/行业基金各走各路，不宜盲目乱动。";
+      signal = useCashMarket
+        ? "🟡 [二八分化] 传统蓝筹护盘，创业板科技股失血暴跌！"
+        : "🟡 [二八分化] 传统蓝筹护盘，创业板承压！";
+      action = useCashMarket
+        ? "国家队拉动中字头、银行等传统权重护盘（上证指数跌幅受限），但新能源、半导体等创业板权重失血暴跌。板块各走各路，此时千万不宜盲目乱动调仓，多看少动。"
+        : "今天国家队可能会拉中字头、银行（A50强），但新能源、半导体等创业板权重（受中概拖累）会走弱。个股/行业基金各走各路，不宜盲目乱动。";
       label = "二八分化";
       color = "text-amber-600";
       bg = "bg-amber-50/90";
@@ -333,8 +398,12 @@ export default function GlobalMarketPanel({ funds = [] }) {
     // 默认：震荡市
     else {
       activeRule = 4;
-      signal = "⚪ [震荡市] 离岸市场波动微弱";
-      action = "大A今天大概率维持震荡横盘，按照既定定投计划执行即可，无超额盘中交易机会。";
+      signal = useCashMarket
+        ? "☁️ [横盘震荡] 大盘在平稳区间内窄幅拉锯"
+        : "⚪ [震荡市] 离岸市场波动微弱";
+      action = useCashMarket
+        ? "今日大盘波澜不惊，多空处于温和拉锯状态。无明显的单边操作机会，继续保持原有的日常定投节奏，多看少动为主。"
+        : "大A今天大概率维持震荡横盘，按照既定定投计划执行即可，无超额盘中交易机会。";
       label = "震荡整理";
       color = "text-slate-650";
       bg = "bg-slate-50/90";
@@ -343,8 +412,8 @@ export default function GlobalMarketPanel({ funds = [] }) {
       cardGradient = "from-slate-400/5 to-transparent";
     }
     
-    return { f_a50_morning, hxc_last_night, growth_sentiment, activeRule, signal, action, label, color, bg, border, indicator, cardGradient };
-  }, [chinaA50Input, chinaHxcInput]);
+    return { f_a50_morning, hxc_last_night, growth_sentiment, activeRule, signal, action, label, color, bg, border, indicator, cardGradient, useCashMarket };
+  }, [chinaA50Input, chinaHxcInput, indices, marketPhase]);
 
   // US stocks dual-threshold advisor signal processing
   const usAdvisorData = useMemo(() => {
@@ -452,45 +521,65 @@ export default function GlobalMarketPanel({ funds = [] }) {
 
   // Jargon-free market weather indicators for Novice Mode
   const chinaWeather = useMemo(() => {
+    // Find cash market indices
+    const shIndex = indices.find(idx => idx.symbol === '000001.SS');
+    const cyIndex = indices.find(idx => idx.symbol === '399006.SZ');
+    const shChg = shIndex ? shIndex.changePercent : 0.0;
+    const cyChg = cyIndex ? cyIndex.changePercent : 0.0;
+
     const f_a50 = chinaA50Input;
     const hxc = chinaHxcInput;
+
+    const useCashMarket = marketPhase === 'trading' || marketPhase === 'post';
+
+    // 1. Traditional/Blue-chips Card
+    const a50Val = useCashMarket ? shChg : f_a50;
+    const a50Label = useCashMarket ? "A股主板大盘 (代表传统蓝筹白马)" : "A股核心大公司前瞻 (如茅台、银行等)";
+    const a50Sub = useCashMarket ? "(上证综合指数)" : "(富时中国 A50 指数)";
     
     let a50Weather = "⛅ 多云 (平稳没有大涨大跌)";
     let a50Bg = "bg-slate-50 border-slate-200/50";
     let a50Emoji = "⛅";
     let a50Color = "text-slate-600";
     
-    if (f_a50 >= 0.8) {
-      a50Weather = "☀️ 晴天 (大上市公司强劲拉升)";
+    const a50Thresh = useCashMarket ? 0.6 : 0.8;
+    if (a50Val >= a50Thresh) {
+      a50Weather = useCashMarket ? "☀️ 晴天 (大盘权重股显著走强)" : "☀️ 晴天 (大上市公司强劲拉升)";
       a50Bg = "bg-rose-50/70 border-rose-150 shadow-3xs";
       a50Emoji = "☀️";
       a50Color = "text-rose-600";
-    } else if (f_a50 <= -0.8) {
-      a50Weather = "🌧️ 雨天 (核心股票明显下跌)";
+    } else if (a50Val <= -a50Thresh) {
+      a50Weather = useCashMarket ? "🌧️ 雨天 (大盘权重股遭遇明显回调)" : "🌧️ 雨天 (核心股票明显下跌)";
       a50Bg = "bg-emerald-50/70 border-emerald-150 shadow-3xs";
       a50Emoji = "🌧️";
       a50Color = "text-emerald-600";
     }
     
+    // 2. Growth/Tech Card
+    const hxcVal = useCashMarket ? cyChg : hxc;
+    const hxcLabel = useCashMarket ? "A股创业科技 (代表成长、芯片新能源)" : "中国科技股前瞻 (如阿里、拼多多等)";
+    const hxcSub = useCashMarket ? "(创业板指数)" : "(中概金龙指数 HXC)";
+
     let hxcWeather = "⛅ 多云 (科技股平稳整理)";
     let hxcBg = "bg-slate-50 border-slate-200/50";
     let hxcEmoji = "⛅";
     let hxcColor = "text-slate-600";
     
-    if (hxc >= 1.5) {
-      hxcWeather = "☀️ 晴天 (中概科技股超级大涨)";
+    const hxcThresh = useCashMarket ? 1.2 : 1.5;
+    if (hxcVal >= hxcThresh) {
+      hxcWeather = useCashMarket ? "☀️ 晴天 (创业板指全线强劲大涨)" : "☀️ 晴天 (中概科技股超级大涨)";
       hxcBg = "bg-rose-50/70 border-rose-150 shadow-3xs";
       hxcEmoji = "☀️";
       hxcColor = "text-rose-600";
-    } else if (hxc <= -1.5) {
-      hxcWeather = "🌧️ 雨天 (中概科技股陷入大跌)";
+    } else if (hxcVal <= -hxcThresh) {
+      hxcWeather = useCashMarket ? "🌧️ 暴雨 (创业成长股遭遇深度调整)" : "🌧️ 雨天 (中概科技股陷入大跌)";
       hxcBg = "bg-emerald-50/70 border-emerald-150 shadow-3xs";
       hxcEmoji = "🌧️";
       hxcColor = "text-emerald-600";
     }
     
-    return { a50Weather, a50Bg, a50Emoji, a50Color, hxcWeather, hxcBg, hxcEmoji, hxcColor };
-  }, [chinaA50Input, chinaHxcInput]);
+    return { a50Weather, a50Bg, a50Emoji, a50Color, a50Label, a50Sub, hxcWeather, hxcBg, hxcEmoji, hxcColor, hxcLabel, hxcSub };
+  }, [chinaA50Input, chinaHxcInput, indices, marketPhase]);
 
   const usWeather = useMemo(() => {
     const nq = usNasdaqInput;
@@ -550,26 +639,15 @@ export default function GlobalMarketPanel({ funds = [] }) {
     );
   }, [indices]);
 
-  // Calculate user's holding amount for each sector ETF based on funds prop
+  // Calculate user's holding amount for each sector dynamically based on funds prop and indices
   const sectorHoldings = useMemo(() => {
-    if (!Array.isArray(funds) || funds.length === 0) return {};
+    if (!Array.isArray(funds) || funds.length === 0 || !Array.isArray(indices)) return {};
     
     const holdings = {};
-    const SECTOR_MAPPINGS = {
-      "512480.SS": ["芯片", "半导体", "科技", "科创", "chip", "semiconductor"],
-      "512690.SS": ["消费", "白酒", "饮料", "食品", "consumer", "liquor"],
-      "512170.SS": ["医疗", "医药", "健康", "生物", "medical", "healthcare"],
-      "515790.SS": ["新能源", "光伏", "锂电", "能源", "solar", "energy"],
-      "512880.SS": ["证券", "券商", "非银", "broker"],
-      "512660.SS": ["军工", "国防", "航天", "military"],
-      "512800.SS": ["银行", "金融", "bank"],
-      "515060.SS": ["地产", "房地产", "房", "real estate"],
-      "515980.SS": ["人工智能", "AI", "算力", "软件", "TMT", "intel"],
-      "515220.SS": ["煤炭", "红利", "高股息", "资源", "coal", "dividend"]
-    };
+    const sectors = indices.filter(idx => idx.region === 'SEC');
     
-    Object.keys(SECTOR_MAPPINGS).forEach(sym => {
-      holdings[sym] = 0;
+    sectors.forEach(sec => {
+      holdings[sec.symbol] = 0;
     });
     
     funds.forEach(fund => {
@@ -577,17 +655,39 @@ export default function GlobalMarketPanel({ funds = [] }) {
       const fundSector = (fund.sector || '').toLowerCase();
       const fundAmt = Number(fund.amount) || 0;
       
-      // Try to find matching sector by keywords
       let matchedSymbol = null;
-      for (const [sym, keywords] of Object.entries(SECTOR_MAPPINGS)) {
-        const matchesKeyword = keywords.some(kw => 
-          fundSector.includes(kw) || fundName.includes(kw)
-        );
-        if (matchesKeyword) {
-          matchedSymbol = sym;
-          break;
-        }
-      }
+      let bestScore = 0;
+      
+      sectors.forEach(sec => {
+        const secName = sec.name.replace("行业", "").replace("板块", "");
+        
+        // Define aliases for hot technology/growth themes to optimize matching accuracy
+        const aliases = {
+          "通信设备": ["通信", "cpo", "光模块", "5g", "光通信", "telecom"],
+          "半导体": ["芯片", "半导体", "集成电路", "chip", "semiconductor"],
+          "计算机设备": ["算力", "计算机", "硬件", "服务器", "computer"],
+          "软件开发": ["软件", "应用软件", "系统软件", "software"],
+          "电子元件": ["电子", "pcb", "硬件", "电路板", "印制电路", "electronics"],
+          "食品饮料": ["白酒", "消费", "饮料", "食品", "酒", "liquor", "consumer"],
+          "化学制药": ["医药", "医疗", "创新药", "制药", "pharma", "biotech"],
+          "生物制品": ["生物", "创新药", "疫苗", "biotech"],
+          "电力设备": ["光伏", "新能源", "太阳能", "电池", "锂电", "solar"],
+          "证券": ["证券", "券商", "非银", "broker"]
+        };
+        
+        const keywords = aliases[sec.name] || [secName];
+        
+        keywords.forEach(kw => {
+          const kwLower = kw.toLowerCase();
+          if (fundSector.includes(kwLower) || fundName.includes(kwLower)) {
+            const score = kwLower.length;
+            if (score > bestScore) {
+              bestScore = score;
+              matchedSymbol = sec.symbol;
+            }
+          }
+        });
+      });
       
       if (matchedSymbol) {
         holdings[matchedSymbol] += fundAmt;
@@ -595,7 +695,7 @@ export default function GlobalMarketPanel({ funds = [] }) {
     });
     
     return holdings;
-  }, [funds]);
+  }, [funds, indices]);
 
   const sectorIndices = useMemo(() => {
     const list = indices.filter(idx => idx.region === 'SEC');
@@ -604,12 +704,16 @@ export default function GlobalMarketPanel({ funds = [] }) {
     } else if (sectorSort === 'loss') {
       return [...list].sort((a, b) => a.changePercent - b.changePercent);
     } else if (sectorSort === 'hot') {
-      const hotScores = {
-        "512480.SS": 96, "512690.SS": 99, "512170.SS": 93, "515790.SS": 90, 
-        "512880.SS": 95, "512660.SS": 88, "512800.SS": 86, "515060.SS": 82, 
-        "515980.SS": 97, "515220.SS": 89
+      const hotAliases = {
+        "通信设备": 98, "半导体": 96, "计算机设备": 97, "软件开发": 95, 
+        "电子元件": 94, "食品饮料": 90, "证券": 93, "电力设备": 88, 
+        "化学制药": 92, "航天航空": 86, "煤炭行业": 89
       };
-      return [...list].sort((a, b) => (hotScores[b.symbol] || 50) - (hotScores[a.symbol] || 50));
+      return [...list].sort((a, b) => {
+        const scoreA = hotAliases[a.name] || (50 + (a.changePercent > 0 ? a.changePercent * 5 : 0));
+        const scoreB = hotAliases[b.name] || (50 + (b.changePercent > 0 ? b.changePercent * 5 : 0));
+        return scoreB - scoreA;
+      });
     } else if (sectorSort === 'holding') {
       return [...list].sort((a, b) => (sectorHoldings[b.symbol] || 0) - (sectorHoldings[a.symbol] || 0));
     }
@@ -1212,8 +1316,8 @@ export default function GlobalMarketPanel({ funds = [] }) {
                 {/* A50 Weather Card */}
                 <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${chinaWeather.a50Bg}`}>
                   <div className="flex flex-col gap-1 text-left">
-                    <span className="text-xs font-black text-slate-600">A股核心大公司前瞻 (如茅台、银行等)</span>
-                    <span className="text-10 text-slate-400 font-bold">(富时中国 A50 指数)</span>
+                    <span className="text-xs font-black text-slate-600">{chinaWeather.a50Label}</span>
+                    <span className="text-10 text-slate-400 font-bold">{chinaWeather.a50Sub}</span>
                     <span className={`text-13 font-black mt-1.5 ${chinaWeather.a50Color}`}>{chinaWeather.a50Weather}</span>
                   </div>
                   <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{chinaWeather.a50Emoji}</span>
@@ -1222,8 +1326,8 @@ export default function GlobalMarketPanel({ funds = [] }) {
                 {/* HXC Weather Card */}
                 <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${chinaWeather.hxcBg}`}>
                   <div className="flex flex-col gap-1 text-left">
-                    <span className="text-xs font-black text-slate-600">中国科技股前瞻 (如阿里、拼多多等)</span>
-                    <span className="text-10 text-slate-400 font-bold">(中概金龙指数 HXC)</span>
+                    <span className="text-xs font-black text-slate-600">{chinaWeather.hxcLabel}</span>
+                    <span className="text-10 text-slate-400 font-bold">{chinaWeather.hxcSub}</span>
                     <span className={`text-13 font-black mt-1.5 ${chinaWeather.hxcColor}`}>{chinaWeather.hxcWeather}</span>
                   </div>
                   <span className="text-4xl select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]">{chinaWeather.hxcEmoji}</span>

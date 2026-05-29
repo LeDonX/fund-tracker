@@ -21,8 +21,9 @@ async function run() {
   
   if (json.success && Array.isArray(json.indices)) {
     const sectors = json.indices.filter(idx => idx.region === 'SEC');
-    console.log('Sector indices count (should be 10):', sectors.length);
-    sectors.forEach(sec => {
+    console.log('Sector indices count (should be ~70+):', sectors.length);
+    console.log('Top 10 returned sectors:');
+    sectors.slice(0, 10).forEach(sec => {
       console.log(`  - [${sec.symbol}] ${sec.name} | Price: ${sec.currentPrice} | Chg: ${sec.changePercent}% | Sparkline points: ${sec.sparkline.length}`);
     });
   } else {
@@ -30,12 +31,12 @@ async function run() {
   }
   
   console.log('\n==================================================');
-  console.log('TEST 2: Fetching 1D Intraday Detail for Semiconductor ETF (512480.SS)');
+  console.log('TEST 2: Fetching 1D Intraday Detail for Telecom Sector (BK0448)');
   console.log('==================================================');
   
   const mockContextDetail = {
     request: {
-      url: 'http://localhost/api/market?symbol=512480.SS&range=1d'
+      url: 'http://localhost/api/market?symbol=BK0448&range=1d'
     }
   };
   
@@ -59,19 +60,33 @@ async function run() {
   }
   
   console.log('\n==================================================');
-  console.log('TEST 3: Fetching 1D Intraday Detail with Mocked / Offline Fallback');
+  console.log('TEST 3: Fetching 1Y Historical Daily K-line for Semiconductor (BK1036)');
   console.log('==================================================');
-  // We can test fallback by using a sector symbol that fails or runs offline
-  // Since all 10 are valid, let's make sure they load cleanly
+  
   const mockContextDetail2 = {
     request: {
-      url: 'http://localhost/api/market?symbol=512690.SS&range=1d'
+      url: 'http://localhost/api/market?symbol=BK1036&range=1y'
     }
   };
   
   const responseDetail2 = await onRequestGet(mockContextDetail2);
   const jsonDetail2 = await responseDetail2.json();
-  console.log(`[512690.SS] Name: ${jsonDetail2.name} | Price: ${jsonDetail2.currentPrice} | Points: ${jsonDetail2.history?.length}`);
+  
+  console.log('History API Response Status:', responseDetail2.status);
+  console.log('Success:', jsonDetail2.success);
+  console.log('Symbol:', jsonDetail2.symbol);
+  console.log('Name:', jsonDetail2.name);
+  console.log('Current Price:', jsonDetail2.currentPrice);
+  console.log('Price Change:', jsonDetail2.change);
+  console.log('Price Change Percent:', jsonDetail2.changePercent);
+  console.log('History point count:', jsonDetail2.history ? jsonDetail2.history.length : 0);
+  
+  if (jsonDetail2.success && Array.isArray(jsonDetail2.history) && jsonDetail2.history.length > 0) {
+    console.log('First history point:', jsonDetail2.history[0]);
+    console.log('Last history point:', jsonDetail2.history[jsonDetail2.history.length - 1]);
+  } else {
+    console.error('Error or no history returned:', jsonDetail2.error);
+  }
   console.log('==================================================');
 }
 

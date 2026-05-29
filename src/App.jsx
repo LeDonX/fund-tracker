@@ -633,9 +633,17 @@ const shouldPreferOfficialValuation = (fund) => {
   }
 
   const quoteSource = inferStoredQuoteSource(fund);
-  const quoteNetValueDate = typeof fund.netValueDate === 'string' ? fund.netValueDate : '';
+  
+  // 对于估算，数据日期和更新时间分别存储在 estimatedNetValueDate 和 estimatedUpdateTime 中
+  const quoteNetValueDate = quoteSource === 'estimate'
+    ? (typeof fund.estimatedNetValueDate === 'string' ? fund.estimatedNetValueDate : '')
+    : (typeof fund.netValueDate === 'string' ? fund.netValueDate : '');
+    
   const officialNetValueDate = typeof fund.officialNetValueDate === 'string' ? fund.officialNetValueDate : '';
-  const isTodayValuation = typeof fund.lastValuationTime === 'string' && fund.lastValuationTime.startsWith(getTodayDateKey());
+  
+  const isTodayValuation = quoteSource === 'estimate'
+    ? (typeof fund.estimatedUpdateTime === 'string' && fund.estimatedUpdateTime.startsWith(getTodayDateKey()))
+    : (typeof fund.lastValuationTime === 'string' && fund.lastValuationTime.startsWith(getTodayDateKey()));
 
   if (quoteSource === 'estimate') {
     if (isTodayValuation) {
@@ -1917,7 +1925,21 @@ const CURATED_MARKET_FUNDS = [
 ];
 
 export default function FundTrackerApp() {
-  const todayStr = useMemo(() => getTodayDateKey(), []);
+  const [todayStr, setTodayStr] = useState(() => getTodayDateKey());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const current = getTodayDateKey();
+      setTodayStr((prev) => {
+        if (prev !== current) {
+          console.log(`Midnight passed! Updating todayStr from ${prev} to ${current}`);
+          return current;
+        }
+        return prev;
+      });
+    }, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
   
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
