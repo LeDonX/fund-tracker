@@ -1359,40 +1359,12 @@ export default function GlobalMarketPanel({ funds = [] }) {
             )}
           </div>
 
-          {/* Novice Help Card */}
-          <div className="bg-slate-50 border border-slate-200/50 rounded-3xl p-4.5 text-left flex flex-col gap-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
-              <span>💡</span>
-              <span>小白快速避坑指南</span>
-            </div>
-            <div className="flex flex-col gap-2 text-10 leading-relaxed font-bold text-slate-500 font-sans">
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-3xs">
-                <span className="text-slate-700 font-extrabold block">📌 问：大盘暴跌时，我需要手动“暂停定投”来避坑吗？</span>
-                <span className="text-slate-450 block mt-1 font-semibold leading-normal">
-                  答：<span className="font-black text-emerald-500">绝对不需要，甚至恰恰相反！</span> 基金定投（DCA）的核心逻辑在于“低位收集更多廉价份额，均摊持仓成本”。大盘暴跌日正是基金净值大打折的时候。在下午 15:00 前保持自动定投（甚至适当分批加仓），可以用更低廉的折扣价格买到相同的基金份额，从而在后续反弹中更快解套并赚取收益。如果在暴跌日暂停定投，恰恰违背了定投“低买高卖”的底层逻辑。
-                </span>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-3xs">
-                <span className="text-slate-700 font-extrabold block">📌 问：为什么说下午 3:00 是基金交易的“生命线”？</span>
-                <span className="text-slate-450 block mt-1 font-semibold leading-normal">
-                  答：我国场外公募基金均遵循 T+1 交易规则，每个工作日 <span className="font-black text-slate-755">下午 15:00 是申购与赎回的分水岭</span>：
-                  <br />• <span className="font-black text-slate-650">15:00 前</span>下单：按<span className="text-rose-500">今天（T 日）</span>晚上公布的净值成交，即时锁定今天的市场行情。
-                  <br />• <span className="font-black text-slate-650">15:00 后或周末</span>下单：顺延到<span className="text-blue-500">下一个交易日（T+1）</span>，适用下一个交易日晚上公布的净值结算。盘后暴跌时盲目追买是无法锁定今日暴跌的折价净值的。
-                </span>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-3xs">
-                <span className="text-slate-700 font-extrabold block">📌 问：海外美股 QDII 基金存在“一天时差”，该怎么看操作意见？</span>
-                <span className="text-slate-450 block mt-1 font-semibold leading-normal">
-                  答：QDII 基金（如纳斯达克100、标普500基金）由于交易所在海外，在工作日 <span className="font-black text-slate-755">下午 15:00 前</span> 申购，锁定的是 <span className="font-black text-rose-500">今晚美股开盘到收盘的净值</span>（于 T+1 工作日晚计算并公布）。所以下午 15:00 前的申购等于“提前预订”今晚美股的特价票，这让本助手提供的“盘前期指气象预测”具备极高交易指导价值！
-                </span>
-              </div>
-            </div>
-          </div>
+
 
         </div>
 
         {/* Right Area: Extremely simple large action cards (7/12 cols) */}
-        <div className="col-span-1 md:col-span-7 flex flex-col md:h-full md:overflow-y-auto pr-0 md:pr-1 custom-scrollbar shrink-0">
+        <div className="col-span-1 md:col-span-7 flex flex-col md:h-full md:overflow-y-auto px-2 py-1.5 custom-scrollbar shrink-0">
           
           {advisorSubTab === 'china' ? (
             // China Novice Output
@@ -1637,7 +1609,7 @@ export default function GlobalMarketPanel({ funds = [] }) {
       <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0 animate-in duration-300">
         
         {/* Left Column: Sandbox, sliders, 4D Matrix (5 cols on desktop) */}
-        <div className="col-span-1 md:col-span-5 flex flex-col gap-4 md:h-full md:overflow-y-auto pr-0 md:pr-1 custom-scrollbar shrink-0 select-none">
+        <div className="col-span-1 md:col-span-5 flex flex-col gap-4 md:h-full md:overflow-y-auto px-2 py-1.5 custom-scrollbar shrink-0 select-none">
           
           {/* Section 1: Mode segment controller */}
           <div className="bg-slate-100 p-1 rounded-2xl border border-slate-200/60 shadow-inner flex items-center gap-1">
@@ -2017,7 +1989,7 @@ export default function GlobalMarketPanel({ funds = [] }) {
         </div>
 
         {/* Right Column: Execution Output, Dynamic Highlighted Code Debugger (7 cols on desktop) */}
-        <div className="col-span-1 md:col-span-7 flex flex-col gap-4 md:h-full md:overflow-y-auto pr-0 md:pr-1 custom-scrollbar shrink-0">
+        <div className="col-span-1 md:col-span-7 flex flex-col gap-4 md:h-full md:overflow-y-auto px-2 py-1.5 custom-scrollbar shrink-0">
           
           {/* Section 4: Quantitative Action Signal Block */}
           {advisorSubTab === 'china' ? (
@@ -2273,7 +2245,7 @@ export default function GlobalMarketPanel({ funds = [] }) {
   };
 
   return (
-    <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0">
+    <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden px-1.5 pt-1.5 pb-4 md:pb-3">
 
       
       {/* Left Area: Indices Card Grid (7/12 cols on desktop) */}
@@ -2359,7 +2331,7 @@ export default function GlobalMarketPanel({ funds = [] }) {
         <div className="flex-1 md:overflow-y-auto custom-scrollbar p-2.5">
           {loading ? (
             /* Loading skeletons */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
                 <div key={i} className="bg-white border border-slate-100 rounded-2xl p-4.5 h-[120px] animate-pulse flex flex-col justify-between">
                   <div className="flex justify-between items-center">
@@ -2402,7 +2374,7 @@ export default function GlobalMarketPanel({ funds = [] }) {
                   </div>
 
                   {/* Section Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                     {group.items.map((item) => {
                       const isSelected = item.symbol === selectedSymbol;
                       const isPositive = item.changePercent >= 0;
