@@ -2418,6 +2418,45 @@ export default function FundTrackerApp() {
   
   const canSubmitFund = fundLookup.status === 'success' && isHoldingAmountValid && isHoldingProfitValid && isDerivedCostAmountValid && isFundSectorValid;
 
+  const handleFundCodeChange = useCallback((value) => {
+    const nextCode = String(value || '').trim();
+    fundLookupRequestRef.current += 1;
+
+    setFundForm((current) => ({
+      ...current,
+      code: nextCode,
+    }));
+
+    if (!nextCode) {
+      setFundLookup(createEmptyFundLookup());
+      return;
+    }
+
+    if (/^\d{1,5}$/.test(nextCode)) {
+      setFundLookup({
+        status: 'idle',
+        message: '输入满 6 位基金代码后将自动查询基金名称与最新可用净值。',
+        quote: null,
+      });
+      return;
+    }
+
+    if (!/^\d{6}$/.test(nextCode)) {
+      setFundLookup({
+        status: 'error',
+        message: '请输入正确的 6 位基金代码后再查询。',
+        quote: null,
+      });
+      return;
+    }
+
+    setFundLookup({
+      status: 'loading',
+      message: `正在查询 ${nextCode} 的基金信息...`,
+      quote: null,
+    });
+  }, []);
+
   const resetFundModalState = useCallback(() => {
     const defaultSector = sectors.includes(UNGROUPED_SECTOR) ? UNGROUPED_SECTOR : (sectors[0] || UNGROUPED_SECTOR);
     fundLookupRequestRef.current += 1;
@@ -2425,15 +2464,15 @@ export default function FundTrackerApp() {
     setFundLookup(createEmptyFundLookup());
   }, [sectors]);
 
-  const handleOpenFundModal = () => {
+  const handleOpenFundModal = useCallback(() => {
     resetFundModalState();
     openModal('fund');
-  };
+  }, [resetFundModalState]);
 
-  const handleCloseFundModal = () => {
+  const handleCloseFundModal = useCallback(() => {
     resetFundModalState();
     closeModal('fund');
-  };
+  }, [resetFundModalState]);
 
   useEffect(() => {
     const handleOpenAddFundModalEvent = (e) => {
@@ -2479,45 +2518,6 @@ export default function FundTrackerApp() {
         syncFundLookupRequestRef.current += 1;
       }
       return nextForm;
-    });
-  };
-
-  const handleFundCodeChange = (value) => {
-    const nextCode = String(value || '').trim();
-    fundLookupRequestRef.current += 1;
-
-    setFundForm((current) => ({
-      ...current,
-      code: nextCode,
-    }));
-
-    if (!nextCode) {
-      setFundLookup(createEmptyFundLookup());
-      return;
-    }
-
-    if (/^\d{1,5}$/.test(nextCode)) {
-      setFundLookup({
-        status: 'idle',
-        message: '输入满 6 位基金代码后将自动查询基金名称与最新可用净值。',
-        quote: null,
-      });
-      return;
-    }
-
-    if (!/^\d{6}$/.test(nextCode)) {
-      setFundLookup({
-        status: 'error',
-        message: '请输入正确的 6 位基金代码后再查询。',
-        quote: null,
-      });
-      return;
-    }
-
-    setFundLookup({
-      status: 'loading',
-      message: `正在查询 ${nextCode} 的基金信息...`,
-      quote: null,
     });
   };
 
