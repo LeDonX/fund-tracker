@@ -27,6 +27,8 @@ import {
   Activity,
   Zap,
   Globe,
+  Layers,
+  Compass,
   ShieldCheck,
   Award,
   Users,
@@ -4892,15 +4894,51 @@ export default function FundTrackerApp() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('market')}
+            onClick={() => setActiveTab('market_overview')}
             className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
-              activeTab === 'market' 
+              activeTab === 'market_overview' 
                 ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
                 : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
             }`}
           >
             <Globe className="w-4 h-4" />
-            <span>全球股市</span>
+            <span>大盘走势</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('market_sectors')}
+            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+              activeTab === 'market_sectors' 
+                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>板块走势</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('market_predictor')}
+            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+              activeTab === 'market_predictor' 
+                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>翌日预测</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('market_advisor')}
+            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+              activeTab === 'market_advisor' 
+                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+            }`}
+          >
+            <Cpu className="w-4 h-4" />
+            <span>投资助手</span>
           </button>
         </div>
 
@@ -4963,27 +5001,48 @@ export default function FundTrackerApp() {
         {/* --- 移动端特化：极简顶部状态条 --- */}
         <div className="md:hidden flex flex-col gap-2.5 px-1 py-1.5 shrink-0">
           <div className="flex justify-between items-center">
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-inner scale-95 origin-left">
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-inner scale-95 origin-left overflow-x-auto scrollbar-none max-w-[70vw] sm:max-w-none whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setActiveTab('portfolio')}
-                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all ${activeTab === 'portfolio' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all shrink-0 ${activeTab === 'portfolio' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
               >
                 自选持仓
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('search')}
-                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all ${activeTab === 'search' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all shrink-0 ${activeTab === 'search' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
               >
                 查找基金
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('market')}
-                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all ${activeTab === 'market' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+                onClick={() => setActiveTab('market_overview')}
+                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all shrink-0 ${activeTab === 'market_overview' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
               >
-                全球股市
+                大盘走势
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('market_sectors')}
+                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all shrink-0 ${activeTab === 'market_sectors' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+              >
+                板块走势
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('market_predictor')}
+                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all shrink-0 ${activeTab === 'market_predictor' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+              >
+                翌日预测
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('market_advisor')}
+                className={`px-3 py-1.5 rounded-lg text-11 font-black transition-all shrink-0 ${activeTab === 'market_advisor' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400'}`}
+              >
+                投资助手
               </button>
             </div>
             <div className="flex items-center gap-2">
@@ -5026,8 +5085,14 @@ export default function FundTrackerApp() {
                   {funds.length} 支
                 </span>
               </>
-            ) : activeTab === 'market' ? (
-              <h2 className="text-sm font-black text-slate-800 tracking-tight">全球股市行情</h2>
+            ) : activeTab === 'market_overview' ? (
+              <h2 className="text-sm font-black text-slate-800 tracking-tight">全球大盘走势</h2>
+            ) : activeTab === 'market_sectors' ? (
+              <h2 className="text-sm font-black text-slate-800 tracking-tight">热门行业板块走势</h2>
+            ) : activeTab === 'market_predictor' ? (
+              <h2 className="text-sm font-black text-slate-800 tracking-tight">翌日走势预测</h2>
+            ) : activeTab === 'market_advisor' ? (
+              <h2 className="text-sm font-black text-slate-800 tracking-tight">双阈值投资助手</h2>
             ) : (
               <h2 className="text-sm font-black text-slate-800 tracking-tight">查找与检索基金</h2>
             )}
@@ -5065,8 +5130,8 @@ export default function FundTrackerApp() {
                 handleOpenSyncTrade={handleOpenSyncTrade}
                 todayStr={todayStr}
               />
-          ) : activeTab === 'market' ? (
-            <GlobalMarketPanel funds={funds} />
+          ) : activeTab.startsWith('market_') ? (
+            <GlobalMarketPanel funds={funds} activeTab={activeTab.replace('market_', '')} />
           ) : (
             renderSearchTab()
           )}

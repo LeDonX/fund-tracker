@@ -101,7 +101,7 @@ function SidebarSparkline({ data, isPositive, symbol }) {
   const isOneMinute = data.length > 80;
   const fullTimeline = getFullDayTimeline(symbol, isOneMinute);
   
-  const points = data.map((d, index) => {
+  const sortedPoints = data.map((d, index) => {
     let x;
     const timeIndex = d.time ? fullTimeline.indexOf(d.time) : -1;
     if (timeIndex !== -1) {
@@ -110,8 +110,10 @@ function SidebarSparkline({ data, isPositive, symbol }) {
       x = (index / (data.length - 1)) * (width - padding * 2) + padding;
     }
     const y = height - ((d.value - min) / range) * (height - padding * 2) - padding;
-    return `${x},${y}`;
-  }).join(' ');
+    return { x, y };
+  }).sort((a, b) => a.x - b.x);
+  
+  const points = sortedPoints.map(p => `${p.x},${p.y}`).join(' ');
   
   // Chinese stock standard: Rose for up, Emerald for down
   const strokeColor = isPositive ? '#f43f5e' : '#10b981';
@@ -119,11 +121,8 @@ function SidebarSparkline({ data, isPositive, symbol }) {
   const gradId = `sidebar-sparkline-grad-${isPositive ? 'up' : 'down'}-${cleanSym}`;
   
   // Align gradient drop precisely with the start and end of the drawn line
-  const firstTimeIndex = data[0]?.time ? fullTimeline.indexOf(data[0].time) : -1;
-  const firstX = firstTimeIndex !== -1 ? (firstTimeIndex / (fullTimeline.length - 1)) * (width - padding * 2) + padding : padding;
-  
-  const lastTimeIndex = data[data.length - 1]?.time ? fullTimeline.indexOf(data[data.length - 1].time) : -1;
-  const lastX = lastTimeIndex !== -1 ? (lastTimeIndex / (fullTimeline.length - 1)) * (width - padding * 2) + padding : width - padding;
+  const firstX = sortedPoints[0].x;
+  const lastX = sortedPoints[sortedPoints.length - 1].x;
 
   const fillPoints = `${firstX},${height} ${points} ${lastX},${height}`;
   
@@ -241,7 +240,7 @@ export default function SidebarMarketTrends({ setActiveTab }) {
   const handleRowClick = (symbol) => {
     localStorage.setItem('selected_market_symbol', symbol);
     window.dispatchEvent(new CustomEvent('selectedMarketSymbolChanged', { detail: symbol }));
-    setActiveTab('market');
+    setActiveTab('market_overview');
   };
 
   if (pinnedSymbols.length === 0) return null;

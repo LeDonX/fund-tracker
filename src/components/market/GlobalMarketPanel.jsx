@@ -138,7 +138,7 @@ function DetailedChart({ option }) {
   return <div ref={chartRef} className="w-full h-full min-h-[220px] md:min-h-[300px]" />;
 }
 
-export default function GlobalMarketPanel({ funds = [] }) {
+export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }) {
   const [indices, setIndices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -212,7 +212,11 @@ export default function GlobalMarketPanel({ funds = [] }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
   const [period, setPeriod] = useState('1D'); // 1D, 1M, 3M, 6M, 1Y
-  const [marketTab, setMarketTab] = useState('overview'); // 'overview' | 'predictor' | 'advisor'
+  const [marketTab, setMarketTab] = useState(activeTab); // 'overview' | 'sectors' | 'predictor' | 'advisor'
+
+  useEffect(() => {
+    setMarketTab(activeTab);
+  }, [activeTab]);
   const [sectorSort, setSectorSort] = useState('gain'); // 'gain' (领涨优先), 'loss' (领跌优先), 'hot' (全网人气), 'holding' (我的持仓), 'default' (默认排序)
 
   const targetDateCN = useMemo(() => {
@@ -788,15 +792,29 @@ export default function GlobalMarketPanel({ funds = [] }) {
       let bestScore = 0;
       
       sectors.forEach(sec => {
-        const secName = sec.name.replace("行业", "").replace("板块", "");
+        const secName = sec.name.replace("行业", "").replace("板块", "").replace("概念", "");
+        const secNameLower = secName.toLowerCase();
         
-        // Define aliases for hot technology/growth themes to optimize matching accuracy
+        // 1. Direct Name Match (high priority bonus of +100 to avoid broad category grouping)
+        if (fundSector === secNameLower || fundName.includes(secNameLower)) {
+          const score = 100 + secNameLower.length;
+          if (score > bestScore) {
+            bestScore = score;
+            matchedSymbol = sec.symbol;
+          }
+        }
+        
+        // 2. Specialized Concept and Industry Aliases Matching
         const aliases = {
-          "通信设备": ["通信", "cpo", "光模块", "5g", "光通信", "telecom"],
+          "CPO概念": ["cpo", "光模块", "光通信器件"],
+          "算力概念": ["算力", "国产算力", "服务器"],
+          "印制电路板": ["pcb", "电路板", "印制电路"],
+          "光通信器件": ["光模块", "光器件", "光通信"],
+          "通信设备": ["通信", "5g", "telecom"],
           "半导体": ["芯片", "半导体", "集成电路", "chip", "semiconductor"],
-          "计算机设备": ["算力", "计算机", "硬件", "服务器", "computer"],
+          "计算机设备": ["计算机", "硬件", "computer"],
           "软件开发": ["软件", "应用软件", "系统软件", "software"],
-          "电子元件": ["电子", "pcb", "硬件", "电路板", "印制电路", "electronics"],
+          "电子元件": ["电子", "硬件", "electronics"],
           "食品饮料": ["白酒", "消费", "饮料", "食品", "酒", "liquor", "consumer"],
           "化学制药": ["医药", "医疗", "创新药", "制药", "pharma", "biotech"],
           "生物制品": ["生物", "创新药", "疫苗", "biotech"],
@@ -833,16 +851,7 @@ export default function GlobalMarketPanel({ funds = [] }) {
     } else if (sectorSort === 'loss') {
       return [...list].sort((a, b) => a.changePercent - b.changePercent);
     } else if (sectorSort === 'hot') {
-      const hotAliases = {
-        "通信设备": 98, "半导体": 96, "计算机设备": 97, "软件开发": 95, 
-        "电子元件": 94, "食品饮料": 90, "证券": 93, "电力设备": 88, 
-        "化学制药": 92, "航天航空": 86, "煤炭行业": 89
-      };
-      return [...list].sort((a, b) => {
-        const scoreA = hotAliases[a.name] || (50 + (a.changePercent > 0 ? a.changePercent * 5 : 0));
-        const scoreB = hotAliases[b.name] || (50 + (b.changePercent > 0 ? b.changePercent * 5 : 0));
-        return scoreB - scoreA;
-      });
+      return [...list].sort((a, b) => (b.netInflow || 0) - (a.netInflow || 0));
     } else if (sectorSort === 'holding') {
       return [...list].sort((a, b) => (sectorHoldings[b.symbol] || 0) - (sectorHoldings[a.symbol] || 0));
     }
@@ -1186,6 +1195,82 @@ export default function GlobalMarketPanel({ funds = [] }) {
   const activeIndex = useMemo(() => {
     return indices.find(idx => idx.symbol === selectedSymbol) || null;
   }, [indices, selectedSymbol]);
+
+  // Dynamically calculate holdings matching the currently selected sector
+  const activeSectorFunds = useMemo(() => {
+    if (!activeIndex || activeIndex.region !== 'SEC' || !Array.isArray(funds) || funds.length === 0) {
+      return [];
+    }
+    const matched = [];
+    const sectors = indices.filter(idx => idx.region === 'SEC');
+    
+    funds.forEach(fund => {
+      const fundName = (fund.name || '').toLowerCase();
+      const fundSector = (fund.sector || '').toLowerCase();
+      const fundAmt = Number(fund.amount) || 0;
+      
+      let matchedSymbol = null;
+      let bestScore = 0;
+      let matchedKeyword = '';
+      
+      sectors.forEach(sec => {
+        const secName = sec.name.replace("行业", "").replace("板块", "").replace("概念", "");
+        const secNameLower = secName.toLowerCase();
+        
+        // 1. Direct Name Match (high priority bonus)
+        if (fundSector === secNameLower || fundName.includes(secNameLower)) {
+          const score = 100 + secNameLower.length;
+          if (score > bestScore) {
+            bestScore = score;
+            matchedSymbol = sec.symbol;
+            matchedKeyword = sec.name;
+          }
+        }
+        
+        // 2. Specialized Concept and Industry Aliases Matching
+        const aliases = {
+          "CPO概念": ["cpo", "光模块", "光通信器件"],
+          "算力概念": ["算力", "国产算力", "服务器"],
+          "印制电路板": ["pcb", "电路板", "印制电路"],
+          "光通信器件": ["光模块", "光器件", "光通信"],
+          "通信设备": ["通信", "5g", "telecom"],
+          "半导体": ["芯片", "半导体", "集成电路", "chip", "semiconductor"],
+          "计算机设备": ["计算机", "硬件", "computer"],
+          "软件开发": ["软件", "应用软件", "系统软件", "software"],
+          "电子元件": ["电子", "硬件", "electronics"],
+          "食品饮料": ["白酒", "消费", "饮料", "食品", "酒", "liquor", "consumer"],
+          "化学制药": ["医药", "医疗", "创新药", "制药", "pharma", "biotech"],
+          "生物制品": ["生物", "创新药", "疫苗", "biotech"],
+          "电力设备": ["光伏", "新能源", "太阳能", "电池", "锂电", "solar"],
+          "证券": ["证券", "券商", "非银", "broker"]
+        };
+        
+        const keywords = aliases[sec.name] || [secName];
+        
+        keywords.forEach(kw => {
+          const kwLower = kw.toLowerCase();
+          if (fundSector.includes(kwLower) || fundName.includes(kwLower)) {
+            const score = kwLower.length;
+            if (score > bestScore) {
+              bestScore = score;
+              matchedSymbol = sec.symbol;
+              matchedKeyword = kw;
+            }
+          }
+        });
+      });
+      
+      if (matchedSymbol === activeIndex.symbol) {
+        matched.push({
+          ...fund,
+          matchedKeyword,
+          amount: fundAmt
+        });
+      }
+    });
+    
+    return matched.sort((a, b) => b.amount - a.amount);
+  }, [activeIndex, funds, indices]);
 
   // Filter history based on selected period
   const filteredHistory = useMemo(() => {
@@ -2473,58 +2558,38 @@ export default function GlobalMarketPanel({ funds = [] }) {
         {/* Dashboard Title & Actions Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-3 sm:px-5 sm:py-3 rounded-2xl border border-slate-200/50 shadow-xs shrink-0 gap-3 sm:gap-0 animate-in fade-in duration-200">
           
-          {/* Tab Selector */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-inner w-full sm:w-auto shrink-0 select-none">
-            <button
-              onClick={() => setMarketTab('overview')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                marketTab === 'overview'
-                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
-                  : 'text-slate-500 hover:text-slate-805 border border-transparent'
-              }`}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>全球主流大盘</span>
-            </button>
-            <button
-              onClick={() => setMarketTab('sectors')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                marketTab === 'sectors'
-                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
-                  : 'text-slate-500 hover:text-slate-805 border border-transparent'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>热门行业板块</span>
-            </button>
-            <button
-              onClick={() => setMarketTab('predictor')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer relative ${
-                marketTab === 'predictor'
-                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
-                  : 'text-slate-500 hover:text-slate-805 border border-transparent'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5 animate-spin-slow" />
-              <span className="relative flex items-center">
-                翌日走势预测
-                <span className="absolute -top-1 -right-3 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+          {/* Active Title */}
+          <div className="flex items-center gap-2.5 select-none py-1">
+            {marketTab === 'overview' && (
+              <>
+                <Globe className="w-4 h-4 text-blue-600 animate-pulse" />
+                <span className="text-sm font-black text-slate-800 tracking-tight">全球主流大盘行情</span>
+              </>
+            )}
+            {marketTab === 'sectors' && (
+              <>
+                <Layers className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-black text-slate-800 tracking-tight">热门行业板块走势</span>
+              </>
+            )}
+            {marketTab === 'predictor' && (
+              <>
+                <Compass className="w-4 h-4 text-rose-500 animate-spin-slow" />
+                <span className="text-sm font-black text-slate-800 tracking-tight relative flex items-center">
+                  翌日大盘走势预测
+                  <span className="absolute -top-1 -right-3 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-450 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-550"></span>
+                  </span>
                 </span>
-              </span>
-            </button>
-            <button
-              onClick={() => setMarketTab('advisor')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer relative ${
-                marketTab === 'advisor'
-                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
-                  : 'text-slate-500 hover:text-slate-805 border border-transparent'
-              }`}
-            >
-              <Cpu className="w-3.5 h-3.5" />
-              <span>双阈值投资助手</span>
-            </button>
+              </>
+            )}
+            {marketTab === 'advisor' && (
+              <>
+                <Cpu className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-black text-slate-800 tracking-tight">智能双阈值投资助手</span>
+              </>
+            )}
           </div>
           
           {/* Actions */}
@@ -3158,6 +3223,65 @@ export default function GlobalMarketPanel({ funds = [] }) {
                 <div className="text-center text-xs text-slate-400">暂无历史走势数据</div>
               )}
             </div>
+
+            {/* Associated Holdings List */}
+            {activeIndex.region === 'SEC' && (
+              <div className="flex flex-col gap-2 shrink-0 border-t border-slate-100 pt-3 select-none">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    💰 关联持仓基金 ({activeSectorFunds.length} 支)
+                  </span>
+                  {activeSectorFunds.length > 0 && (
+                    <span className="text-10 font-bold text-blue-600 bg-blue-50/80 px-2 py-0.5 rounded-full font-mono">
+                      合计: ¥{activeSectorFunds.reduce((sum, f) => sum + f.amount, 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+                
+                {activeSectorFunds.length > 0 ? (
+                  <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto custom-scrollbar pr-0.5 mt-1">
+                    {activeSectorFunds.map(fund => (
+                      <div 
+                        key={fund.id || fund.code}
+                        className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/40 hover:bg-slate-100/50 hover:border-slate-350 transition-all text-left"
+                      >
+                        <div className="flex flex-col gap-0.5 min-w-0 flex-1 pr-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-extrabold text-[11px] text-slate-750 truncate leading-snug">
+                              {fund.name}
+                            </span>
+                            <span className="text-[9px] font-black text-slate-400 font-mono shrink-0">
+                              {fund.code}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200/50 text-slate-500 uppercase">
+                              {fund.sector || '未分类'}
+                            </span>
+                            {fund.matchedKeyword && (
+                              <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-blue-50 text-blue-500">
+                                🏷️ 匹配题材: {fund.matchedKeyword.toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono font-black text-[11px] text-slate-700">
+                            ¥{fund.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 bg-slate-50 border border-dashed border-slate-200/60 rounded-xl text-[10px] font-bold text-slate-450 leading-relaxed">
+                    💡 您目前未持有与本行业相关的自选基金。
+                    <br />
+                    可以在基金详情中将基金板块设为“{activeIndex.name.replace("行业", "").replace("板块", "")}”以建立关联。
+                  </div>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 select-none">
