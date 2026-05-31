@@ -918,12 +918,68 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   }, [portfolioRecommendations]);
 
   const sectorForecasts = useMemo(() => {
+    const getSectorRecommendedFunds = (sectorName) => {
+      const name = sectorName || '';
+      if (name.includes('半导体') || name.includes('芯片')) {
+        return [
+          { code: '320007', name: '诺安成长混合' },
+          { code: '007300', name: '国联安半导体联接A' }
+        ];
+      }
+      if (name.includes('通信') || name.includes('CPO') || name.includes('CPO概念') || name.includes('光模块') || name.includes('光通信')) {
+        return [
+          { code: '008086', name: '华夏中证5G通信联接A' },
+          { code: '008124', name: '易方达万得信息联接A' }
+        ];
+      }
+      if (name.includes('电力') || name.includes('新能源') || name.includes('光伏') || name.includes('电池')) {
+        return [
+          { code: '501057', name: '汇添富新能源车联接A' },
+          { code: '011102', name: '天弘中证光伏产业A' }
+        ];
+      }
+      if (name.includes('饮料') || name.includes('白酒') || name.includes('食品') || name.includes('消费')) {
+        return [
+          { code: '161725', name: '招商中证白酒指数A' },
+          { code: '110022', name: '易方达消费行业股票' }
+        ];
+      }
+      if (name.includes('制药') || name.includes('生物') || name.includes('医药') || name.includes('医疗') || name.includes('健康')) {
+        return [
+          { code: '003095', name: '中欧医疗健康混合A' },
+          { code: '004851', name: '广发医疗保健股票A' }
+        ];
+      }
+      if (name.includes('证券') || name.includes('券商')) {
+        return [
+          { code: '161720', name: '招商中证全指证券指数A' },
+          { code: '006098', name: '华宝全指证券联接A' }
+        ];
+      }
+      if (name.includes('创业板')) {
+        return [
+          { code: '110026', name: '易方达创业板联接A' },
+          { code: '001592', name: '天弘创业板指数A' }
+        ];
+      }
+      if (name.includes('计算机') || name.includes('软件') || name.includes('算力') || name.includes('算力概念')) {
+        return [
+          { code: '012701', name: '易方达人工智能联接A' },
+          { code: '001688', name: '嘉实腾讯自律联接A' }
+        ];
+      }
+      return [
+        { code: '000961', name: '天弘沪深300联接A' },
+        { code: '011612', name: '华夏科创50联接A' }
+      ];
+    };
+
     const list = indices.filter(idx => idx.region === 'SEC') || [];
     if (list.length === 0) {
       return {
         opportunities: [
-          { name: '半导体芯片', symbol: '512480.SS', reason: '主力大额资金流入，国产替代预期强烈，建议分批定投/逢低买入', type: 'buy', change: -1.25 },
-          { name: '通信设备(CPO)', symbol: '512800.SS', reason: '算力需求强劲，高弹性核心龙头回调企稳，具有极佳的低吸性价比', type: 'buy', change: -1.82 }
+          { name: '半导体芯片', symbol: '512480.SS', reason: '主力大额资金流入，国产替代预期强烈，建议分批定投/逢低买入', recommendedFunds: getSectorRecommendedFunds('半导体芯片'), type: 'buy', change: -1.25 },
+          { name: '通信设备(CPO)', symbol: '512800.SS', reason: '算力需求强劲，高弹性核心龙头回调企稳，具有极佳的低吸性价比', recommendedFunds: getSectorRecommendedFunds('通信设备'), type: 'buy', change: -1.82 }
         ],
         risks: [
           { name: '食品饮料(白酒)', symbol: '512690.SS', reason: '盘中放量杀跌，跌破短期均线支撑，避险情绪升温，建议暂时观望防踩雷', type: 'risk', change: -2.15 },
@@ -953,6 +1009,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
           symbol: sec.symbol,
           change,
           reason: '今日该板块温和调整（跌幅 ' + change.toFixed(2) + '%），洗盘健康且回调蓄势，属于高性价比定投低吸窗口。',
+          recommendedFunds: getSectorRecommendedFunds(secName),
           type: 'bargain'
         });
       } else if (change >= 0.8 && change < 2.0 && inflow > 50000000) {
@@ -961,6 +1018,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
           symbol: sec.symbol,
           change,
           reason: '盘中强劲拉升且主力资金大幅净流入，行业景气度高，看涨预期强烈，有良好加仓预期。',
+          recommendedFunds: getSectorRecommendedFunds(secName),
           type: 'momentum'
         });
       }
@@ -1006,6 +1064,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
           symbol: worstCandidate.symbol,
           change: worstCandidate.changePercent,
           reason: '板块今日进行温和震荡调整，回调蓄势健康，适合按计划分批定投，分摊持仓均价。',
+          recommendedFunds: getSectorRecommendedFunds(worstCandidate.name),
           type: 'bargain'
         });
       }
@@ -1016,6 +1075,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
           symbol: bestCandidate.symbol,
           change: bestCandidate.changePercent,
           reason: '板块整体运行于健康上行通道，均线呈多头排列，中长线向上预期良好，适合定投关注。',
+          recommendedFunds: getSectorRecommendedFunds(bestCandidate.name),
           type: 'momentum'
         });
       }
@@ -2495,7 +2555,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
                 <div className="flex flex-col gap-2">
                   {sectorForecasts.opportunities.map((opp, idx) => (
                     <div key={idx} className="bg-emerald-50/20 p-2.5 rounded-2xl border border-emerald-100/30 flex flex-col gap-1 text-left">
-                      <div className="flex justify-between items-center select-none">
+                      <div className="flex justify-between items-center select-none font-bold">
                         <span className="text-11 font-black text-slate-800 flex items-center gap-1.5">
                           <span className="text-10">🟢</span>
                           {opp.name}
@@ -2505,6 +2565,24 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-500 font-bold leading-relaxed">{opp.reason}</p>
+                      
+                      {/* Fund Recommendations */}
+                      {opp.recommendedFunds && opp.recommendedFunds.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1.5 border-t border-emerald-100/20 pt-1.5 select-none">
+                          <span className="text-[9px] text-slate-400 font-black shrink-0">特选加仓标的:</span>
+                          {opp.recommendedFunds.map((f, fIdx) => (
+                            <button
+                              key={fIdx}
+                              onClick={() => window.dispatchEvent(new CustomEvent('openAddFundModal', { detail: f.code }))}
+                              className="text-[9px] font-black text-blue-650 bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200 px-2 py-0.5 rounded-md cursor-pointer transition-all active:scale-95 flex items-center gap-1 shrink-0"
+                              title="点击即可直接跳转至查找与添加该基金"
+                            >
+                              <span>{f.name}</span>
+                              <span className="font-mono text-slate-400 text-[8px]">({f.code})</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -3754,7 +3832,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
                   <span className="text-11 font-black text-slate-450 uppercase tracking-wider">前瞻核心风向标核心指标</span>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {leadingIndices.map((item) => {
                     const isSelected = item.symbol === selectedSymbol;
                     const isPositive = item.changePercent >= 0;
