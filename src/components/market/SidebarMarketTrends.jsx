@@ -145,9 +145,10 @@ export default function SidebarMarketTrends({ setActiveTab }) {
   const [pinnedSymbols, setPinnedSymbols] = useState(() => {
     try {
       const stored = localStorage.getItem('sidebar_market_pinned_symbols');
-      return stored ? JSON.parse(stored) : ['000001.SS', '399006.SZ', '^IXIC'];
+      const parsed = stored ? JSON.parse(stored) : ['000001.SS', '^IXIC'];
+      return Array.isArray(parsed) ? parsed.slice(0, 2) : ['000001.SS', '^IXIC'];
     } catch {
-      return ['000001.SS', '399006.SZ', '^IXIC'];
+      return ['000001.SS', '^IXIC'];
     }
   });
 
@@ -265,7 +266,7 @@ export default function SidebarMarketTrends({ setActiveTab }) {
       <div className="flex flex-col gap-2">
         {loading ? (
           // Shimmer loading skeletons
-          [1, 2, 3].map(i => (
+          [1, 2].map(i => (
             <div key={i} className="h-[88px] w-full bg-white border border-slate-100 rounded-xl p-3 flex flex-col justify-between animate-pulse">
               <div className="flex justify-between items-start w-full">
                 <div className="space-y-1.5 flex-1">

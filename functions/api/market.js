@@ -582,16 +582,32 @@ async function getIndexData(symbol, range = "1y", interval = "1d") {
 // Fetch all 76+ industry sectors in real-time from Eastmoney
 async function fetchEastmoneySectors() {
   try {
-    const url = 'https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb040893a3cf4fc3d054b7fc6b&flg=1&fid=f3&fs=m:90+t:2&fields=f12,f14,f2,f3,f4,f62';
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://quote.eastmoney.com/'
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const json = await response.json();
-    const list = json?.data?.diff || [];
+    const fetchPage = async (page) => {
+      const url = `https://push2.eastmoney.com/api/qt/clist/get?pn=${page}&pz=100&po=1&np=1&ut=bd1d9ddb040893a3cf4fc3d054b7fc6b&flg=1&fid=f3&fs=m:90+t:2&fields=f12,f14,f2,f3,f4,f62`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://quote.eastmoney.com/'
+        }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      return json?.data?.diff || [];
+    };
+
+    // Parallel fetching of 4 pages (400 items) to guarantee coverage of both top gainers and deepest losers,
+    // ensuring standard sectors like Semiconductors (BK1036) and Telecom (BK0448) are always included regardless of daily market moves.
+    const pages = await Promise.all([
+      fetchPage(1),
+      fetchPage(2),
+      fetchPage(3),
+      fetchPage(4)
+    ]);
+    const list = pages.flat().filter(item => item && item.f12 && item.f14);
+    
+    if (list.length === 0) {
+      throw new Error('Fetched list is empty');
+    }
     
     const now = Date.now();
     return list.map(item => {
