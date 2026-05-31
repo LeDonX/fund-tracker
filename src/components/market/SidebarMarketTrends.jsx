@@ -27,8 +27,67 @@ const INDICES_SHORT_NAMES = {
   "USDCNH=X": "离岸汇率"
 };
 
+// Timezone-aware date helpers to check if market has opened today
+function getMarketCurrentDateStr(symbol) {
+  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
+  const hkIndices = ["^HSI", "^HSTECH"];
+  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
+  
+  let timeZone = 'Asia/Shanghai';
+  const symbolStr = String(symbol || '');
+  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK')) {
+    timeZone = 'Asia/Shanghai';
+  } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
+    timeZone = 'Asia/Hong_Kong';
+  } else if (usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US')) {
+    timeZone = 'America/New_York';
+  } else if (symbolStr === "^N225") {
+    timeZone = 'Asia/Tokyo';
+  } else if (symbolStr === "^FTSE") {
+    timeZone = 'Europe/London';
+  } else if (symbolStr === "^GDAXI") {
+    timeZone = 'Europe/Berlin';
+  }
+  
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    return formatter.format(new Date());
+  } catch (e) {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
+function getMarketDateStrFromISO(isoStr, symbol) {
+  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
+  const hkIndices = ["^HSI", "^HSTECH"];
+  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
+  
+  let timeZone = 'Asia/Shanghai';
+  const symbolStr = String(symbol || '');
+  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK')) {
+    timeZone = 'Asia/Shanghai';
+  } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
+    timeZone = 'Asia/Hong_Kong';
+  } else if (usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US')) {
+    timeZone = 'America/New_York';
+  } else if (symbolStr === "^N225") {
+    timeZone = 'Asia/Tokyo';
+  } else if (symbolStr === "^FTSE") {
+    timeZone = 'Europe/London';
+  } else if (symbolStr === "^GDAXI") {
+    timeZone = 'Europe/Berlin';
+  }
+  
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    return formatter.format(new Date(isoStr));
+  } catch (e) {
+    return isoStr.split('T')[0];
+  }
+}
+
 // Helper to generate the full day timeline of "HH:MM" strings for alignment
-function getFullDayTimeline(symbol, isOneMinute = false) {
+function getFullDayTimeline(symbol) {
   const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
   const hkIndices = ["^HSI", "^HSTECH"];
   const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
@@ -50,82 +109,122 @@ function getFullDayTimeline(symbol, isOneMinute = false) {
     }
   };
 
-  const step = isOneMinute ? 1 : 5;
+  const step = 1; // Always generate 1-minute intervals for perfect alignment!
 
-  if (cnIndices.includes(symbol)) {
-    addMinutes(9, 30, 11, 30, step);
-    addMinutes(13, 0, 15, 0, step);
+  const symbolStr = String(symbol || '');
+  const isChina = cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK');
+  const isHK = hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK');
+  const isUS = usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US');
+
+  if (isChina) {
+    addMinutes(9, 30, 11, 31, step);
+    addMinutes(13, 0, 15, 2, step);
     return minutes;
   }
-  if (hkIndices.includes(symbol)) {
-    addMinutes(9, 30, 12, 0, step);
-    addMinutes(13, 0, 16, 0, step);
+  if (isHK) {
+    addMinutes(9, 30, 12, 2, step);
+    addMinutes(13, 0, 16, 10, step);
     return minutes;
   }
-  if (usIndices.includes(symbol)) {
-    addMinutes(9, 30, 16, 0, step);
+  if (isUS) {
+    addMinutes(9, 30, 16, 5, step);
     return minutes;
   }
-  if (jpIndices.includes(symbol)) {
-    addMinutes(9, 0, 11, 30, step);
-    addMinutes(12, 30, 15, 0, step);
+  if (jpIndices.includes(symbolStr)) {
+    addMinutes(9, 0, 11, 32, step);
+    addMinutes(12, 30, 15, 5, step);
     return minutes;
   }
-  if (ukIndices.includes(symbol)) {
-    addMinutes(8, 0, 16, 30, step);
+  if (ukIndices.includes(symbolStr)) {
+    addMinutes(8, 0, 16, 35, step);
     return minutes;
   }
-  if (deIndices.includes(symbol)) {
-    addMinutes(9, 0, 17, 30, step);
+  if (deIndices.includes(symbolStr)) {
+    addMinutes(9, 0, 17, 35, step);
     return minutes;
   }
 
-  // 24h fallback at 15m intervals
-  addMinutes(0, 0, 23, 45, 15);
+  // 24h fallback at 1m intervals
+  addMinutes(0, 0, 23, 59, step);
   return minutes;
 }
 
 // Compact SVG sparkline component for sidebar rows
 function SidebarSparkline({ data, isPositive, symbol }) {
-  if (!data || data.length <= 1) return null;
-  
-  const values = data.map(d => d.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  
   const width = 240;
   const height = 32;
   const padding = 1;
 
-  const isOneMinute = data.length > 80;
-  const fullTimeline = getFullDayTimeline(symbol, isOneMinute);
+  if (!data || data.length <= 1) return null;
+
+  const marketToday = getMarketCurrentDateStr(symbol);
   
-  const sortedPoints = data.map((d, index) => {
-    let x;
-    const timeIndex = d.time ? fullTimeline.indexOf(d.time) : -1;
-    if (timeIndex !== -1) {
-      x = (timeIndex / (fullTimeline.length - 1)) * (width - padding * 2) + padding;
-    } else {
-      x = (index / (data.length - 1)) * (width - padding * 2) + padding;
-    }
-    const y = height - ((d.value - min) / range) * (height - padding * 2) - padding;
-    return { x, y };
-  }).sort((a, b) => a.x - b.x);
-  
-  const points = sortedPoints.map(p => `${p.x},${p.y}`).join(' ');
-  
+  // Filter data to only contain today's points in target timezone to avoid drawing yesterday's chart
+  const todayData = data.filter(d => getMarketDateStrFromISO(d.date, symbol) === marketToday);
+  const isHistoryFromToday = todayData.length > 0;
+
   // Chinese stock standard: Rose for up, Emerald for down
   const strokeColor = isPositive ? '#f43f5e' : '#10b981';
+
+  // If unopened or no points from today, render a beautiful flat dashed line representing previous close
+  if (!isHistoryFromToday) {
+    return (
+      <svg className="w-full h-8 overflow-visible pointer-events-none opacity-30" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#94a3b8" strokeWidth="1.25" strokeDasharray="3,3" />
+      </svg>
+    );
+  }
+
+  const values = todayData.map(d => d.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  const fullTimeline = getFullDayTimeline(symbol);
+
+  const mappedPoints = todayData.map((d, index) => {
+    const timeIndex = d.time ? fullTimeline.indexOf(d.time) : -1;
+    const y = height - ((d.value - min) / range) * (height - padding * 2) - padding;
+    return { d, timeIndex, y, index };
+  });
+
+  const hasAnyValidTime = mappedPoints.some(p => p.timeIndex !== -1);
+
+  let sortedPoints;
+  if (hasAnyValidTime) {
+    sortedPoints = mappedPoints
+      .filter(p => p.timeIndex !== -1)
+      .map(p => ({
+        x: (p.timeIndex / (fullTimeline.length - 1)) * (width - padding * 2) + padding,
+        y: p.y
+      }))
+      .sort((a, b) => a.x - b.x);
+  } else {
+    sortedPoints = mappedPoints
+      .map(p => ({
+        x: (p.index / (todayData.length - 1)) * (width - padding * 2) + padding,
+        y: p.y
+      }))
+      .sort((a, b) => a.x - b.x);
+  }
+
+  if (!sortedPoints || sortedPoints.length <= 1) {
+    return (
+      <svg className="w-full h-8 overflow-visible pointer-events-none opacity-30" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#94a3b8" strokeWidth="1.25" strokeDasharray="3,3" />
+      </svg>
+    );
+  }
+
+  const points = sortedPoints.map(p => `${p.x},${p.y}`).join(' ');
   const cleanSym = symbol ? symbol.replace(/[^a-zA-Z0-9]/g, '') : Math.random().toString(36).substr(2, 5);
   const gradId = `sidebar-sparkline-grad-${isPositive ? 'up' : 'down'}-${cleanSym}`;
-  
+
   // Align gradient drop precisely with the start and end of the drawn line
   const firstX = sortedPoints[0].x;
   const lastX = sortedPoints[sortedPoints.length - 1].x;
-
   const fillPoints = `${firstX},${height} ${points} ${lastX},${height}`;
-  
+
   return (
     <svg className="w-full h-8 overflow-visible pointer-events-none" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
       <defs>

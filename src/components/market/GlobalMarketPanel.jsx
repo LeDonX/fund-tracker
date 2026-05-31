@@ -96,6 +96,128 @@ function formatTargetDate(date) {
   return `${month}月${day} (周${weekday.charAt(1)})`;
 }
 
+// Timezone-aware date helpers to check if market has opened today
+function getMarketCurrentDateStr(symbol) {
+  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
+  const hkIndices = ["^HSI", "^HSTECH"];
+  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
+  
+  let timeZone = 'Asia/Shanghai';
+  const symbolStr = String(symbol || '');
+  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK')) {
+    timeZone = 'Asia/Shanghai';
+  } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
+    timeZone = 'Asia/Hong_Kong';
+  } else if (usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US')) {
+    timeZone = 'America/New_York';
+  } else if (symbolStr === "^N225") {
+    timeZone = 'Asia/Tokyo';
+  } else if (symbolStr === "^FTSE") {
+    timeZone = 'Europe/London';
+  } else if (symbolStr === "^GDAXI") {
+    timeZone = 'Europe/Berlin';
+  }
+  
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    return formatter.format(new Date());
+  } catch (e) {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
+function getMarketDateStrFromISO(isoStr, symbol) {
+  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
+  const hkIndices = ["^HSI", "^HSTECH"];
+  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
+  
+  let timeZone = 'Asia/Shanghai';
+  const symbolStr = String(symbol || '');
+  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK')) {
+    timeZone = 'Asia/Shanghai';
+  } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
+    timeZone = 'Asia/Hong_Kong';
+  } else if (usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US')) {
+    timeZone = 'America/New_York';
+  } else if (symbolStr === "^N225") {
+    timeZone = 'Asia/Tokyo';
+  } else if (symbolStr === "^FTSE") {
+    timeZone = 'Europe/London';
+  } else if (symbolStr === "^GDAXI") {
+    timeZone = 'Europe/Berlin';
+  }
+  
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    return formatter.format(new Date(isoStr));
+  } catch (e) {
+    return isoStr.split('T')[0];
+  }
+}
+
+// Helper to generate the full day timeline of "HH:MM" strings for alignment
+function getFullDayTimeline(symbol) {
+  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
+  const hkIndices = ["^HSI", "^HSTECH"];
+  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
+  const jpIndices = ["^N225"];
+  const ukIndices = ["^FTSE"];
+  const deIndices = ["^GDAXI"];
+
+  const minutes = [];
+  const addMinutes = (startH, startM, endH, endM, step) => {
+    let h = startH;
+    let m = startM;
+    while (h < endH || (h === endH && m <= endM)) {
+      minutes.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      m += step;
+      if (m >= 60) {
+        h += Math.floor(m / 60);
+        m = m % 60;
+      }
+    }
+  };
+
+  const step = 1; // Always generate 1-minute intervals for perfect alignment!
+
+  const symbolStr = String(symbol || '');
+  const isChina = cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK');
+  const isHK = hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK');
+  const isUS = usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US');
+
+  if (isChina) {
+    addMinutes(9, 30, 11, 31, step);
+    addMinutes(13, 0, 15, 2, step);
+    return minutes;
+  }
+  if (isHK) {
+    addMinutes(9, 30, 12, 2, step);
+    addMinutes(13, 0, 16, 10, step);
+    return minutes;
+  }
+  if (isUS) {
+    addMinutes(9, 30, 16, 5, step);
+    return minutes;
+  }
+  if (jpIndices.includes(symbolStr)) {
+    addMinutes(9, 0, 11, 32, step);
+    addMinutes(12, 30, 15, 5, step);
+    return minutes;
+  }
+  if (ukIndices.includes(symbolStr)) {
+    addMinutes(8, 0, 16, 35, step);
+    return minutes;
+  }
+  if (deIndices.includes(symbolStr)) {
+    addMinutes(9, 0, 17, 35, step);
+    return minutes;
+  }
+
+  // 24h fallback at 1m intervals
+  addMinutes(0, 0, 23, 59, step);
+  return minutes;
+}
+
 // ECharts line renderer for detailed interactive historical chart
 function DetailedChart({ option }) {
   const chartRef = useRef(null);
@@ -137,6 +259,54 @@ function DetailedChart({ option }) {
   
   return <div ref={chartRef} className="w-full h-full min-h-[220px] md:min-h-[300px]" />;
 }
+
+const DUMMY_FUNDS = [
+  {
+    id: 'dummy-1',
+    name: '招商深证100地产等权自律联接A',
+    code: '003001',
+    sector: '房地产',
+    amount: 15000,
+    shares: 10000,
+    costAmount: 15500,
+    currentNetValue: 1.50,
+    lastNetValue: 1.52,
+    dailyRate: -1.32,
+    dailyProfit: -200,
+    totalProfit: -500,
+    totalRate: -3.23
+  },
+  {
+    id: 'dummy-2',
+    name: '广发纳斯达克100指数联接A(QDII)',
+    code: '270042',
+    sector: 'QDII海外科技',
+    amount: 32000,
+    shares: 20000,
+    costAmount: 29600,
+    currentNetValue: 1.60,
+    lastNetValue: 1.58,
+    dailyRate: 1.27,
+    dailyProfit: 400,
+    totalProfit: 2400,
+    totalRate: 8.11
+  },
+  {
+    id: 'dummy-3',
+    name: '诺安成长混合(科技芯片核心)',
+    code: '320007',
+    sector: '半导体',
+    amount: 8500,
+    shares: 10000,
+    costAmount: 9500,
+    currentNetValue: 0.85,
+    lastNetValue: 0.88,
+    dailyRate: -3.41,
+    dailyProfit: -300,
+    totalProfit: -1000,
+    totalRate: -10.53
+  }
+];
 
 export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }) {
   const [indices, setIndices] = useState([]);
@@ -611,46 +781,262 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
     };
   }, []);
 
-  const dcaBargainData = useMemo(() => {
-    const isChina = advisorSubTab === 'china';
-    const rate = isChina 
-      ? chinaAdvisorData.growth_sentiment 
-      : (usNasdaqInput * 0.6 + usSp505Input * 0.4);
+  const activeFunds = useMemo(() => {
+    return Array.isArray(funds) && funds.length > 0 ? funds : DUMMY_FUNDS;
+  }, [funds]);
+
+  const portfolioRecommendations = useMemo(() => {
+    if (!indices || indices.length === 0) return [];
+    
+    return activeFunds.map(fund => {
+      const fundName = fund.name || '';
+      const fundSector = fund.sector || '';
       
-    let score = 50 - rate * 15;
-    score = Math.max(0, Math.min(100, Math.round(score)));
+      // Map to proxy index
+      const proxy = (() => {
+        const name = fundName.toLowerCase();
+        const sector = fundSector.toLowerCase();
+        
+        if (name.includes('纳指') || name.includes('纳斯达克') || name.includes('nasdaq')) {
+          return { symbol: 'NQ=F', name: '纳斯达克100期指', isUS: true };
+        }
+        if (name.includes('标普') || name.includes('s&p') || name.includes('sp500')) {
+          return { symbol: 'ES=F', name: '标普500期指', isUS: true };
+        }
+        if (name.includes('半导体') || name.includes('芯片') || name.includes('集成电路') || name.includes('000688') || name.includes('科创') || name.includes('512480')) {
+          return { symbol: '000688.SS', name: '科创50指数', isUS: false };
+        }
+        if (name.includes('医疗') || name.includes('生物') || name.includes('医药') || name.includes('健康') || name.includes('512170')) {
+          return { symbol: '512170.SS', name: '医药行业', isUS: false };
+        }
+        if (name.includes('新能源') || name.includes('光伏') || name.includes('锂电') || name.includes('电池') || name.includes('515790')) {
+          return { symbol: '515790.SS', name: '新能源行业', isUS: false };
+        }
+        if (name.includes('证券') || name.includes('券商') || name.includes('金融') || name.includes('512690')) {
+          return { symbol: '512690.SS', name: '证券行业', isUS: false };
+        }
+        if (name.includes('创业板') || name.includes('399006')) {
+          return { symbol: '399006.SZ', name: '创业板指数', isUS: false };
+        }
+        if (name.includes('中概') || name.includes('金龙') || name.includes('恒生') || name.includes('腾讯') || name.includes('阿里') || name.includes('互联网') || name.includes('港股') || name.includes('hstech') || name.includes('hxc')) {
+          return { symbol: '^HXC', name: '纳斯达克金龙指数', isUS: true };
+        }
+        return { symbol: '000300.SS', name: '沪深300指数', isUS: false };
+      })();
+      
+      const indexObj = indices.find(idx => idx.symbol === proxy.symbol) || indices.find(idx => idx.symbol === '000300.SS');
+      const changePercent = indexObj ? indexObj.changePercent : 0.0;
+      
+      // Calculate metrics
+      const estimatedRate = changePercent;
+      const estimatedProfit = Number(fund.amount || 0) * (changePercent / 100);
+      
+      let bargainIndex = Math.round(50 - changePercent * 15);
+      bargainIndex = Math.max(0, Math.min(100, bargainIndex));
+      
+      // Action and color styling
+      let actionLabel = '';
+      let actionColor = '';
+      let actionBg = '';
+      let actionBorder = '';
+      let actionDot = '';
+      
+      if (estimatedRate <= -1.5) {
+        actionLabel = '🔥 特价超值低吸';
+        actionColor = 'text-emerald-700 bg-emerald-50 border-emerald-250';
+        actionBg = 'from-emerald-500/5 to-transparent';
+        actionBorder = 'border-emerald-250 hover:border-emerald-400';
+        actionDot = 'bg-emerald-500';
+      } else if (estimatedRate <= -0.5) {
+        actionLabel = '🟢 逢低加仓收集';
+        actionColor = 'text-teal-700 bg-teal-50 border-teal-200';
+        actionBg = 'from-teal-500/5 to-transparent';
+        actionBorder = 'border-teal-200 hover:border-teal-350';
+        actionDot = 'bg-teal-500';
+      } else if (estimatedRate < 1.0) {
+        actionLabel = '☁️ 持仓不动观望';
+        actionColor = 'text-slate-600 bg-slate-50 border-slate-200';
+        actionBg = 'from-slate-500/5 to-transparent';
+        actionBorder = 'border-slate-200 hover:border-slate-300';
+        actionDot = 'bg-slate-400';
+      } else {
+        const isProfit = Number(fund.totalProfit || 0) > 0;
+        if (isProfit) {
+          actionLabel = '🔴 逢高分批止盈';
+          actionColor = 'text-rose-700 bg-rose-50 border-rose-200';
+          actionBg = 'from-rose-500/5 to-transparent';
+          actionBorder = 'border-rose-250 hover:border-rose-450';
+          actionDot = 'bg-rose-500';
+        } else {
+          actionLabel = '🟡 冲高持仓捂股';
+          actionColor = 'text-amber-700 bg-amber-50 border-amber-200';
+          actionBg = 'from-amber-500/5 to-transparent';
+          actionBorder = 'border-amber-200 hover:border-amber-350';
+          actionDot = 'bg-amber-500';
+        }
+      }
+      
+      return {
+        ...fund,
+        proxy,
+        indexChange: changePercent,
+        estimatedRate,
+        estimatedProfit,
+        bargainIndex,
+        actionLabel,
+        actionColor,
+        actionBg,
+        actionBorder,
+        actionDot
+      };
+    });
+  }, [activeFunds, indices]);
+
+  // Aggregate statistics for diagnostic
+  const diagnosticsSummary = useMemo(() => {
+    const total = portfolioRecommendations.length;
+    const lowBuy = portfolioRecommendations.filter(r => r.estimatedRate <= -0.5).length;
+    const hold = portfolioRecommendations.filter(r => r.estimatedRate > -0.5 && r.estimatedRate < 1.0).length;
+    const takeProfit = portfolioRecommendations.filter(r => r.estimatedRate >= 1.0).length;
     
-    let statusLabel = "";
-    let colorClass = "";
-    let progressBg = "";
-    let desc = "";
-    
-    if (score >= 75) {
-      statusLabel = "🔥 折价超值大捡漏";
-      colorClass = "text-emerald-600 bg-emerald-50/70 border-emerald-200";
-      progressBg = "bg-emerald-500";
-      desc = isChina
-        ? "成长科技股深度回调。今日下午 15:00 前进行定投，相当于以特惠折价吸筹，摊薄均价效率极高，良机难得！"
-        : "纳指期指及美股盘前承压。下午 15:00 前申购可锁定今晚美股开盘的暴跌底位净值，是大幅摊薄持仓均价的黄金加仓点！";
-    } else if (score >= 55) {
-      statusLabel = "🟢 折价温和吸筹";
-      colorClass = "text-teal-600 bg-teal-50/70 border-teal-200";
-      progressBg = "bg-teal-500";
-      desc = "大盘温和回落。适合按部就班继续日常自动定投，积攒廉价份额，稳步探低长线持仓成本。";
-    } else if (score >= 40) {
-      statusLabel = "☁️ 正常平稳吸筹";
-      colorClass = "text-slate-500 bg-slate-50 border-slate-200";
-      progressBg = "bg-slate-400";
-      desc = "市场温和震荡。无需任何额外手动加减仓操作，以静制动，严格遵守日常既定定投节奏即可。";
+    let summaryText = '';
+    if (lowBuy > 0) {
+      summaryText = '🔍 今日诊断：当前市场有 ' + lowBuy + ' 只基金估算处于【打折低吸区】，下午 15:00 前是进行分批低吸或坚持定投收集便宜份额的极佳窗口！';
+    } else if (takeProfit > 0) {
+      summaryText = '🔍 今日诊断：当前市场有 ' + takeProfit + ' 只基金估算大涨拉升，建议【持仓观望】享受浮盈，若有止盈计划可考虑 15:00 前分批减仓落袋。';
     } else {
-      statusLabel = "⚠️ 溢价风险防冲高";
-      colorClass = "text-rose-600 bg-rose-50/70 border-rose-200";
-      progressBg = "bg-rose-550 animate-pulse";
-      desc = "大盘多头疯抢，估值短期内有些溢价。定投用户应维持常规定投，切勿在当前情绪亢奋点盲目单笔大额追高。";
+      summaryText = '🔍 今日诊断：当前市场走势平稳波动较小，有 ' + hold + ' 只基金处于【卧倒观望区】。建议保持常规定投节奏，无需手动进行额外调仓干预。';
     }
     
-    return { score, statusLabel, colorClass, progressBg, desc };
-  }, [advisorSubTab, chinaAdvisorData, usNasdaqInput, usSp505Input]);
+    return {
+      total,
+      lowBuy,
+      hold,
+      takeProfit,
+      summaryText
+    };
+  }, [portfolioRecommendations]);
+
+  const sectorForecasts = useMemo(() => {
+    const list = indices.filter(idx => idx.region === 'SEC') || [];
+    if (list.length === 0) {
+      return {
+        opportunities: [
+          { name: '半导体芯片', symbol: '512480.SS', reason: '主力大额资金流入，国产替代预期强烈，建议分批定投/逢低买入', type: 'buy', change: -1.25 },
+          { name: '通信设备(CPO)', symbol: '512800.SS', reason: '算力需求强劲，高弹性核心龙头回调企稳，具有极佳的低吸性价比', type: 'buy', change: -1.82 }
+        ],
+        risks: [
+          { name: '食品饮料(白酒)', symbol: '512690.SS', reason: '盘中放量杀跌，跌破短期均线支撑，避险情绪升温，建议暂时观望防踩雷', type: 'risk', change: -2.15 },
+          { name: '证券金融', symbol: '512880.SS', reason: '冲高遭遇抛压，短线上方压力巨大，谨防诱多冲高回落，切勿追高', type: 'risk', change: 1.45 }
+        ]
+      };
+    }
+    
+    // Sort sectors by changePercent
+    const sortedByChange = [...list].sort((a, b) => b.changePercent - a.changePercent);
+    
+    const opportunities = [];
+    const risks = [];
+    
+    // Scan sectors and categorize
+    list.forEach(sec => {
+      const change = sec.changePercent;
+      const inflow = sec.netInflow || 0;
+      const secName = sec.name.replace("行业", "").replace("板块", "").replace("概念", "");
+      
+      // Opportunity: Experiencing correction (DCA bargain) or experiencing extremely strong inflow
+      if (change <= -1.5) {
+        opportunities.push({
+          name: secName,
+          symbol: sec.symbol,
+          change,
+          reason: '今日深幅打折（跌幅 ' + change.toFixed(2) + '%），典型低吸窗口，分批买入性价比极高。',
+          type: 'bargain'
+        });
+      } else if (change >= 0.8 && inflow > 50000000) { // Momentum & net inflow
+        opportunities.push({
+          name: secName,
+          symbol: sec.symbol,
+          change,
+          reason: '盘中拉升且主力资金净流入超 5000 万，行业景气度及后续看涨预期强烈，有良好加仓预期。',
+          type: 'momentum'
+        });
+      }
+      
+      // Risk: Overbought chase risk OR sharp panic selloff (falling knife)
+      if (change >= 2.0) {
+        risks.push({
+          name: secName,
+          symbol: sec.symbol,
+          change,
+          reason: '单日已大涨 ' + change.toFixed(2) + '%，短期估值偏离度较高，谨防冲高回落，切勿高位追涨。',
+          type: 'overbought'
+        });
+      } else if (change <= -2.0) {
+        risks.push({
+          name: secName,
+          symbol: sec.symbol,
+          change,
+          reason: '盘中破位恐慌性杀跌，板块失血严重，短线仍有惯性下杀风险，建议捂股但暂缓手动重仓补仓。',
+          type: 'panic'
+        });
+      }
+    });
+    
+    // Fallbacks to ensure card is always beautifully populated
+    if (opportunities.length === 0) {
+      // Find the most discounted sector (negative but not deep enough for -1.5)
+      const worstSector = sortedByChange[sortedByChange.length - 1];
+      if (worstSector) {
+        opportunities.push({
+          name: worstSector.name.replace("行业", "").replace("板块", "").replace("概念", ""),
+          symbol: worstSector.symbol,
+          change: worstSector.changePercent,
+          reason: '板块今日进行温和震荡调整，回调蓄势健康，适合按计划分批定投，摊薄建仓均价。',
+          type: 'bargain'
+        });
+      }
+      // Add a second fallback gainer representing momentum
+      const bestSector = sortedByChange[0];
+      if (bestSector && bestSector !== worstSector) {
+        opportunities.push({
+          name: bestSector.name.replace("行业", "").replace("板块", "").replace("概念", ""),
+          symbol: bestSector.symbol,
+          change: bestSector.changePercent,
+          reason: '板块整体运行于健康上行通道，均线呈多头排列，中长线向上预期良好，适合逢低关注。',
+          type: 'momentum'
+        });
+      }
+    }
+    
+    if (risks.length === 0) {
+      const bestSector = sortedByChange[0];
+      if (bestSector) {
+        risks.push({
+          name: bestSector.name.replace("行业", "").replace("板块", "").replace("概念", ""),
+          symbol: bestSector.symbol,
+          change: bestSector.changePercent,
+          reason: '日内冲高累计涨幅较大，短线跟风筹码较为拥挤，切勿冲动申购加仓以防短线套牢。',
+          type: 'chase'
+        });
+      }
+      const secondWorst = sortedByChange[sortedByChange.length - 2];
+      if (secondWorst && secondWorst !== bestSector) {
+        risks.push({
+          name: secondWorst.name.replace("行业", "").replace("板块", "").replace("概念", ""),
+          symbol: secondWorst.symbol,
+          change: secondWorst.changePercent,
+          reason: '板块整体弱势整理，缺乏主流资金进场关照，建议以观望静守为主，暂避盲目试底风险。',
+          type: 'weak'
+        });
+      }
+    }
+    
+    return {
+      opportunities: opportunities.slice(0, 2),
+      risks: risks.slice(0, 2)
+    };
+  }, [indices]);
 
   // Jargon-free market weather indicators for Novice Mode
   const chinaWeather = useMemo(() => {
@@ -1318,44 +1704,100 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   // Create ECharts option config
   const chartOption = useMemo(() => {
     if (filteredHistory.length === 0 || !activeIndex) return null;
-    
-    const dates = filteredHistory.map(pt => {
-      if (period === '1D') {
-        if (pt.time) return pt.time;
-        try {
-          const d = new Date(pt.date);
-          const hours = String(d.getHours()).padStart(2, '0');
-          const minutes = String(d.getMinutes()).padStart(2, '0');
-          return `${hours}:${minutes}`;
-        } catch (e) {
-          return pt.date;
-        }
-      }
-      return pt.date;
-    });
-    const values = filteredHistory.map(pt => pt.value);
-    
+
+    let xAxisData;
+    let seriesData;
+
+    const isOneDay = period === '1D';
     const isPositive = activeIndex.changePercent >= 0;
     const lineColor = isPositive ? '#f43f5e' : '#10b981'; // Rose for up, Emerald for down
+
+    const marketToday = getMarketCurrentDateStr(activeIndex.symbol);
+    
+    // Check if the history has any points from today in target timezone
+    const todayPoints = filteredHistory.filter(pt => getMarketDateStrFromISO(pt.date, activeIndex.symbol) === marketToday);
+    const isOpenedToday = todayPoints.length > 0;
+
+    if (isOneDay) {
+      const fullTimeline = getFullDayTimeline(activeIndex.symbol);
+      xAxisData = fullTimeline;
+      seriesData = new Array(fullTimeline.length).fill(null);
+
+      if (isOpenedToday) {
+        todayPoints.forEach(pt => {
+          let ptTime = pt.time;
+          if (!ptTime) {
+            try {
+              const d = new Date(pt.date);
+              const hours = String(d.getHours()).padStart(2, '0');
+              const minutes = String(d.getMinutes()).padStart(2, '0');
+              ptTime = `${hours}:${minutes}`;
+            } catch (e) {}
+          }
+          if (ptTime) {
+            const tIdx = fullTimeline.indexOf(ptTime);
+            if (tIdx !== -1) {
+              seriesData[tIdx] = pt.value;
+            }
+          }
+        });
+      }
+      
+      // Fallback in case no points match the timeline (should not happen for 1D)
+      const hasAnyData = seriesData.some(v => v !== null);
+      if (!hasAnyData && isOpenedToday) {
+        xAxisData = todayPoints.map(pt => pt.time || pt.date);
+        seriesData = todayPoints.map(pt => pt.value);
+      }
+    } else {
+      xAxisData = filteredHistory.map(pt => pt.date);
+      seriesData = filteredHistory.map(pt => pt.value);
+    }
+
+    const hasAnyData = seriesData.some(v => v !== null);
+    
+    // Compute Y-axis bounds nicely to center and span cleanly when unopened today
+    const prevClose = activeIndex.currentPrice - activeIndex.change;
+    const basePrice = activeIndex.currentPrice || prevClose || 1000;
     
     return {
       tooltip: {
         trigger: 'axis',
         formatter: (params) => {
           const pt = params[0];
-          let labelText = pt.name;
-          if (period === '1D' && filteredHistory[pt.dataIndex]) {
-            try {
-              const originalDate = new Date(filteredHistory[pt.dataIndex].date);
-              labelText = originalDate.toLocaleString('zh-CN', {
-                month: 'numeric',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-              });
-            } catch (e) {}
+          if (pt.value === null || pt.value === undefined || isNaN(pt.value)) {
+            return '<div style="display: none;"></div>';
           }
+          
+          let labelText = pt.name;
+          if (isOneDay) {
+            const matchedPt = filteredHistory.find(h => {
+              let ptTime = h.time;
+              if (!ptTime) {
+                try {
+                  const d = new Date(h.date);
+                  const hours = String(d.getHours()).padStart(2, '0');
+                  const minutes = String(d.getMinutes()).padStart(2, '0');
+                  ptTime = `${hours}:${minutes}`;
+                } catch (e) {}
+              }
+              return ptTime === pt.name;
+            });
+            
+            if (matchedPt) {
+              try {
+                const originalDate = new Date(matchedPt.date);
+                labelText = originalDate.toLocaleString('zh-CN', {
+                  month: 'numeric',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                });
+              } catch (e) {}
+            }
+          }
+          
           return `
             <div style="font-family: sans-serif; padding: 4px 8px;">
               <div style="font-size: 10px; color: #64748b; font-weight: bold; margin-bottom: 4px;">${labelText}</div>
@@ -1381,7 +1823,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
       },
       xAxis: {
         type: 'category',
-        data: dates,
+        data: xAxisData,
         boundaryGap: false,
         axisLabel: {
           fontSize: 10,
@@ -1394,6 +1836,8 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
       yAxis: {
         type: 'value',
         scale: true,
+        min: hasAnyData ? null : Number((basePrice * 0.99).toFixed(2)),
+        max: hasAnyData ? null : Number((basePrice * 1.01).toFixed(2)),
         axisLabel: {
           fontSize: 10,
           color: '#64748b',
@@ -1404,7 +1848,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
         }
       },
       series: [{
-        data: values,
+        data: seriesData,
         type: 'line',
         smooth: false,
         showSymbol: false,
@@ -1419,7 +1863,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
         }
       }]
     };
-  }, [filteredHistory, activeIndex]);
+  }, [filteredHistory, activeIndex, period]);
 
   // Format currency/number
   const formatIndexPrice = (val) => {
@@ -1896,13 +2340,313 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
 
   const renderQuantAdvisorView = () => {
     return (
-      <div className="flex-1 flex flex-col gap-4 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-0 animate-in fade-in duration-300">
+      <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-4 md:pb-3 animate-in fade-in duration-300">
         
-        {/* Top Control Bar */}
-        {renderTopControlBar()}
+        {/* Left Column: Clock看板, Hold诊断, FAQ Rules (5/12 cols on desktop) */}
+        <div className="col-span-1 md:col-span-5 flex flex-col gap-4 md:h-full md:overflow-y-auto px-1 py-1 custom-scrollbar shrink-0 select-none">
+          
+          {/* Card 1: T+1 Fund Trading Cycle timeline info */}
+          <div className="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-2xs flex flex-col gap-4 shrink-0 relative overflow-hidden text-left">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/15 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">📅</span>
+                <span className="text-xs font-black text-slate-700 tracking-wider">场外基金 T+1 交易时效看板</span>
+              </div>
+              
+              <span className={'text-[10px] font-black px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ' + (
+                fundTradingCycle.isTPlus1Effect 
+                  ? 'bg-amber-50 text-amber-600 border-amber-200' 
+                  : 'bg-emerald-50 text-emerald-600 border-emerald-200 animate-pulse'
+              )}>
+                <span className={'w-1.5 h-1.5 rounded-full ' + (fundTradingCycle.isTPlus1Effect ? 'bg-amber-500' : 'bg-emerald-500 animate-ping')}></span>
+                {fundTradingCycle.isTPlus1Effect ? 'T+1 计价期' : 'T日进行中'}
+              </span>
+            </div>
 
-        {/* Dynamic content depending on isNoviceMode */}
-        {isNoviceMode ? renderNoviceView() : renderProView()}
+            {/* Countdown / cut-off status badge */}
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/40 text-10 font-bold text-slate-500 leading-normal flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-slate-700 font-extrabold">
+                <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <span>{fundTradingCycle.cutoffMsg}</span>
+              </div>
+              <span className="font-mono text-[9px] bg-slate-200/50 px-2 py-0.5 rounded text-slate-650 font-black shrink-0">{fundTradingCycle.countdownStr}</span>
+            </div>
+
+            {/* Timeline steps */}
+            <div className="flex flex-col gap-4 relative pl-3.5 before:content-[''] before:absolute before:left-1 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
+              
+              {/* Step 1: Submit Trade */}
+              <div className="flex flex-col gap-0.5 text-left relative">
+                <span className={'absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full border border-white shadow-3xs flex items-center justify-center ' + (
+                  !fundTradingCycle.isTPlus1Effect ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-slate-350'
+                )}></span>
+                <span className="text-xs font-black text-slate-750 leading-none">申购/定投申请扣款 (今日 15:00 截止前)</span>
+                <span className="text-[10px] text-slate-450 font-bold mt-1.5">
+                  交易确认归属日：
+                  <span className={!fundTradingCycle.isTPlus1Effect ? "text-emerald-600 font-extrabold" : "text-slate-500 font-extrabold"}>
+                    {fundTradingCycle.tradeDateStr} (T日)
+                  </span>
+                </span>
+              </div>
+
+              {/* Step 2: Confirmation */}
+              <div className="flex flex-col gap-0.5 text-left relative">
+                <span className="absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full bg-slate-350 border border-white shadow-3xs flex items-center justify-center"></span>
+                <span className="text-xs font-black text-slate-655 leading-none">基金份额确认及可查收益</span>
+                <span className="text-[10px] text-slate-450 font-bold mt-1.5">
+                  份额确认交割日：
+                  <span className="text-slate-750 font-extrabold">
+                    {fundTradingCycle.confirmationDateStr} (T+1)
+                  </span>
+                </span>
+              </div>
+
+              {/* Step 3: Settle NAV display */}
+              <div className="flex flex-col gap-0.5 text-left relative">
+                <span className="absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full bg-slate-350 border border-white shadow-3xs flex items-center justify-center"></span>
+                <span className="text-xs font-black text-slate-655 leading-none">首次净值账面更新与持仓收益查询</span>
+                <span className="text-[10px] text-slate-450 font-bold mt-1.5">
+                  界面净值更新时间：
+                  <span className="text-slate-750 font-extrabold">
+                    {fundTradingCycle.navDisplayDateStr} 晚 20:00 - 24:00
+                  </span>
+                </span>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Card 2: Diagnostics summary */}
+          <div className="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-2xs flex flex-col gap-4 shrink-0 relative overflow-hidden text-left animate-in fade-in duration-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50/15 rounded-full blur-xl pointer-events-none"></div>
+
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">📊</span>
+                <span className="text-xs font-black text-slate-700 tracking-wider">今日持仓诊断摘要</span>
+              </div>
+              <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                全网行情联动中
+              </span>
+            </div>
+
+            {/* Metrics count cards */}
+            <div className="grid grid-cols-4 gap-2 text-center select-none">
+              <div className="bg-slate-50 p-2 rounded-2xl border border-slate-200/20 flex flex-col justify-center">
+                <span className="text-10 text-slate-400 font-extrabold leading-none">总持仓</span>
+                <span className="text-lg font-black text-slate-800 font-mono mt-1.5">{diagnosticsSummary.total}</span>
+              </div>
+              <div className="bg-emerald-50/50 p-2 rounded-2xl border border-emerald-100/50 flex flex-col justify-center">
+                <span className="text-10 text-emerald-600 font-extrabold leading-none">低吸买点</span>
+                <span className="text-lg font-black text-emerald-600 font-mono mt-1.5">{diagnosticsSummary.lowBuy}</span>
+              </div>
+              <div className="bg-slate-50 p-2 rounded-2xl border border-slate-200/20 flex flex-col justify-center">
+                <span className="text-10 text-slate-400 font-extrabold leading-none">观望持有</span>
+                <span className="text-lg font-black text-slate-655 font-mono mt-1.5">{diagnosticsSummary.hold}</span>
+              </div>
+              <div className="bg-rose-50/50 p-2 rounded-2xl border border-rose-100/50 flex flex-col justify-center">
+                <span className="text-10 text-rose-600 font-extrabold leading-none">建议止盈</span>
+                <span className="text-lg font-black text-rose-600 font-mono mt-1.5">{diagnosticsSummary.takeProfit}</span>
+              </div>
+            </div>
+
+            {/* Summary description */}
+            <div className="bg-blue-50/30 p-3 rounded-2xl border border-blue-100/40">
+              <p className="text-11 text-slate-650 leading-relaxed font-bold font-sans">
+                {diagnosticsSummary.summaryText}
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: Interactive rules guidelines */}
+          <div className="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-2xs flex flex-col gap-3.5 shrink-0 text-left select-none animate-in fade-in duration-300">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎯</span>
+                <span className="text-xs font-black text-slate-700 tracking-wider">今日行业板块风向标 & 交易雷达</span>
+              </div>
+              <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 animate-pulse">
+                机会与风险今日前瞻
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {/* Opportunities Area */}
+              <div className="flex flex-col gap-2">
+                <span className="text-10 text-emerald-600 font-extrabold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  今日加仓良好预期板块
+                </span>
+                <div className="flex flex-col gap-2">
+                  {sectorForecasts.opportunities.map((opp, idx) => (
+                    <div key={idx} className="bg-emerald-50/20 p-2.5 rounded-2xl border border-emerald-100/30 flex flex-col gap-1 text-left">
+                      <div className="flex justify-between items-center select-none">
+                        <span className="text-11 font-black text-slate-800 flex items-center gap-1.5">
+                          <span className="text-10">🟢</span>
+                          {opp.name}
+                        </span>
+                        <span className={"text-10 font-mono font-bold leading-none " + (opp.change >= 0 ? "text-rose-500" : "text-emerald-500")}>
+                          {opp.change >= 0 ? "+" : ""}{opp.change.toFixed(2)}%
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-bold leading-relaxed">{opp.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Risks Area */}
+              <div className="flex flex-col gap-2 border-t border-slate-100 pt-3.5">
+                <span className="text-10 text-rose-600 font-extrabold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                  今日高风险偏离警示板块
+                </span>
+                <div className="flex flex-col gap-2">
+                  {sectorForecasts.risks.map((risk, idx) => (
+                    <div key={idx} className="bg-rose-50/20 p-2.5 rounded-2xl border border-rose-100/30 flex flex-col gap-1 text-left">
+                      <div className="flex justify-between items-center select-none">
+                        <span className="text-11 font-black text-slate-800 flex items-center gap-1.5">
+                          <span className="text-10">⚠️</span>
+                          {risk.name}
+                        </span>
+                        <span className={"text-10 font-mono font-bold leading-none " + (risk.change >= 0 ? "text-rose-500" : "text-emerald-500")}>
+                          {risk.change >= 0 ? "+" : ""}{risk.change.toFixed(2)}%
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-bold leading-relaxed">{risk.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right Area: Portfolio decision center cards (7/12 cols on desktop) */}
+        <div className="col-span-1 md:col-span-7 flex flex-col md:h-full md:overflow-hidden gap-4 px-1 py-1">
+          
+          <div className="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-2xs flex-1 flex flex-col gap-4 min-h-0 overflow-hidden">
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0 select-none">
+              <div className="flex items-center gap-2">
+                <span className="text-base">📡</span>
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-black text-slate-700 tracking-wider">今日持仓申赎决策雷达</span>
+                  <span className="text-[9px] text-slate-400 font-bold mt-0.5">根据绑定的全球指数盘中实时行情进行精密测算</span>
+                </div>
+              </div>
+              
+              <span className="text-10 text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200 animate-pulse flex items-center gap-1">
+                <span className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
+                指数行情自动对齐中
+              </span>
+            </div>
+
+            {/* Dummy data notice */}
+            {funds.length === 0 && (
+              <div className="bg-amber-50/70 border border-amber-200/70 rounded-2xl p-3 flex gap-2.5 items-start text-left shrink-0 animate-in fade-in duration-300">
+                <span className="text-base leading-none select-none">💡</span>
+                <div className="flex-1 flex flex-col gap-0.5 text-11 text-amber-700 font-bold font-sans">
+                  <h5 className="text-xs font-black leading-none mb-1 text-amber-800">当前正在使用“模拟持仓”进行功能演示</h5>
+                  <p className="leading-relaxed">
+                    检测到您目前尚未导入场外基金资产。我们为您准备了包含深证大盘联接、纳斯达克QDII、诺安芯片等 3 只典型模拟基金，以便您直观体验本雷达的实时决策。
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* List of cards */}
+            <div className="flex-1 flex flex-col gap-4 overflow-y-auto px-1 py-1 custom-scrollbar min-h-0">
+              {portfolioRecommendations.map(rec => {
+                const isPositive = rec.estimatedRate >= 0;
+                const profitColor = rec.estimatedProfit >= 0 ? 'text-rose-600 font-extrabold' : 'text-emerald-600 font-extrabold';
+                const profitSign = rec.estimatedProfit >= 0 ? '+' : '';
+                
+                return (
+                  <div key={rec.id} className={'p-4.5 rounded-2.5xl border bg-gradient-to-br transition-all duration-300 ' + rec.actionBg + ' ' + rec.actionBorder + ' flex flex-col gap-3.5 shadow-3xs hover:shadow-2xs'}>
+                    {/* Top Line */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col text-left">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-black text-slate-800 tracking-tight leading-snug">{rec.name}</span>
+                          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md font-mono">{rec.code}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400 font-black">
+                          <span>{rec.sector}</span>
+                          <span>•</span>
+                          <span>持有市值: ¥{rec.amount.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      
+                      <span className={'text-[10px] font-black px-3 py-1 rounded-full border shrink-0 ' + rec.actionColor}>
+                        {rec.actionLabel}
+                      </span>
+                    </div>
+
+                    {/* Metrics Line */}
+                    <div className="grid grid-cols-3 gap-3 bg-white/70 backdrop-blur-md p-2.5 rounded-2xl border border-slate-200/40 text-left select-none">
+                      {/* tracking index */}
+                      <div className="flex flex-col justify-center border-r border-slate-100 pr-1 min-w-0">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">对齐风向标</span>
+                        <div className="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap">
+                          <span className="text-10 text-slate-655 font-black leading-none truncate max-w-[90px]">{rec.proxy.name}</span>
+                          <span className={'text-10 font-mono font-bold leading-none ' + (rec.indexChange >= 0 ? 'text-rose-500' : 'text-emerald-500')}>
+                            {rec.indexChange >= 0 ? '+' : ''}{rec.indexChange.toFixed(2)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* estimated rate */}
+                      <div className="flex flex-col justify-center border-r border-slate-100 pl-1 pr-1">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">今日估算涨跌</span>
+                        <span className={'text-12 font-mono font-black mt-1 leading-none ' + (isPositive ? 'text-rose-500' : 'text-emerald-500')}>
+                          {isPositive ? '+' : ''}{rec.estimatedRate.toFixed(2)}%
+                        </span>
+                      </div>
+
+                      {/* estimated profit */}
+                      <div className="flex flex-col justify-center pl-1">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">预估盘中损益</span>
+                        <span className={'text-12 font-mono font-black mt-1 leading-none ' + profitColor}>
+                          {profitSign}{rec.estimatedProfit.toFixed(2)} 元
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Bargain progress bar */}
+                    <div className="flex items-center justify-between gap-4 text-left select-none">
+                      <div className="flex flex-col shrink-0">
+                        <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider leading-none">今日折价捡漏指数</span>
+                        <span className="text-base font-black font-mono text-slate-800 mt-1 leading-none">{rec.bargainIndex} <span className="text-[10px] text-slate-400 font-bold">/ 100</span></span>
+                      </div>
+                      
+                      <div className="flex-1 flex flex-col justify-center min-w-0">
+                        <div className="h-2.5 bg-slate-150 rounded-full overflow-hidden relative border border-slate-200/20">
+                          <div 
+                            className={'h-full rounded-full transition-all duration-500 ' + (
+                              rec.bargainIndex >= 70 ? 'bg-emerald-500' : (rec.bargainIndex >= 50 ? 'bg-teal-500' : (rec.bargainIndex >= 35 ? 'bg-slate-400' : 'bg-rose-500 animate-pulse'))
+                            )}
+                            style={{ width: rec.bargainIndex + "%" }} 
+                          />
+                        </div>
+                        <div className="flex justify-between text-[8px] font-bold text-slate-400 font-mono mt-1 leading-none">
+                          <span>溢价/防追 (0)</span>
+                          <span>合理 (50)</span>
+                          <span>大折扣 (100)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+          </div>
+
+        </div>
 
       </div>
     );

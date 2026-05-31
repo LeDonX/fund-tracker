@@ -336,7 +336,14 @@ export default function FundTable({
                         >
                           <span className="truncate">{fund.name}</span>
                         </button>
-                        <span className="text-10 text-slate-400 font-semibold font-mono">{fund.code}</span>
+                        <div className="flex items-center gap-2 mt-0.5 select-none">
+                          <span className="text-10 text-slate-400 font-semibold font-mono">{fund.code}</span>
+                          {fund.sector && (
+                            <span className="inline-flex items-center text-[9px] font-black text-blue-600 bg-blue-50 border border-blue-100/50 px-1.5 py-0.2 rounded-md leading-none">
+                              🏷️ {fund.sector}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
                       {fund.valuationSource === 'official' && fund.netValueDate === actualTodayStr && (
@@ -567,9 +574,16 @@ export default function FundTable({
                           )}
                         </div>
                       </button>
-                      <div className="text-xs text-slate-400 mt-0.5 font-medium">
-                        {fund.code}
-                        {toNumber(fund.shares) > 0 && ` · ${toNumber(fund.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份`}
+                      <div className="text-xs text-slate-400 mt-0.5 font-medium flex items-center gap-2 select-none">
+                        <span>
+                          {fund.code}
+                          {toNumber(fund.shares) > 0 && ` · ${toNumber(fund.shares).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 份`}
+                        </span>
+                        {fund.sector && (
+                          <span className="inline-flex items-center text-[9px] font-black text-blue-600 bg-blue-50 border border-blue-100/50 px-1.5 py-0.2 rounded-md leading-none">
+                            🏷️ {fund.sector}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="p-4 text-right font-bold text-slate-700 text-14 font-mono">
