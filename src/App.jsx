@@ -5137,9 +5137,9 @@ export default function FundTrackerApp() {
           )}
         </div>
 
-        {/* 底部操作舱 Docker (非 fixed 悬浮，位于列表容器下方) */}
+        {/* 底部操作舱 Docker (悬浮在表格上方) */}
         {activeTab === 'portfolio' && (
-          <div className="hidden md:flex shrink-0 justify-center items-center mt-5 w-full">
+          <div className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 z-20 justify-center items-center w-auto">
             <div className="bg-white/85 backdrop-blur-xl border border-slate-200/60 rounded-full px-5 py-2.5 shadow-[0_8px_30px_rgba(15,23,42,0.06),0_1px_3px_rgba(15,23,42,0.02)] flex items-center gap-3 transition-all duration-300 hover:scale-[1.01] hover:bg-white/95 hover:shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
               <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs shadow-sm shrink-0 cursor-pointer hover:shadow hover:scale-[1.01] active:scale-[0.98]">
                 <Plus className="w-3.5 h-3.5" />
@@ -5360,10 +5360,10 @@ export default function FundTrackerApp() {
         localTxsCount={localDataStats.txsCount}
       />
 
-      {/* --- 移动端底部操作舱 Dock (非 fixed 悬浮，位于列表容器下方) --- */}
+      {/* --- 移动端底部操作舱 Dock (悬浮在表格上方) --- */}
       {activeTab === 'portfolio' && (
-        <div className="md:hidden shrink-0 w-full flex justify-center items-center mt-3 pb-[env(safe-area-inset-bottom)]">
-          <div className="w-[80%] max-w-[260px] relative">
+        <div className="md:hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[80%] max-w-[260px]">
+          <div className="w-full relative">
             {/* Settings Popover (Floating above dock) */}
             {settingsDropdownOpen && (
               <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-72 bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/60 p-5 z-50 animate-in slide-in-from-bottom-5 duration-300 ease-out">
