@@ -4996,7 +4996,7 @@ export default function FundTrackerApp() {
       </aside>
 
       {/* 2. 右侧主工作区 */}
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden p-4 pb-6 md:p-6 md:pb-8 w-full max-w-none mx-0">
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden p-4 pb-4 md:p-6 md:pb-4 w-full max-w-none mx-0">
         
         {/* --- 移动端特化：极简顶部状态条 --- */}
         <div className="md:hidden flex flex-col gap-2.5 px-1 py-1.5 shrink-0">
@@ -5107,7 +5107,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 主面板展现区 */}
-        <div className="flex-1 custom-scrollbar mt-12 md:mt-0 flex flex-col min-h-0 overflow-hidden px-1.5 pt-1 pb-3">
+        <div className="flex-1 custom-scrollbar mt-12 md:mt-0 flex flex-col min-h-0 overflow-hidden px-1.5 pt-1 pb-0">
           {activeTab === 'portfolio' ? (
             <FundTable
                 groupTableRef={groupTableRef}

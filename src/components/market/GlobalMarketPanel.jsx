@@ -938,38 +938,42 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
     const opportunities = [];
     const risks = [];
     
-    // Scan sectors and categorize
+    // Scan sectors and categorize with strictly disjoint mathematical ranges
     list.forEach(sec => {
       const change = sec.changePercent;
       const inflow = sec.netInflow || 0;
       const secName = sec.name.replace("行业", "").replace("板块", "").replace("概念", "");
       
-      // Opportunity: Experiencing correction (DCA bargain) or experiencing extremely strong inflow
-      if (change <= -1.5) {
+      // 1. Opportunities (Disjoint Range):
+      // - Moderate discount: between -2.0% and -0.5% (DCA bargain window)
+      // - Or healthy momentum: between 0.8% and 2.0% with strong net inflow (> 50,000,000)
+      if (change > -2.0 && change <= -0.5) {
         opportunities.push({
           name: secName,
           symbol: sec.symbol,
           change,
-          reason: '今日深幅打折（跌幅 ' + change.toFixed(2) + '%），典型低吸窗口，分批买入性价比极高。',
+          reason: '今日该板块温和调整（跌幅 ' + change.toFixed(2) + '%），洗盘健康且回调蓄势，属于高性价比定投低吸窗口。',
           type: 'bargain'
         });
-      } else if (change >= 0.8 && inflow > 50000000) { // Momentum & net inflow
+      } else if (change >= 0.8 && change < 2.0 && inflow > 50000000) {
         opportunities.push({
           name: secName,
           symbol: sec.symbol,
           change,
-          reason: '盘中拉升且主力资金净流入超 5000 万，行业景气度及后续看涨预期强烈，有良好加仓预期。',
+          reason: '盘中强劲拉升且主力资金大幅净流入，行业景气度高，看涨预期强烈，有良好加仓预期。',
           type: 'momentum'
         });
       }
       
-      // Risk: Overbought chase risk OR sharp panic selloff (falling knife)
+      // 2. Risks (Disjoint Range):
+      // - Deep panic crash: change <= -2.0% (severe loss / falling knife)
+      // - Or overbought bubble: change >= 2.0% (high premium chase risk)
       if (change >= 2.0) {
         risks.push({
           name: secName,
           symbol: sec.symbol,
           change,
-          reason: '单日已大涨 ' + change.toFixed(2) + '%，短期估值偏离度较高，谨防冲高回落，切勿高位追涨。',
+          reason: '单日已暴涨 ' + change.toFixed(2) + '%，短期出现明显的估值偏离与溢价，谨防冲高回落，此时切勿高位追涨。',
           type: 'overbought'
         });
       } else if (change <= -2.0) {
@@ -977,56 +981,65 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
           name: secName,
           symbol: sec.symbol,
           change,
-          reason: '盘中破位恐慌性杀跌，板块失血严重，短线仍有惯性下杀风险，建议捂股但暂缓手动重仓补仓。',
+          reason: '盘中遭遇破位恐慌性放量杀跌（大跌 ' + change.toFixed(2) + '%），短线仍有惯性下杀风险，建议持仓但【暂缓手动重仓补仓】。',
           type: 'panic'
         });
       }
     });
     
+    // Defensive Helper: Filter candidates to ensure absolute mutual exclusion at symbol level
+    const getFallbackCandidates = () => {
+      const existingSymbols = new Set([
+        ...opportunities.map(o => o.symbol),
+        ...risks.map(r => r.symbol)
+      ]);
+      return sortedByChange.filter(sec => !existingSymbols.has(sec.symbol));
+    };
+    
     // Fallbacks to ensure card is always beautifully populated
     if (opportunities.length === 0) {
-      // Find the most discounted sector (negative but not deep enough for -1.5)
-      const worstSector = sortedByChange[sortedByChange.length - 1];
-      if (worstSector) {
+      const candidates = getFallbackCandidates();
+      const worstCandidate = candidates[candidates.length - 1];
+      if (worstCandidate) {
         opportunities.push({
-          name: worstSector.name.replace("行业", "").replace("板块", "").replace("概念", ""),
-          symbol: worstSector.symbol,
-          change: worstSector.changePercent,
-          reason: '板块今日进行温和震荡调整，回调蓄势健康，适合按计划分批定投，摊薄建仓均价。',
+          name: worstCandidate.name.replace("行业", "").replace("板块", "").replace("概念", ""),
+          symbol: worstCandidate.symbol,
+          change: worstCandidate.changePercent,
+          reason: '板块今日进行温和震荡调整，回调蓄势健康，适合按计划分批定投，分摊持仓均价。',
           type: 'bargain'
         });
       }
-      // Add a second fallback gainer representing momentum
-      const bestSector = sortedByChange[0];
-      if (bestSector && bestSector !== worstSector) {
+      const bestCandidate = candidates[0];
+      if (bestCandidate && bestCandidate !== worstCandidate) {
         opportunities.push({
-          name: bestSector.name.replace("行业", "").replace("板块", "").replace("概念", ""),
-          symbol: bestSector.symbol,
-          change: bestSector.changePercent,
-          reason: '板块整体运行于健康上行通道，均线呈多头排列，中长线向上预期良好，适合逢低关注。',
+          name: bestCandidate.name.replace("行业", "").replace("板块", "").replace("概念", ""),
+          symbol: bestCandidate.symbol,
+          change: bestCandidate.changePercent,
+          reason: '板块整体运行于健康上行通道，均线呈多头排列，中长线向上预期良好，适合定投关注。',
           type: 'momentum'
         });
       }
     }
     
     if (risks.length === 0) {
-      const bestSector = sortedByChange[0];
-      if (bestSector) {
+      const candidates = getFallbackCandidates();
+      const bestCandidate = candidates[0];
+      if (bestCandidate) {
         risks.push({
-          name: bestSector.name.replace("行业", "").replace("板块", "").replace("概念", ""),
-          symbol: bestSector.symbol,
-          change: bestSector.changePercent,
-          reason: '日内冲高累计涨幅较大，短线跟风筹码较为拥挤，切勿冲动申购加仓以防短线套牢。',
+          name: bestCandidate.name.replace("行业", "").replace("板块", "").replace("概念", ""),
+          symbol: bestCandidate.symbol,
+          change: bestCandidate.changePercent,
+          reason: '日内累计涨幅较大，短线跟风筹码较为拥挤，不宜盲目加仓，建议轻仓观望。',
           type: 'chase'
         });
       }
-      const secondWorst = sortedByChange[sortedByChange.length - 2];
-      if (secondWorst && secondWorst !== bestSector) {
+      const secondWorst = candidates[candidates.length - 2] || candidates[candidates.length - 1];
+      if (secondWorst && secondWorst !== bestCandidate) {
         risks.push({
           name: secondWorst.name.replace("行业", "").replace("板块", "").replace("概念", ""),
           symbol: secondWorst.symbol,
           change: secondWorst.changePercent,
-          reason: '板块整体弱势整理，缺乏主流资金进场关照，建议以观望静守为主，暂避盲目试底风险。',
+          reason: '板块今日表现平淡、缩量整理，短期上攻动能有限，建议维持底仓不动。',
           type: 'weak'
         });
       }
