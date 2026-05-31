@@ -5008,7 +5008,7 @@ export default function FundTrackerApp() {
       </aside>
 
       {/* 2. 右侧主工作区 */}
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden p-4 pb-4 md:p-6 md:pb-4 w-full max-w-none mx-0">
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden p-4 pb-3 md:p-6 md:pb-3 w-full max-w-none mx-0">
         
         {/* --- 移动端特化：极简顶部状态条 --- */}
         <div className="md:hidden flex flex-col gap-2.5 px-1 py-1.5 shrink-0">
@@ -5119,7 +5119,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 主面板展现区 */}
-        <div className="flex-1 custom-scrollbar mt-12 md:mt-0 flex flex-col min-h-0 overflow-hidden px-2.5 pt-1.5 pb-4 md:pb-5">
+        <div className="flex-1 custom-scrollbar mt-12 md:mt-0 flex flex-col min-h-0 overflow-hidden px-2.5 pt-1.5 pb-3 md:pb-3 relative">
           {activeTab === 'portfolio' ? (
             <FundTable
                 groupTableRef={groupTableRef}
@@ -5147,42 +5147,177 @@ export default function FundTrackerApp() {
           ) : (
             renderSearchTab()
           )}
-        </div>
 
-        {/* 底部操作舱 Docker (在表格下方) */}
-        {activeTab === 'portfolio' && (
-          <div className="hidden md:flex shrink-0 justify-center items-center w-full mt-4 pb-2 z-20">
-            <div className="bg-white/85 backdrop-blur-xl border border-slate-200/60 rounded-full px-5 py-2.5 shadow-[0_8px_30px_rgba(15,23,42,0.06),0_1px_3px_rgba(15,23,42,0.02)] flex items-center gap-3 transition-all duration-300 hover:scale-[1.01] hover:bg-white/95 hover:shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
-              <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs shadow-sm shrink-0 cursor-pointer hover:shadow hover:scale-[1.01] active:scale-[0.98]">
-                <Plus className="w-3.5 h-3.5" />
-                <span>新增持仓</span>
-              </button>
-              <button type="button" onClick={handleOpenCreateGroup} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs border border-slate-200/60 shrink-0 cursor-pointer active:scale-[0.98]">
-                <FolderPlus className="w-3.5 h-3.5 text-slate-500" />
-                <span>新增分组</span>
-              </button>
-              <button type="button" onClick={() => openModal('sync')} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs border border-slate-200/60 shrink-0 cursor-pointer active:scale-[0.98]">
-                <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
-                <span>同步交易</span>
-              </button>
-              <button type="button" onClick={() => openModal('ocr')} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs border border-slate-200/60 shrink-0 cursor-pointer active:scale-[0.98]">
-                <Camera className="w-3.5 h-3.5 text-slate-500" />
-                <span>截图导入</span>
-              </button>
-              <span className="text-slate-200 select-none">|</span>
-              <button 
-                type="button" 
-                onClick={() => handleRefresh({ isManual: true })} 
-                disabled={funds.length === 0} 
-                className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 px-4.5 py-2 rounded-full font-bold transition-all duration-150 text-xs border border-rose-200/60 shrink-0 cursor-pointer hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                title="刷新数据"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>刷新数据</span>
-              </button>
+          {/* 桌面端底部操作舱 Docker (绝对悬浮，位于白卡片底部内部) */}
+          {activeTab === 'portfolio' && (
+            <div className="hidden md:flex absolute bottom-7 left-1/2 -translate-x-1/2 z-20 justify-center items-center w-auto">
+              <div className="bg-white/85 backdrop-blur-xl border border-slate-200/60 rounded-full px-5 py-2.5 shadow-[0_8px_30px_rgba(15,23,42,0.06),0_1px_3px_rgba(15,23,42,0.02)] flex items-center gap-3 transition-all duration-300 hover:scale-[1.01] hover:bg-white/95 hover:shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
+                <button type="button" onClick={handleOpenFundModal} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs shadow-sm shrink-0 cursor-pointer hover:shadow hover:scale-[1.01] active:scale-[0.98]">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>新增持仓</span>
+                </button>
+                <button type="button" onClick={handleOpenCreateGroup} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs border border-slate-200/60 shrink-0 cursor-pointer active:scale-[0.98]">
+                  <FolderPlus className="w-3.5 h-3.5 text-slate-500" />
+                  <span>新增分组</span>
+                </button>
+                <button type="button" onClick={() => openModal('sync')} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs border border-slate-200/60 shrink-0 cursor-pointer active:scale-[0.98]">
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
+                  <span>同步交易</span>
+                </button>
+                <button type="button" onClick={() => openModal('ocr')} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full font-bold transition-all duration-150 text-xs border border-slate-200/60 shrink-0 cursor-pointer active:scale-[0.98]">
+                  <Camera className="w-3.5 h-3.5 text-slate-500" />
+                  <span>截图导入</span>
+                </button>
+                <span className="text-slate-200 select-none">|</span>
+                <button 
+                  type="button" 
+                  onClick={() => handleRefresh({ isManual: true })} 
+                  disabled={funds.length === 0} 
+                  className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 px-4.5 py-2 rounded-full font-bold transition-all duration-150 text-xs border border-rose-200/60 shrink-0 cursor-pointer hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="刷新数据"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span>刷新数据</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* 移动端底部操作舱 Dock (绝对悬浮，位于白卡片底部内部) */}
+          {activeTab === 'portfolio' && (
+            <div className="md:hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[80%] max-w-[260px]">
+              <div className="w-full relative">
+                {/* Settings Popover (Floating above dock) */}
+                {settingsDropdownOpen && (
+                  <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-72 bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/60 p-5 z-50 animate-in slide-in-from-bottom-5 duration-300 ease-out">
+                    <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase border-b border-slate-100/60 pb-2 flex justify-between items-center">
+                      <span className="flex items-center gap-1.5">
+                        <span>控制与设置中心</span>
+                        {!isAuthenticated ? (
+                          <span className="text-[8px] px-1 py-0.5 rounded font-bold bg-amber-50 text-amber-600 border border-amber-200/50">免登录</span>
+                        ) : (
+                          <span className="text-[8px] px-1 py-0.5 rounded font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/50">已同步</span>
+                        )}
+                      </span>
+                      <button type="button" onClick={() => setSettingsDropdownOpen(false)} className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100/80 transition-colors">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    
+                    {/* 数据源 */}
+                    <div className="flex flex-col gap-1.5 mt-3.5">
+                      <span className="text-xs font-bold text-slate-600">数据源</span>
+                      <select
+                        value={selectedDataSource}
+                        onChange={(e) => setSelectedDataSource(e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 bg-white/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                      >
+                        <option value="auto">智能双阶段 (推荐)</option>
+                        <option value="tiantian">实时估值优先</option>
+                        <option value="eastmoney">收盘净值优先</option>
+                      </select>
+                      <span className="text-[10px] text-slate-400 font-medium leading-relaxed bg-slate-50/50 p-1.5 rounded-md border border-slate-100/50">{valuationSourceHint || '自动识别净值更新状态'}</span>
+                    </div>
+
+                    {/* 显示页签金额 */}
+                    <label className="flex items-center justify-between rounded-lg border border-slate-100 bg-white/60 px-3 py-2 text-xs text-slate-600 gap-2 cursor-pointer hover:bg-slate-100/70 transition-all select-none mt-3">
+                      <span className="font-bold text-slate-600">显示页签金额</span>
+                      <input
+                        type="checkbox"
+                        checked={showTabProfit}
+                        onChange={(e) => setShowTabProfit(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </label>
+
+                    {/* 高级操作 */}
+                    <div className="flex flex-col gap-1.5 mt-3.5">
+                      <span className="text-xs font-bold text-slate-600">高级功能</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => { setSettingsDropdownOpen(false); openModal('sync'); }} className="flex items-center justify-center gap-1 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 py-1.5 rounded-lg font-semibold text-xs border border-indigo-100 shadow-sm active:scale-95 transition-all">
+                          <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-500" /> 同步交易
+                        </button>
+                        <button type="button" onClick={() => { setSettingsDropdownOpen(false); openModal('ocr'); }} className="flex items-center justify-center gap-1 bg-slate-100/80 hover:bg-slate-200 text-slate-700 py-1.5 rounded-lg font-semibold text-xs border border-slate-200 shadow-sm active:scale-95 transition-all">
+                          <Camera className="w-3.5 h-3.5 text-slate-500" /> 截图识别
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-100/80 my-3.5"></div>
+
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => { setSettingsDropdownOpen(false); handleOpenImportModal(); }} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 rounded-lg font-semibold text-xs border border-slate-200 shadow-sm active:scale-95 transition-all">
+                        <Upload className="w-3.5 h-3.5 text-slate-500" /> 导入配置
+                      </button>
+                      <button type="button" onClick={() => { setSettingsDropdownOpen(false); openModal('export'); }} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 rounded-lg font-semibold text-xs border border-slate-200 shadow-sm active:scale-95 transition-all">
+                        <Download className="w-3.5 h-3.5 text-slate-500" /> 导出数据
+                      </button>
+                    </div>
+
+                    <button type="button" onClick={() => { setSettingsDropdownOpen(false); handleLogout(); }} className="flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-600 py-2 rounded-lg font-bold transition-all duration-150 text-xs border border-rose-200/60 shadow-sm w-full mt-2 active:scale-98">
+                      <LogOut className="w-3.5 h-3.5" /> 退出系统登录
+                    </button>
+                  </div>
+                )}
+
+                {/* Dock Main Bar: Premium Frosted Glass */}
+                <div className="backdrop-blur-2xl bg-white/75 border border-white/60 shadow-[0_10px_30px_rgba(15,23,42,0.08),0_-2px_10px_rgba(15,23,42,0.02)] rounded-full px-2 flex items-center justify-around text-slate-700 h-12 relative">
+                  {/* 新增持仓 */}
+                  <button 
+                    type="button" 
+                    onClick={handleOpenFundModal}
+                    className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-indigo-600 active:scale-90 transition-all duration-200 cursor-pointer rounded-full active:bg-slate-100/50 shrink-0"
+                    title="新增持仓"
+                  >
+                    <Plus className="w-4.5 h-4.5" />
+                  </button>
+
+                  {/* 创建分组 */}
+                  <button 
+                    type="button" 
+                    onClick={handleOpenCreateGroup}
+                    className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-indigo-600 active:scale-90 transition-all duration-200 cursor-pointer rounded-full active:bg-slate-100/50 shrink-0"
+                    title="创建分组"
+                  >
+                    <FolderPlus className="w-4.5 h-4.5" />
+                  </button>
+
+                  {/* 一键刷新 */}
+                  <button 
+                    type="button" 
+                    onClick={() => handleRefresh({ isManual: true })}
+                    disabled={funds.length === 0}
+                    className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-indigo-600 active:scale-90 transition-all duration-200 cursor-pointer rounded-full active:bg-slate-100/50 shrink-0"
+                    title="刷新数据"
+                  >
+                    <RefreshCw className={`w-4.5 h-4.5 ${isRefreshing ? 'animate-spin text-indigo-500' : ''}`} />
+                  </button>
+
+                  {/* 同步交易 */}
+                  <button 
+                    type="button" 
+                    onClick={() => openModal('sync')}
+                    className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-indigo-600 active:scale-90 transition-all duration-200 cursor-pointer rounded-full active:bg-slate-100/50 shrink-0"
+                    title="同步交易"
+                  >
+                    <ArrowRightLeft className="w-4.5 h-4.5" />
+                  </button>
+
+                  {/* 工具与设置 */}
+                  <button 
+                    type="button" 
+                    onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}
+                    className={`flex items-center justify-center w-9 h-9 transition-all duration-200 cursor-pointer rounded-full active:scale-90 shrink-0 ${settingsDropdownOpen ? 'text-indigo-600 bg-slate-100/80 shadow-inner' : 'text-slate-500 hover:text-indigo-600 active:bg-slate-100/50'}`}
+                    title="工具与设置"
+                  >
+                    <Settings className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
 
       <FundDetailPanel
@@ -5373,140 +5508,7 @@ export default function FundTrackerApp() {
         localTxsCount={localDataStats.txsCount}
       />
 
-      {/* --- 移动端底部操作舱 Dock (在表格下方) --- */}
-      {activeTab === 'portfolio' && (
-        <div className="md:hidden flex shrink-0 justify-center items-center w-full mt-3 mb-2 px-4 pb-[env(safe-area-inset-bottom)] z-20">
-          <div className="w-full max-w-[260px] relative">
-            {/* Settings Popover (Floating above dock) */}
-            {settingsDropdownOpen && (
-              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-72 bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/60 p-5 z-50 animate-in slide-in-from-bottom-5 duration-300 ease-out">
-                <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase border-b border-slate-100/60 pb-2 flex justify-between items-center">
-                  <span className="flex items-center gap-1.5">
-                    <span>控制与设置中心</span>
-                    {!isAuthenticated ? (
-                      <span className="text-[8px] px-1 py-0.5 rounded font-bold bg-amber-50 text-amber-600 border border-amber-200/50">免登录</span>
-                    ) : (
-                      <span className="text-[8px] px-1 py-0.5 rounded font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/50">已同步</span>
-                    )}
-                  </span>
-                  <button type="button" onClick={() => setSettingsDropdownOpen(false)} className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100/80 transition-colors">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                
-                {/* 数据源 */}
-                <div className="flex flex-col gap-1.5 mt-3.5">
-                  <span className="text-xs font-bold text-slate-600">数据源</span>
-                  <select
-                    value={selectedDataSource}
-                    onChange={(e) => setSelectedDataSource(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                  >
-                    <option value="auto">智能双阶段 (推荐)</option>
-                    <option value="tiantian">实时估值优先</option>
-                    <option value="eastmoney">收盘净值优先</option>
-                  </select>
-                  <span className="text-[10px] text-slate-400 font-medium leading-relaxed bg-slate-50/50 p-1.5 rounded-md border border-slate-100/50">{valuationSourceHint || '自动识别净值更新状态'}</span>
-                </div>
 
-                {/* 显示页签金额 */}
-                <label className="flex items-center justify-between rounded-lg border border-slate-100 bg-white/60 px-3 py-2 text-xs text-slate-600 gap-2 cursor-pointer hover:bg-slate-100/70 transition-all select-none mt-3">
-                  <span className="font-bold text-slate-600">显示页签金额</span>
-                  <input
-                    type="checkbox"
-                    checked={showTabProfit}
-                    onChange={(e) => setShowTabProfit(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                </label>
-
-                {/* 高级操作 */}
-                <div className="flex flex-col gap-1.5 mt-3.5">
-                  <span className="text-xs font-bold text-slate-600">高级功能</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => { setSettingsDropdownOpen(false); openModal('sync'); }} className="flex items-center justify-center gap-1 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 py-1.5 rounded-lg font-semibold text-xs border border-indigo-100 shadow-sm active:scale-95 transition-all">
-                      <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-500" /> 同步交易
-                    </button>
-                    <button type="button" onClick={() => { setSettingsDropdownOpen(false); openModal('ocr'); }} className="flex items-center justify-center gap-1 bg-slate-100/80 hover:bg-slate-200 text-slate-700 py-1.5 rounded-lg font-semibold text-xs border border-slate-200 shadow-sm active:scale-95 transition-all">
-                      <Camera className="w-3.5 h-3.5 text-slate-500" /> 截图识别
-                    </button>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100/80 my-3.5"></div>
-
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => { setSettingsDropdownOpen(false); handleOpenImportModal(); }} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 rounded-lg font-semibold text-xs border border-slate-200 shadow-sm active:scale-95 transition-all">
-                    <Upload className="w-3.5 h-3.5 text-slate-500" /> 导入配置
-                  </button>
-                  <button type="button" onClick={() => { setSettingsDropdownOpen(false); openModal('export'); }} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 rounded-lg font-semibold text-xs border border-slate-200 shadow-sm active:scale-95 transition-all">
-                    <Download className="w-3.5 h-3.5 text-slate-500" /> 导出数据
-                  </button>
-                </div>
-
-                <button type="button" onClick={() => { setSettingsDropdownOpen(false); handleLogout(); }} className="flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-600 py-2 rounded-lg font-bold transition-all duration-150 text-xs border border-rose-200/60 shadow-sm w-full mt-2 active:scale-98">
-                  <LogOut className="w-3.5 h-3.5" /> 退出系统登录
-                </button>
-              </div>
-            )}
-
-            {/* Dock Main Bar: Premium Frosted Glass */}
-            <div className="backdrop-blur-2xl bg-white/75 border border-white/60 shadow-[0_10px_30px_rgba(15,23,42,0.08),0_-2px_10px_rgba(15,23,42,0.02)] rounded-full px-2 flex items-center justify-around text-slate-700 h-12 relative">
-              {/* 新增持仓 */}
-              <button 
-                type="button" 
-                onClick={handleOpenFundModal}
-                className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-indigo-600 active:scale-90 transition-all duration-200 cursor-pointer rounded-full active:bg-slate-100/50 shrink-0"
-                title="新增持仓"
-              >
-                <Plus className="w-4.5 h-4.5" />
-              </button>
-
-              {/* 创建分组 */}
-              <button 
-                type="button" 
-                onClick={handleOpenCreateGroup}
-                className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-indigo-600 active:scale-90 transition-all duration-200 cursor-pointer rounded-full active:bg-slate-100/50 shrink-0"
-                title="创建分组"
-              >
-                <FolderPlus className="w-4.5 h-4.5" />
-              </button>
-
-              {/* 一键刷新 */}
-              <button 
-                type="button" 
-                onClick={() => handleRefresh({ isManual: true })}
-                disabled={funds.length === 0}
-                className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-indigo-600 active:scale-90 transition-all duration-200 cursor-pointer rounded-full active:bg-slate-100/50 shrink-0"
-                title="刷新数据"
-              >
-                <RefreshCw className={`w-4.5 h-4.5 ${isRefreshing ? 'animate-spin text-indigo-500' : ''}`} />
-              </button>
-
-              {/* 同步交易 */}
-              <button 
-                type="button" 
-                onClick={() => openModal('sync')}
-                className="flex items-center justify-center w-9 h-9 text-slate-500 hover:text-indigo-600 active:scale-90 transition-all duration-200 cursor-pointer rounded-full active:bg-slate-100/50 shrink-0"
-                title="同步交易"
-              >
-                <ArrowRightLeft className="w-4.5 h-4.5" />
-              </button>
-
-              {/* 工具与设置 */}
-              <button 
-                type="button" 
-                onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}
-                className={`flex items-center justify-center w-9 h-9 transition-all duration-200 cursor-pointer rounded-full active:scale-90 shrink-0 ${settingsDropdownOpen ? 'text-indigo-600 bg-slate-100/80 shadow-inner' : 'text-slate-500 hover:text-indigo-600 active:bg-slate-100/50'}`}
-                title="工具与设置"
-              >
-                <Settings className="w-4.5 h-4.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Toast Notification */}
       {toast.show && (

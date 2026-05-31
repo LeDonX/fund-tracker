@@ -239,7 +239,7 @@ export default function FundTable({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto relative custom-scrollbar pb-6 md:pb-8">
+      <div className="flex-1 overflow-auto relative custom-scrollbar pb-16 md:pb-20">
         {/* --- 移动端卡片视图 --- */}
         <div className="md:hidden flex flex-col divide-y divide-slate-100">
           {orderedGroups.map(({ sector, data }) => {
