@@ -4956,14 +4956,13 @@ export default function FundTrackerApp() {
             </button>
           </div>
 
-          {/* 侧边栏三个实时大盘分时走势图 */}
-          <div className="flex flex-col gap-3 border-t border-slate-200/50 pt-3 select-none shrink-0">
-            <SidebarMarketTrends setActiveTab={setActiveTab} />
-          </div>
         </div>
 
-        {/* 侧边栏底部区域 (固定在底部，只包含账号与参数配置) */}
+        {/* 侧边栏底部区域 (固定在底部，包含走势图卡片 + 账号与参数配置) */}
         <div className="mt-auto flex flex-col gap-3 border-t border-slate-200/50 pt-3 select-none shrink-0">
+          {/* 实时大盘走势卡片 */}
+          <SidebarMarketTrends setActiveTab={setActiveTab} />
+
           {/* 登录与同步状态 + 系统参数按钮 (常驻侧边栏并排为一行 - 极致空间利用) */}
           <div className="flex items-center gap-2">
             {/* 登录与账号状态 */}
