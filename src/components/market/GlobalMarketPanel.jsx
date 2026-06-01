@@ -570,7 +570,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
     return indices.map(item => {
       const isSelected = item.symbol === selectedSymbol;
       if (isSelected) {
-        const hasLivePrice = liveDetail && liveDetail.symbol === item.symbol;
+        const hasLivePrice = liveDetail && liveDetail.symbol === item.symbol && liveDetail.currentPrice > 0;
         return {
           ...item,
           currentPrice: hasLivePrice ? liveDetail.currentPrice : item.currentPrice,
@@ -906,6 +906,63 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
     
     return { f_nasdaq, f_sp500, has_macro_data, spread, activeRule, signal, action, label, color, bg, border, indicator, cardGradient };
   }, [usNasdaqInput, usSp505Input, usMacroData]);
+
+  const dcaBargainData = useMemo(() => {
+    const chinaA50 = chinaAdvisorData.f_a50_morning || 0;
+    const chinaHxc = chinaAdvisorData.hxc_last_night || 0;
+    const usNasdaq = usNasdaqInput;
+    const usSp505 = usSp505Input;
+    
+    // Compute composite bargain index (0 to 100)
+    // Lower rates = higher bargain index (more discount)
+    let score = 50;
+    if (advisorSubTab === 'china') {
+      const avgChg = (chinaA50 + chinaHxc) / 2;
+      score = Math.round(50 - avgChg * 15);
+    } else {
+      const avgChg = (usNasdaq + usSp505) / 2;
+      score = Math.round(50 - avgChg * 15);
+    }
+    score = Math.max(0, Math.min(100, score));
+    
+    let statusLabel = "";
+    let colorClass = "";
+    let progressBg = "";
+    let desc = "";
+    
+    if (score >= 80) {
+      statusLabel = "🔥 黄金级超值折价";
+      colorClass = "text-emerald-650 bg-emerald-50/90 border-emerald-300 animate-pulse";
+      progressBg = "bg-emerald-500 animate-pulse";
+      desc = advisorSubTab === 'china' 
+        ? "国内核心宽基资产均深度大打折。下午 15:00 前建议分批定投或手动加仓，是极限拉低持仓均值、积攒黄金底仓的稀缺机会！"
+        : "纳指期指及美股盘前遭遇暴跌式大打折。下午 15:00 前申购可直接锁定今晚开盘后大跌的特价净值，是大幅分摊长线成本的绝佳窗口！";
+    } else if (score >= 65) {
+      statusLabel = "🟢 优质折价收集";
+      colorClass = "text-emerald-650 bg-emerald-50 border-emerald-200";
+      progressBg = "bg-emerald-500";
+      desc = advisorSubTab === 'china'
+        ? "市场震荡下调，优质中国核心筹码折扣窗口开启。下午 15:00 前按计划进行定投吸筹，性价比非常高。"
+        : "纳指期指及美股盘前承压。下午 15:00 前申购可锁定今晚美股开盘的暴跌底位净值，是大幅摊薄持仓均价的黄金加仓点！";
+    } else if (score >= 55) {
+      statusLabel = "🟢 折价温和吸筹";
+      colorClass = "text-teal-600 bg-teal-50/70 border-teal-200";
+      progressBg = "bg-teal-500";
+      desc = "大盘温和回落。适合按部就班继续日常自动定投，积攒廉价份额，稳步探低长线持仓成本。";
+    } else if (score >= 40) {
+      statusLabel = "☁️ 正常平稳吸筹";
+      colorClass = "text-slate-500 bg-slate-50 border-slate-200";
+      progressBg = "bg-slate-400";
+      desc = "市场温和震荡。无需任何额外手动加减仓操作，以静制动，严格遵守日常既定定投节奏即可。";
+    } else {
+      statusLabel = "⚠️ 溢价风险防冲高";
+      colorClass = "text-rose-600 bg-rose-50/70 border-rose-200";
+      progressBg = "bg-rose-550 animate-pulse";
+      desc = "大盘多头疯抢，估值短期内有些溢价。定投用户应维持常规定投，切勿在当前情绪亢奋点盲目单笔大额追高。";
+    }
+    
+    return { score, statusLabel, colorClass, progressBg, desc };
+  }, [advisorSubTab, chinaAdvisorData, usNasdaqInput, usSp505Input]);
 
   const fundTradingCycle = useMemo(() => {
     const now = new Date();
@@ -1875,7 +1932,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   // Find active index information
   const activeIndex = useMemo(() => {
     const baseActive = indices.find(idx => idx.symbol === selectedSymbol) || null;
-    if (baseActive && liveDetail && liveDetail.symbol === selectedSymbol) {
+    if (baseActive && liveDetail && liveDetail.symbol === selectedSymbol && liveDetail.currentPrice > 0) {
       return {
         ...baseActive,
         currentPrice: liveDetail.currentPrice,
