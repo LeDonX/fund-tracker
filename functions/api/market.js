@@ -772,9 +772,6 @@ export async function onRequestGet(context) {
           }
           
           const [nameRes, detailRes] = await Promise.all([namePromise, detailPromise]);
-          const sectorName = nameRes?.data?.f58 || symbol;
-          const currentPrice = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1000 : 0;
-          const prevClose = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1000 : currentPrice;
           
           const history = [];
           if (range === "1d") {
@@ -812,6 +809,10 @@ export async function onRequestGet(context) {
               });
             }
           }
+          
+          const sectorName = nameRes?.data?.f58 || symbol;
+          const currentPrice = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1000 : (history.length > 0 ? history[history.length - 1].value : 0);
+          const prevClose = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1000 : (history.length > 0 ? history[0].value : currentPrice);
           
           const change = Number((currentPrice - prevClose).toFixed(2));
           const changePercent = prevClose > 0 ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
