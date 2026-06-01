@@ -559,6 +559,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
     return () => window.removeEventListener('selectedMarketSymbolChanged', handleSymbolChanged);
   }, []);
   const [detailHistory, setDetailHistory] = useState([]);
+  const [liveDetail, setLiveDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
   const [period, setPeriod] = useState('1D'); // 1D, 1M, 3M, 6M, 1Y
@@ -979,7 +980,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   }, [funds]);
 
   const portfolioRecommendations = useMemo(() => {
-    if (!indices || indices.length === 0) return [];
+    if (!displayIndices || displayIndices.length === 0) return [];
     
     return activeFunds.map(fund => {
       const fundName = fund.name || '';
@@ -1017,7 +1018,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
         return { symbol: '000300.SS', name: '沪深300指数', isUS: false };
       })();
       
-      const indexObj = indices.find(idx => idx.symbol === proxy.symbol) || indices.find(idx => idx.symbol === '000300.SS');
+      const indexObj = displayIndices.find(idx => idx.symbol === proxy.symbol) || displayIndices.find(idx => idx.symbol === '000300.SS');
       const changePercent = indexObj ? indexObj.changePercent : 0.0;
       
       // Calculate metrics
@@ -1167,7 +1168,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
       ];
     };
 
-    const list = indices.filter(idx => idx.region === 'SEC') || [];
+    const list = displayIndices.filter(idx => idx.region === 'SEC') || [];
     if (list.length === 0) {
       return {
         opportunities: [
@@ -1412,9 +1413,28 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
     return { nqWeather, nqBg, nqEmoji, nqColor, esWeather, esBg, esEmoji, esColor };
   }, [usNasdaqInput, usSp505Input]);
 
+  // Dynamic displayIndices memo that injects live detail updates into indices
+  const displayIndices = useMemo(() => {
+    if (!indices || indices.length === 0) return [];
+    return indices.map(item => {
+      const isSelected = item.symbol === selectedSymbol;
+      if (isSelected) {
+        const hasLivePrice = liveDetail && liveDetail.symbol === item.symbol;
+        return {
+          ...item,
+          currentPrice: hasLivePrice ? liveDetail.currentPrice : item.currentPrice,
+          change: hasLivePrice ? liveDetail.change : item.change,
+          changePercent: hasLivePrice ? liveDetail.changePercent : item.changePercent,
+          sparkline: (period === '1D' && detailHistory && detailHistory.length > 0) ? detailHistory : item.sparkline
+        };
+      }
+      return item;
+    });
+  }, [indices, selectedSymbol, liveDetail, detailHistory, period]);
+
   // Filter indices into main stock indices and leading wind vane indicators
   const mainIndices = useMemo(() => {
-    return indices.filter(idx => 
+    return displayIndices.filter(idx => 
       !idx.symbol.includes('CN=F') && 
       !idx.symbol.includes('NQ=F') && 
       !idx.symbol.includes('ES=F') && 
@@ -1422,14 +1442,14 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
       !idx.symbol.includes('USDCNH=X') &&
       idx.region !== 'SEC'
     );
-  }, [indices]);
+  }, [displayIndices]);
 
   // Calculate user's holding amount for each sector dynamically based on funds prop and indices
   const sectorHoldings = useMemo(() => {
-    if (!Array.isArray(funds) || funds.length === 0 || !Array.isArray(indices)) return {};
+    if (!Array.isArray(funds) || funds.length === 0 || !Array.isArray(displayIndices)) return {};
     
     const holdings = {};
-    const sectors = indices.filter(idx => idx.region === 'SEC');
+    const sectors = displayIndices.filter(idx => idx.region === 'SEC');
     
     sectors.forEach(sec => {
       holdings[sec.symbol] = 0;
@@ -1494,10 +1514,10 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
     });
     
     return holdings;
-  }, [funds, indices]);
+  }, [funds, displayIndices]);
 
   const sectorIndices = useMemo(() => {
-    const list = indices.filter(idx => idx.region === 'SEC');
+    const list = displayIndices.filter(idx => idx.region === 'SEC');
     if (sectorSort === 'gain') {
       return [...list].sort((a, b) => b.changePercent - a.changePercent);
     } else if (sectorSort === 'loss') {
@@ -1508,7 +1528,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
       return [...list].sort((a, b) => (sectorHoldings[b.symbol] || 0) - (sectorHoldings[a.symbol] || 0));
     }
     return list;
-  }, [indices, sectorSort, sectorHoldings]);
+  }, [displayIndices, sectorSort, sectorHoldings]);
 
   // Group main indices by region/country, sorting China (CN & HK) first
   const groupedIndices = useMemo(() => {
@@ -1545,13 +1565,13 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
 
   const leadingIndices = useMemo(() => {
     const order = ['CN=F', '^HXC', 'NQ=F', 'USDCNH=X'];
-    const filtered = indices.filter(idx => idx.symbol.includes('CN=F') || idx.symbol.includes('NQ=F') || idx.symbol.includes('^HXC') || idx.symbol.includes('USDCNH=X'));
+    const filtered = displayIndices.filter(idx => idx.symbol.includes('CN=F') || idx.symbol.includes('NQ=F') || idx.symbol.includes('^HXC') || idx.symbol.includes('USDCNH=X'));
     return [...filtered].sort((a, b) => {
       const idxA = order.findIndex(sym => a.symbol.includes(sym));
       const idxB = order.findIndex(sym => b.symbol.includes(sym));
       return idxA - idxB;
     });
-  }, [indices]);
+  }, [displayIndices]);
 
   // Calculate Sentiment Score based on leading indices
   const sentimentData = useMemo(() => {
@@ -1821,6 +1841,14 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
       const data = await res.json();
       if (data.success && Array.isArray(data.history)) {
         setDetailHistory(data.history);
+        if (data.currentPrice !== undefined) {
+          setLiveDetail({
+            symbol,
+            currentPrice: data.currentPrice,
+            change: data.change,
+            changePercent: data.changePercent
+          });
+        }
       } else {
         throw new Error(data.error || '返回的详细历史数据格式有误');
       }
@@ -1839,14 +1867,24 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   // Fetch details when selected symbol or period changes
   useEffect(() => {
     if (selectedSymbol) {
+      setLiveDetail(null);
       fetchDetail(selectedSymbol, period);
     }
   }, [selectedSymbol, period]);
 
   // Find active index information
   const activeIndex = useMemo(() => {
-    return indices.find(idx => idx.symbol === selectedSymbol) || null;
-  }, [indices, selectedSymbol]);
+    const baseActive = indices.find(idx => idx.symbol === selectedSymbol) || null;
+    if (baseActive && liveDetail && liveDetail.symbol === selectedSymbol) {
+      return {
+        ...baseActive,
+        currentPrice: liveDetail.currentPrice,
+        change: liveDetail.change,
+        changePercent: liveDetail.changePercent
+      };
+    }
+    return baseActive;
+  }, [indices, selectedSymbol, liveDetail]);
 
   // Dynamically calculate holdings matching the currently selected sector
   const activeSectorFunds = useMemo(() => {
@@ -4480,7 +4518,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
 
                             {/* Pure SVG Sparkline */}
                             <div className="h-8 mt-2.5 flex items-end">
-                              <Sparkline data={reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
+                              <Sparkline data={item.sparkline === detailHistory ? detailHistory : reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
                             </div>
                           </div>
                         </div>
@@ -4619,7 +4657,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
 
                           {/* Pure SVG Sparkline */}
                           <div className="h-8 mt-2.5 flex items-end">
-                            <Sparkline data={reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
+                            <Sparkline data={item.sparkline === detailHistory ? detailHistory : reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
                           </div>
                         </div>
                       </div>
@@ -4800,7 +4838,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
                           
                           {/* Sparkline & custom instruction */}
                           <div className="h-8 mt-2.5 flex items-end">
-                            <Sparkline data={reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
+                            <Sparkline data={item.sparkline === detailHistory ? detailHistory : reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
                           </div>
                           
                           {/* Meaning instruction */}
