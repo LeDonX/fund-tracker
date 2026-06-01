@@ -4832,7 +4832,7 @@ export default function FundTrackerApp() {
   return (
     <div className="h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800 overflow-hidden">
       {/* 1. 左侧悬浮玻璃侧边栏 (Desktop Only) */}
-      <aside className="hidden md:flex w-72 flex-col bg-white/80 backdrop-blur-md border-r border-slate-200/50 p-5 z-30 shrink-0 gap-5 select-none relative overflow-y-auto custom-scrollbar">
+      <aside className="hidden md:flex w-72 flex-col bg-white/80 backdrop-blur-md border-r border-slate-200/50 p-5 z-30 shrink-0 gap-5 select-none relative overflow-hidden">
         {/* Brand/Logo */}
         <div className="flex items-center gap-2 shrink-0">
           {totalDailyProfit > 0 ? (
@@ -4878,87 +4878,92 @@ export default function FundTrackerApp() {
           </div>
         </div>
 
-        {/* 导航菜单 Tabs */}
-        <div className="flex flex-col gap-1 select-none shrink-0">
-          <button
-            type="button"
-            onClick={() => setActiveTab('portfolio')}
-            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
-              activeTab === 'portfolio' 
-                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
-                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
-            }`}
-          >
-            <Wallet className="w-4 h-4" />
-            <span>我的持仓</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('search')}
-            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
-              activeTab === 'search' 
-                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
-                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
-            }`}
-          >
-            <Search className="w-4 h-4" />
-            <span>查找基金</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('market_overview')}
-            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
-              activeTab === 'market_overview' 
-                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
-                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            <span>大盘走势</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('market_sectors')}
-            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
-              activeTab === 'market_sectors' 
-                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
-                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>板块走势</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('market_predictor')}
-            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
-              activeTab === 'market_predictor' 
-                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
-                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
-            }`}
-          >
-            <Compass className="w-4 h-4" />
-            <span>翌日预测</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('market_advisor')}
-            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
-              activeTab === 'market_advisor' 
-                ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
-                : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
-            }`}
-          >
-            <Cpu className="w-4 h-4" />
-            <span>投资助手</span>
-          </button>
+        {/* 中间可滚动区域：导航菜单 Tabs + 侧边栏实时大盘走势图 */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-5 pr-1.5 -mr-1.5">
+          {/* 导航菜单 Tabs */}
+          <div className="flex flex-col gap-1 select-none shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('portfolio')}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+                activeTab === 'portfolio' 
+                  ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                  : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+              }`}
+            >
+              <Wallet className="w-4 h-4" />
+              <span>我的持仓</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('search')}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+                activeTab === 'search' 
+                  ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                  : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+              }`}
+            >
+              <Search className="w-4 h-4" />
+              <span>查找基金</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('market_overview')}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+                activeTab === 'market_overview' 
+                  ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                  : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              <span>大盘走势</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('market_sectors')}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+                activeTab === 'market_sectors' 
+                  ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                  : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>板块走势</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('market_predictor')}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+                activeTab === 'market_predictor' 
+                  ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                  : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+              }`}
+            >
+              <Compass className="w-4 h-4" />
+              <span>翌日预测</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('market_advisor')}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs tracking-tight transition-all duration-150 border ${
+                activeTab === 'market_advisor' 
+                  ? 'bg-blue-50/60 text-blue-700 border-blue-100 shadow-3xs' 
+                  : 'text-slate-500 hover:text-slate-800 border-transparent hover:bg-slate-100/50'
+              }`}
+            >
+              <Cpu className="w-4 h-4" />
+              <span>投资助手</span>
+            </button>
+          </div>
+
+          {/* 侧边栏三个实时大盘分时走势图 */}
+          <div className="flex flex-col gap-3.5 border-t border-slate-200/50 pt-4 select-none shrink-0">
+            <SidebarMarketTrends setActiveTab={setActiveTab} />
+          </div>
         </div>
 
-        {/* 侧边栏底部区域 (走势图 + 账号与参数配置) */}
+        {/* 侧边栏底部区域 (固定在底部，只包含账号与参数配置) */}
         <div className="mt-auto flex flex-col gap-3.5 border-t border-slate-200/50 pt-4 select-none shrink-0">
-          {/* 侧边栏三个实时大盘分时走势图 */}
-          <SidebarMarketTrends setActiveTab={setActiveTab} />
-
           {/* 登录与同步状态 + 系统参数按钮 (常驻侧边栏并排为一行 - 极致空间利用) */}
           <div className="flex items-center gap-2">
             {/* 登录与账号状态 */}

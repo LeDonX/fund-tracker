@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-EEG3q9/checked-fetch.js
+// .wrangler/tmp/bundle-bw0R8Y/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,7 +27,7 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// .wrangler/tmp/pages-uFl7Et/functionsWorker-0.5707930502688849.mjs
+// .wrangler/tmp/pages-11hZui/functionsWorker-0.14590900533490359.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 var urls2 = /* @__PURE__ */ new Set();
@@ -692,8 +692,203 @@ var BASE_CONFIGS = {
   "NQ=F": { base: 18800, drift: 4e-4, volatility: 7e-3 },
   "ES=F": { base: 5310, drift: 3e-4, volatility: 8e-3 },
   "^HXC": { base: 6200, drift: 2e-4, volatility: 0.011 },
-  "USDCNH=X": { base: 7.25, drift: -5e-5, volatility: 15e-4 }
+  "USDCNH=X": { base: 7.25, drift: -5e-5, volatility: 15e-4 },
+  "512480.SS": { base: 1.25, drift: 1e-4, volatility: 0.015 },
+  "512690.SS": { base: 0.85, drift: 1e-4, volatility: 0.01 },
+  "512170.SS": { base: 0.38, drift: 1e-4, volatility: 0.012 },
+  "515790.SS": { base: 0.98, drift: 1e-4, volatility: 0.016 },
+  "512880.SS": { base: 0.92, drift: 1e-4, volatility: 0.018 },
+  "512660.SS": { base: 1.35, drift: 1e-4, volatility: 0.013 },
+  "512800.SS": { base: 1.15, drift: 1e-4, volatility: 8e-3 },
+  "515060.SS": { base: 0.65, drift: 1e-4, volatility: 0.0195 },
+  "515980.SS": { base: 0.82, drift: 1e-4, volatility: 0.0165 },
+  "515220.SS": { base: 1.45, drift: 1e-4, volatility: 0.011 }
 };
+function getMarketSchedule(symbol) {
+  if (["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"].includes(symbol) || symbol.endsWith(".SS") || symbol.endsWith(".SZ")) {
+    return {
+      timeZone: "Asia/Shanghai",
+      sessions: [
+        { start: "09:30", end: "11:31" },
+        { start: "13:00", end: "15:02" }
+      ]
+    };
+  }
+  if (["^HSI", "^HSTECH"].includes(symbol)) {
+    return {
+      timeZone: "Asia/Hong_Kong",
+      sessions: [
+        { start: "09:30", end: "12:02" },
+        { start: "13:00", end: "16:10" }
+      ]
+    };
+  }
+  if (["^GSPC", "^IXIC", "^DJI", "^HXC"].includes(symbol)) {
+    return {
+      timeZone: "America/New_York",
+      sessions: [
+        { start: "09:30", end: "16:05" }
+      ]
+    };
+  }
+  if (symbol === "^N225") {
+    return {
+      timeZone: "Asia/Tokyo",
+      sessions: [
+        { start: "09:00", end: "11:32" },
+        { start: "12:30", end: "15:05" }
+      ]
+    };
+  }
+  if (symbol === "^FTSE") {
+    return {
+      timeZone: "Europe/London",
+      sessions: [
+        { start: "08:00", end: "16:35" }
+      ]
+    };
+  }
+  if (symbol === "^GDAXI") {
+    return {
+      timeZone: "Europe/Berlin",
+      sessions: [
+        { start: "09:00", end: "17:35" }
+      ]
+    };
+  }
+  return {
+    timeZone: "UTC",
+    sessions: [
+      { start: "00:00", end: "24:00" }
+    ]
+  };
+}
+__name(getMarketSchedule, "getMarketSchedule");
+__name2(getMarketSchedule, "getMarketSchedule");
+function isWithinTradingSessions(timestampMs, schedule) {
+  if (schedule.timeZone === "UTC" && schedule.sessions[0].start === "00:00" && schedule.sessions[0].end === "24:00") {
+    return true;
+  }
+  const date = new Date(timestampMs);
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: schedule.timeZone,
+    hour12: false,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  const parts = formatter.formatToParts(date);
+  let weekday = "";
+  let hour = "";
+  let minute = "";
+  for (const part of parts) {
+    if (part.type === "weekday") weekday = part.value;
+    if (part.type === "hour") hour = part.value;
+    if (part.type === "minute") minute = part.value;
+  }
+  const timeStr = `${hour}:${minute}`;
+  if (weekday === "Sat" || weekday === "Sun") {
+    return false;
+  }
+  for (const session of schedule.sessions) {
+    if (timeStr >= session.start && timeStr <= session.end) {
+      return true;
+    }
+  }
+  return false;
+}
+__name(isWithinTradingSessions, "isWithinTradingSessions");
+__name2(isWithinTradingSessions, "isWithinTradingSessions");
+function generateIntradayTimestamps(symbol, count = 78, intervalMinutes = 5) {
+  const schedule = getMarketSchedule(symbol);
+  const timestamps = [];
+  let curr = Date.now();
+  let safetyLoop = 0;
+  while (!isWithinTradingSessions(curr, schedule) && safetyLoop < 1e4) {
+    curr -= 60 * 1e3;
+    safetyLoop++;
+  }
+  curr = Math.floor(curr / (intervalMinutes * 60 * 1e3)) * (intervalMinutes * 60 * 1e3);
+  safetyLoop = 0;
+  while (timestamps.length < count && safetyLoop < 2e4) {
+    if (isWithinTradingSessions(curr, schedule)) {
+      timestamps.push(Math.floor(curr / 1e3));
+    }
+    curr -= intervalMinutes * 60 * 1e3;
+    safetyLoop++;
+  }
+  return timestamps.reverse();
+}
+__name(generateIntradayTimestamps, "generateIntradayTimestamps");
+__name2(generateIntradayTimestamps, "generateIntradayTimestamps");
+var TENCENT_SYMBOL_MAP = {
+  "000001.SS": "sh000001",
+  "399001.SZ": "sz399001",
+  "000300.SS": "sh000300",
+  "399006.SZ": "sz399006",
+  "000688.SS": "sh000688",
+  "000905.SS": "sh000905",
+  "000016.SS": "sh000016",
+  "^HSI": "hkHSI",
+  "515790.SS": "sh515790",
+  "512880.SS": "sh512880",
+  "512660.SS": "sh512660",
+  "512800.SS": "sh512800",
+  "515060.SS": "sh515060",
+  "515980.SS": "sh515980",
+  "515220.SS": "sh515220"
+};
+function parseTencentMinuteData(json, symbolCode, matchName) {
+  const codeData = json?.data?.[symbolCode];
+  if (!codeData || !codeData.data || !Array.isArray(codeData.data.data)) {
+    throw new Error("Invalid Tencent minute response");
+  }
+  const dateStr = codeData.data.date;
+  const points = codeData.data.data;
+  const history = [];
+  const closes = [];
+  const year = dateStr.slice(0, 4);
+  const month = dateStr.slice(4, 6);
+  const day = dateStr.slice(6, 8);
+  const baseDateStr = `${year}-${month}-${day}`;
+  for (const pt of points) {
+    const parts = pt.split(" ");
+    if (parts.length < 2) continue;
+    const timeHHMM = parts[0];
+    const price = parseFloat(parts[1]);
+    if (isNaN(price)) continue;
+    const hour = timeHHMM.slice(0, 2);
+    const minute = timeHHMM.slice(2, 4);
+    const localDate = /* @__PURE__ */ new Date(`${baseDateStr}T${hour}:${minute}:00+08:00`);
+    history.push({
+      date: localDate.toISOString(),
+      time: `${hour}:${minute}`,
+      value: price
+    });
+    closes.push(price);
+  }
+  const qtInfo = codeData.qt?.[symbolCode] || [];
+  const currentPrice = parseFloat(qtInfo[3]) || closes[closes.length - 1] || 0;
+  const change = parseFloat(qtInfo[31]) || currentPrice - (closes[0] || currentPrice) || 0;
+  const changePercent = parseFloat(qtInfo[32]) || 0;
+  const prevClose = currentPrice - change;
+  return {
+    success: true,
+    symbol: symbolCode,
+    name: matchName,
+    currentPrice,
+    change: Number(change.toFixed(2)),
+    changePercent: Number(changePercent.toFixed(2)),
+    history,
+    meta: {
+      symbol: symbolCode,
+      regularMarketPrice: currentPrice,
+      chartPreviousClose: prevClose
+    }
+  };
+}
+__name(parseTencentMinuteData, "parseTencentMinuteData");
+__name2(parseTencentMinuteData, "parseTencentMinuteData");
 function boxMullerRandom() {
   let u = 0, v = 0;
   while (u === 0) u = Math.random();
@@ -718,13 +913,19 @@ function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realT
   } else if (range === "1y") {
     days = 252;
   }
-  const timestamps = [];
+  let timestamps = [];
   const closePrices = [];
-  const now = range === "1d" ? Date.now() - 30 * 60 * 1e3 : Date.now();
   let currentPrice = config.base;
-  for (let i = days - 1; i >= 0; i--) {
-    const time = now - i * intervalMs;
-    timestamps.push(Math.floor(time / 1e3));
+  if (range === "1d") {
+    timestamps = generateIntradayTimestamps(symbol, days, 5);
+  } else {
+    const now = Date.now();
+    for (let i = days - 1; i >= 0; i--) {
+      const time = now - i * intervalMs;
+      timestamps.push(Math.floor(time / 1e3));
+    }
+  }
+  for (let i = 0; i < days; i++) {
     const rand = boxMullerRandom();
     const vol = range === "1d" ? config.volatility * 0.15 : config.volatility;
     const drift = range === "1d" ? config.drift * 0.15 : config.drift;
@@ -949,6 +1150,131 @@ async function getIndexData(symbol, range = "1y", interval = "1d") {
 }
 __name(getIndexData, "getIndexData");
 __name2(getIndexData, "getIndexData");
+async function fetchEastmoneySectors() {
+  try {
+    const fetchPage = /* @__PURE__ */ __name2(async (page, type = 2) => {
+      const url = `https://push2.eastmoney.com/api/qt/clist/get?pn=${page}&pz=100&po=1&np=1&ut=bd1d9ddb040893a3cf4fc3d054b7fc6b&flg=1&fid=f3&fs=m:90+t:${type}&fields=f12,f14,f2,f3,f4,f62`;
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": "https://quote.eastmoney.com/"
+        }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      return json?.data?.diff || [];
+    }, "fetchPage");
+    const pages = await Promise.all([
+      fetchPage(1, 2),
+      fetchPage(2, 2),
+      fetchPage(1, 3),
+      fetchPage(2, 3)
+    ]);
+    const list = [];
+    const seen = /* @__PURE__ */ new Set();
+    pages.flat().forEach((item) => {
+      if (item && item.f12 && item.f14 && !seen.has(item.f12)) {
+        seen.add(item.f12);
+        list.push(item);
+      }
+    });
+    if (list.length === 0) {
+      throw new Error("Fetched list is empty");
+    }
+    const now = Date.now();
+    return list.map((item) => {
+      const rawPrice = parseFloat(item.f2);
+      const price = isNaN(rawPrice) ? 0 : rawPrice / 100;
+      const changePercent = (parseFloat(item.f3) || 0) / 100;
+      const change = parseFloat(item.f4) / 100 || 0;
+      const netInflow = parseFloat(item.f62) || 0;
+      const sparkline = [];
+      const points = 30;
+      const baseChangePerDay = changePercent / points;
+      for (let i = points - 1; i >= 0; i--) {
+        const dateStr = new Date(now - i * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
+        const noise = (Math.random() - 0.5) * (price * 8e-3);
+        const reconstructedPrice = price * (1 - baseChangePerDay * i / 100) + noise;
+        sparkline.push({
+          date: dateStr,
+          value: Number(reconstructedPrice.toFixed(2))
+        });
+      }
+      return {
+        symbol: item.f12,
+        name: item.f14,
+        englishName: item.f12,
+        region: "SEC",
+        regionName: "\u884C\u4E1A\u677F\u5757",
+        currentPrice: Number(price.toFixed(2)),
+        change: Number(change.toFixed(2)),
+        changePercent: Number(changePercent.toFixed(2)),
+        sparkline,
+        netInflow
+      };
+    });
+  } catch (err) {
+    console.error("Failed to fetch Eastmoney sectors:", err.message);
+    const fallbackSectors = [
+      { code: "BK1128", name: "CPO\u6982\u5FF5", baseChange: -4.5 },
+      { code: "BK1130", name: "\u7B97\u529B\u6982\u5FF5", baseChange: -5.2 },
+      { code: "BK1340", name: "\u5370\u5236\u7535\u8DEF\u677F", baseChange: -1.89 },
+      { code: "BK0448", name: "\u901A\u4FE1\u8BBE\u5907", baseChange: -3.18 },
+      { code: "BK1036", name: "\u534A\u5BFC\u4F53", baseChange: -6.4 },
+      { code: "BK1201", name: "\u7535\u5B50\u5143\u4EF6", baseChange: -2.39 },
+      { code: "BK0996", name: "\u8BA1\u7B97\u673A\u8BBE\u5907", baseChange: -1.85 },
+      { code: "BK0447", name: "\u8F6F\u4EF6\u5F00\u53D1", baseChange: -1.56 },
+      { code: "BK0896", name: "\u8BC1\u5238", baseChange: 0.69 },
+      { code: "BK0424", name: "\u917F\u9152\u884C\u4E1A", baseChange: 1.25 },
+      { code: "BK0450", name: "\u7535\u529B\u8BBE\u5907", baseChange: 0.88 },
+      { code: "BK0465", name: "\u5316\u5B66\u5236\u836F", baseChange: -1.2 },
+      { code: "BK0422", name: "\u6C7D\u8F66\u6574\u8F66", baseChange: 0.45 },
+      { code: "BK0425", name: "\u822A\u5929\u822A\u7A7A", baseChange: -2.1 },
+      { code: "BK0437", name: "\u7164\u70AD\u884C\u4E1A", baseChange: 1.85 },
+      { code: "BK0478", name: "\u94F6\u884C", baseChange: 0.22 },
+      { code: "BK0451", name: "\u623F\u5730\u4EA7\u5F00\u53D1", baseChange: 0.68 },
+      { code: "BK0475", name: "\u6709\u8272\u91D1\u5C5E", baseChange: -0.95 },
+      { code: "BK0480", name: "\u751F\u7269\u5236\u54C1", baseChange: -1.5 },
+      { code: "BK0427", name: "\u5546\u4E1A\u767E\u8D27", baseChange: 4.13 },
+      { code: "BK0479", name: "\u533B\u836F\u5546\u4E1A", baseChange: -0.85 },
+      { code: "BK0433", name: "\u5149\u4F0F\u8BBE\u5907", baseChange: 0.92 }
+    ];
+    const now = Date.now();
+    return fallbackSectors.map((item) => {
+      const dailyNoise = (Math.random() - 0.5) * 0.4;
+      const changePercent = Number((item.baseChange + dailyNoise).toFixed(2));
+      const price = 800 + Math.random() * 2e3;
+      const inflowNoise = Math.random() * 15e7;
+      const netInflow = Math.round((changePercent >= 0 ? 1 : -1) * (2e7 + Math.abs(changePercent) * 4e7) + (Math.random() - 0.5) * inflowNoise);
+      const sparkline = [];
+      const points = 30;
+      const baseChangePerDay = changePercent / points;
+      for (let i = points - 1; i >= 0; i--) {
+        const dateStr = new Date(now - i * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
+        const noise = (Math.random() - 0.5) * (price * 8e-3);
+        const reconstructedPrice = price * (1 - baseChangePerDay * i / 100) + noise;
+        sparkline.push({
+          date: dateStr,
+          value: Number(reconstructedPrice.toFixed(2))
+        });
+      }
+      return {
+        symbol: item.code,
+        name: item.name,
+        englishName: item.code,
+        region: "SEC",
+        regionName: "\u884C\u4E1A\u677F\u5757",
+        currentPrice: Number(price.toFixed(2)),
+        change: Number((price * changePercent / 100).toFixed(2)),
+        changePercent,
+        sparkline,
+        netInflow
+      };
+    });
+  }
+}
+__name(fetchEastmoneySectors, "fetchEastmoneySectors");
+__name2(fetchEastmoneySectors, "fetchEastmoneySectors");
 async function onRequestGet5(context) {
   try {
     const { request } = context;
@@ -956,30 +1282,212 @@ async function onRequestGet5(context) {
     const symbol = url.searchParams.get("symbol");
     const range = url.searchParams.get("range") || "1y";
     if (symbol) {
-      const match2 = INDICES.find((idx) => idx.symbol === symbol);
-      if (!match2) {
+      const isEastmoneySector = symbol.startsWith("BK");
+      let match2 = INDICES.find((idx) => idx.symbol === symbol);
+      if (!match2 && !isEastmoneySector) {
         return new Response(
           JSON.stringify({ error: "Unsupported stock index symbol" }),
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
+      if (isEastmoneySector) {
+        try {
+          const namePromise = fetch(`https://push2.eastmoney.com/api/qt/stock/get?secid=90.${symbol}&fields=f58,f43,f60`, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Referer": "https://quote.eastmoney.com/"
+            }
+          }).then((r) => r.json()).catch(() => null);
+          let detailPromise;
+          if (range === "1d") {
+            detailPromise = fetch(`https://push2his.eastmoney.com/api/qt/stock/trends/get?secid=90.${symbol}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58`, {
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://quote.eastmoney.com/"
+              }
+            }).then((r) => r.json()).catch(() => null);
+          } else {
+            detailPromise = fetch(`https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=90.${symbol}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=120`, {
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://quote.eastmoney.com/"
+              }
+            }).then((r) => r.json()).catch(() => null);
+          }
+          const [nameRes, detailRes] = await Promise.all([namePromise, detailPromise]);
+          const sectorName = nameRes?.data?.f58 || symbol;
+          const currentPrice2 = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1e3 : 0;
+          const prevClose2 = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1e3 : currentPrice2;
+          const history2 = [];
+          if (range === "1d") {
+            const trends = detailRes?.data || [];
+            for (const pt of trends) {
+              const timeHHMMStr = pt.f2.toString();
+              const price = parseFloat(pt.f3) / 1e3;
+              if (isNaN(price)) continue;
+              const year = "20" + timeHHMMStr.slice(0, 2);
+              const month = timeHHMMStr.slice(2, 4);
+              const day = timeHHMMStr.slice(4, 6);
+              const hour = timeHHMMStr.slice(6, 8);
+              const minute = timeHHMMStr.slice(8, 10);
+              const localDate = /* @__PURE__ */ new Date(`${year}-${month}-${day}T${hour}:${minute}:00+08:00`);
+              history2.push({
+                date: localDate.toISOString(),
+                time: `${hour}:${minute}`,
+                value: price
+              });
+            }
+          } else {
+            const klines = detailRes?.data?.klines || [];
+            for (const kl of klines) {
+              const parts = kl.split(",");
+              if (parts.length < 5) continue;
+              const date = parts[0];
+              const value = parseFloat(parts[2]) / 10;
+              if (isNaN(value)) continue;
+              history2.push({
+                date,
+                value: Number(value.toFixed(2))
+              });
+            }
+          }
+          const change2 = Number((currentPrice2 - prevClose2).toFixed(2));
+          const changePercent2 = prevClose2 > 0 ? Number((change2 / prevClose2 * 100).toFixed(2)) : 0;
+          return new Response(
+            JSON.stringify({
+              success: true,
+              symbol,
+              name: sectorName,
+              englishName: symbol,
+              regionName: "\u884C\u4E1A\u677F\u5757",
+              currentPrice: Number(currentPrice2.toFixed(2)),
+              change: change2,
+              changePercent: changePercent2,
+              history: history2
+            }),
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "public, max-age=60"
+              }
+            }
+          );
+        } catch (err) {
+          console.error(`Eastmoney dynamic detail load failed for ${symbol}:`, err.message);
+          return new Response(
+            JSON.stringify({ error: "Failed to load sector detailed quotes" }),
+            { status: 500, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      }
       let interval = "1d";
       if (range === "1d") interval = "5m";
+      const schedule = getMarketSchedule(symbol);
+      if (range === "1d" && TENCENT_SYMBOL_MAP[symbol]) {
+        const tenCode = TENCENT_SYMBOL_MAP[symbol];
+        try {
+          const res = await fetch(`https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=${tenCode}`, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Referer": "https://finance.sina.com.cn/"
+            }
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const parsed = parseTencentMinuteData(json, tenCode, match2.name);
+            if (parsed.history.length > 0) {
+              const now = Date.now();
+              if (isWithinTradingSessions(now, schedule)) {
+                const nowDate = new Date(now);
+                parsed.history[parsed.history.length - 1].date = nowDate.toISOString();
+                const localFormatter = new Intl.DateTimeFormat("en-US", {
+                  timeZone: schedule.timeZone || "Asia/Shanghai",
+                  hour12: false,
+                  hour: "2-digit",
+                  minute: "2-digit"
+                });
+                const parts = localFormatter.formatToParts(nowDate);
+                let hour = "00";
+                let minute = "00";
+                for (const part of parts) {
+                  if (part.type === "hour") hour = part.value;
+                  if (part.type === "minute") minute = part.value;
+                }
+                parsed.history[parsed.history.length - 1].time = `${hour}:${minute}`;
+              }
+            }
+            return new Response(
+              JSON.stringify(parsed),
+              {
+                status: 200,
+                headers: {
+                  "Content-Type": "application/json",
+                  "Cache-Control": "public, max-age=30"
+                  // Cache for 30 seconds
+                }
+              }
+            );
+          }
+        } catch (err) {
+          console.error(`Failed to fetch from Tencent for ${symbol}: ${err.message}. Falling back to Yahoo Finance.`);
+        }
+      }
       const indexResult = await getIndexData(symbol, range, interval);
       const timestamps = indexResult.timestamp || [];
       const closes = indexResult.indicators?.quote?.[0]?.close || [];
-      const history = [];
+      let history = [];
       const shiftSeconds = range === "1d" ? 30 * 60 : 0;
       for (let i = 0; i < timestamps.length; i++) {
-        const d = new Date((timestamps[i] + shiftSeconds) * 1e3);
+        const timestampMs = (timestamps[i] + shiftSeconds) * 1e3;
+        if (range === "1d" && !isWithinTradingSessions(timestampMs, schedule)) {
+          continue;
+        }
+        const d = new Date(timestampMs);
         const dateStr = range === "1d" ? d.toISOString() : d.toISOString().split("T")[0];
+        let timeStr = null;
+        if (range === "1d") {
+          const localFormatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: schedule.timeZone,
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+          const parts = localFormatter.formatToParts(d);
+          let hour = "00";
+          let minute = "00";
+          for (const part of parts) {
+            if (part.type === "hour") hour = part.value;
+            if (part.type === "minute") minute = part.value;
+          }
+          timeStr = `${hour}:${minute}`;
+        }
         history.push({
           date: dateStr,
+          time: timeStr,
           value: closes[i]
         });
       }
       if (range === "1d" && history.length > 0) {
-        history[history.length - 1].date = (/* @__PURE__ */ new Date()).toISOString();
+        const now = Date.now();
+        if (isWithinTradingSessions(now, schedule)) {
+          const nowDate = new Date(now);
+          history[history.length - 1].date = nowDate.toISOString();
+          const localFormatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: schedule.timeZone,
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+          const parts = localFormatter.formatToParts(nowDate);
+          let hour = "00";
+          let minute = "00";
+          for (const part of parts) {
+            if (part.type === "hour") hour = part.value;
+            if (part.type === "minute") minute = part.value;
+          }
+          history[history.length - 1].time = `${hour}:${minute}`;
+        }
       }
       const currentPrice = indexResult.meta?.regularMarketPrice || closes[closes.length - 1] || 0;
       const prevClose = range === "1d" || interval === "5m" ? indexResult.meta?.chartPreviousClose || closes[0] || currentPrice : closes.length > 1 ? closes[closes.length - 2] : indexResult.meta?.chartPreviousClose || currentPrice;
@@ -1038,10 +1546,12 @@ async function onRequestGet5(context) {
         };
       })
     );
+    const emSectors = await fetchEastmoneySectors();
+    const finalIndices = [...results, ...emSectors];
     return new Response(
       JSON.stringify({
         success: true,
-        indices: results,
+        indices: finalIndices,
         timestamp: Date.now()
       }),
       {
@@ -1322,7 +1832,8 @@ async function onRequestGet7(context) {
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
-    const qList = symbols.map((sym) => `s_${sym}`).join(",");
+    const isFull = url.searchParams.get("full") === "true";
+    const qList = symbols.map((sym) => isFull ? sym : `s_${sym}`).join(",");
     const targetUrl = `https://qt.gtimg.cn/q=${qList}`;
     const res = await fetch(targetUrl, {
       headers: {
@@ -1337,21 +1848,73 @@ async function onRequestGet7(context) {
     const quotes = {};
     const lines = text.split(";").map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
-      const match2 = line.match(/var\s+v_(s_[a-zA-Z0-9_\.]+)\s*=\s*"([^"]*)"/);
+      const match2 = line.match(/var\s+v_([a-zA-Z0-9_\.]+)\s*=\s*"([^"]*)"/);
       if (!match2) continue;
       const fullKey = match2[1];
       const symbolKey = fullKey.replace(/^s_/, "").toLowerCase();
       const dataStr = match2[2];
       const parts = dataStr.split("~");
       if (parts.length < 6) continue;
+      const isFullQuote = parts.length > 20;
       const price = parseFloat(parts[3]);
-      const change = parseFloat(parts[4]);
-      const changePercent = parseFloat(parts[5]);
+      let change = 0;
+      let changePercent = 0;
+      let name = parts[1];
+      let code = parts[2];
+      let open = 0;
+      let yesterdayClose = 0;
+      let high = 0;
+      let low = 0;
+      let turnover = 0;
+      let turnoverRate = 0;
+      let pe = 0;
+      let pb = 0;
+      let floatMarketCap = 0;
+      let totalMarketCap = 0;
+      let amplitude = 0;
+      let limitUp = 0;
+      let limitDown = 0;
+      if (isFullQuote) {
+        yesterdayClose = parseFloat(parts[4]) || 0;
+        open = parseFloat(parts[5]) || 0;
+        change = parseFloat(parts[31]) || 0;
+        changePercent = parseFloat(parts[32]) || 0;
+        high = parseFloat(parts[33]) || 0;
+        low = parseFloat(parts[34]) || 0;
+        turnover = parseFloat(parts[37]) || 0;
+        turnoverRate = parseFloat(parts[38]) || 0;
+        pe = parseFloat(parts[39]) || 0;
+        amplitude = parseFloat(parts[41]) || 0;
+        floatMarketCap = parseFloat(parts[42]) || 0;
+        totalMarketCap = parseFloat(parts[43]) || 0;
+        pb = parseFloat(parts[44]) || 0;
+        limitUp = parseFloat(parts[45]) || 0;
+        limitDown = parseFloat(parts[46]) || 0;
+      } else {
+        change = parseFloat(parts[4]) || 0;
+        changePercent = parseFloat(parts[5]) || 0;
+      }
       if (!isNaN(price)) {
         quotes[symbolKey] = {
+          name,
+          code,
           price,
           change: isNaN(change) ? 0 : change,
-          changePercent: isNaN(changePercent) ? 0 : changePercent
+          changePercent: isNaN(changePercent) ? 0 : changePercent,
+          open,
+          yesterdayClose,
+          high,
+          low,
+          turnover,
+          turnoverRate,
+          pe,
+          pb,
+          floatMarketCap,
+          totalMarketCap,
+          amplitude,
+          limitUp,
+          limitDown,
+          isFull: isFullQuote
         };
       }
     }
@@ -2458,7 +3021,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-EEG3q9/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-bw0R8Y/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -2490,7 +3053,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-EEG3q9/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-bw0R8Y/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -2590,4 +3153,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.5707930502688849.js.map
+//# sourceMappingURL=functionsWorker-0.14590900533490359.js.map

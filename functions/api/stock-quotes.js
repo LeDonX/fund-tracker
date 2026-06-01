@@ -26,9 +26,11 @@ export async function onRequestGet(context) {
       );
     }
 
+    const isFull = url.searchParams.get("full") === "true";
+
     // Comma join the symbols for a single multi-quote request to Tencent
-    // E.g. https://qt.gtimg.cn/q=s_sh600519,s_sz000858,s_usAAPL
-    const qList = symbols.map(sym => `s_${sym}`).join(",");
+    // E.g. https://qt.gtimg.cn/q=s_sh600519,s_sz000858,s_usAAPL or for full quotes: https://qt.gtimg.cn/q=sh600519,sz000858
+    const qList = symbols.map(sym => isFull ? sym : `s_${sym}`).join(",");
     const targetUrl = `https://qt.gtimg.cn/q=${qList}`;
 
     const res = await fetch(targetUrl, {
@@ -47,29 +49,84 @@ export async function onRequestGet(context) {
     const quotes = {};
 
     // Tencent response format: var v_s_sh600519="1~贵州茅台~600519~1285.88~-4.32~-0.33~...~";
+    // For full quote: var v_sh600519="51~贵州茅台~600519~1285.88~...~";
     const lines = text.split(";").map(l => l.trim()).filter(Boolean);
 
     for (const line of lines) {
-      // Find matches like v_s_sh600519="1~...~"
-      const match = line.match(/var\s+v_(s_[a-zA-Z0-9_\.]+)\s*=\s*"([^"]*)"/);
+      // Find matches like v_s_sh600519="1~...~" or v_sh600519="51~...~"
+      const match = line.match(/(?:var\s+)?v_([a-zA-Z0-9_\.]+)\s*=\s*"([^"]*)"/);
       if (!match) continue;
 
-      const fullKey = match[1]; // e.g. "s_sh600519"
+      const fullKey = match[1]; // e.g. "s_sh600519" or "sh600519"
       const symbolKey = fullKey.replace(/^s_/, "").toLowerCase(); // e.g. "sh600519"
       const dataStr = match[2];
 
       const parts = dataStr.split("~");
       if (parts.length < 6) continue;
 
+      const isFullQuote = parts.length > 20;
+
       const price = parseFloat(parts[3]);
-      const change = parseFloat(parts[4]);
-      const changePercent = parseFloat(parts[5]);
+      let change = 0;
+      let changePercent = 0;
+      let name = parts[1];
+      let code = parts[2];
+      let open = 0;
+      let yesterdayClose = 0;
+      let high = 0;
+      let low = 0;
+      let turnover = 0;
+      let turnoverRate = 0;
+      let pe = 0;
+      let pb = 0;
+      let floatMarketCap = 0;
+      let totalMarketCap = 0;
+      let amplitude = 0;
+      let limitUp = 0;
+      let limitDown = 0;
+
+      if (isFullQuote) {
+        yesterdayClose = parseFloat(parts[4]) || 0;
+        open = parseFloat(parts[5]) || 0;
+        change = parseFloat(parts[31]) || 0;
+        changePercent = parseFloat(parts[32]) || 0;
+        high = parseFloat(parts[33]) || 0;
+        low = parseFloat(parts[34]) || 0;
+        turnover = parseFloat(parts[37]) || 0;
+        turnoverRate = parseFloat(parts[38]) || 0;
+        pe = parseFloat(parts[39]) || 0;
+        amplitude = parseFloat(parts[41]) || 0;
+        floatMarketCap = parseFloat(parts[42]) || 0;
+        totalMarketCap = parseFloat(parts[43]) || 0;
+        pb = parseFloat(parts[44]) || 0;
+        limitUp = parseFloat(parts[45]) || 0;
+        limitDown = parseFloat(parts[46]) || 0;
+      } else {
+        change = parseFloat(parts[4]) || 0;
+        changePercent = parseFloat(parts[5]) || 0;
+      }
 
       if (!isNaN(price)) {
         quotes[symbolKey] = {
+          name,
+          code,
           price,
           change: isNaN(change) ? 0 : change,
-          changePercent: isNaN(changePercent) ? 0 : changePercent
+          changePercent: isNaN(changePercent) ? 0 : changePercent,
+          open,
+          yesterdayClose,
+          high,
+          low,
+          turnover,
+          turnoverRate,
+          pe,
+          pb,
+          floatMarketCap,
+          totalMarketCap,
+          amplitude,
+          limitUp,
+          limitDown,
+          isFull: isFullQuote
         };
       }
     }

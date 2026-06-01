@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-I1WJqb/checked-fetch.js
+// .wrangler/tmp/bundle-s4Apr0/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,11 +27,39 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// api/auth/_utils.js
+// .wrangler/tmp/pages-gTRAfP/functionsWorker-0.3077027244375776.mjs
+var __defProp2 = Object.defineProperty;
+var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
+var urls2 = /* @__PURE__ */ new Set();
+function checkURL2(request, init) {
+  const url = request instanceof URL ? request : new URL(
+    (typeof request === "string" ? new Request(request, init) : request).url
+  );
+  if (url.port && url.port !== "443" && url.protocol === "https:") {
+    if (!urls2.has(url.toString())) {
+      urls2.add(url.toString());
+      console.warn(
+        `WARNING: known issue with \`fetch()\` requests to custom HTTPS ports in published Workers:
+ - ${url.toString()} - the custom port will be ignored when the Worker is published using the \`wrangler deploy\` command.
+`
+      );
+    }
+  }
+}
+__name(checkURL2, "checkURL");
+__name2(checkURL2, "checkURL");
+globalThis.fetch = new Proxy(globalThis.fetch, {
+  apply(target, thisArg, argArray) {
+    const [request, init] = argArray;
+    checkURL2(request, init);
+    return Reflect.apply(target, thisArg, argArray);
+  }
+});
 function bytesToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 __name(bytesToHex, "bytesToHex");
+__name2(bytesToHex, "bytesToHex");
 function hexToBytes(hex) {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
@@ -40,12 +68,14 @@ function hexToBytes(hex) {
   return bytes;
 }
 __name(hexToBytes, "hexToBytes");
+__name2(hexToBytes, "hexToBytes");
 function generateSalt() {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return bytesToHex(bytes);
 }
 __name(generateSalt, "generateSalt");
+__name2(generateSalt, "generateSalt");
 async function hashPassword(password, saltHex) {
   const encoder = new TextEncoder();
   const passwordKey = await crypto.subtle.importKey(
@@ -70,10 +100,11 @@ async function hashPassword(password, saltHex) {
   return bytesToHex(new Uint8Array(derivedKeyBytes));
 }
 __name(hashPassword, "hashPassword");
+__name2(hashPassword, "hashPassword");
 async function signJWT(payload, secret) {
   const encoder = new TextEncoder();
   const header = { alg: "HS256", typ: "JWT" };
-  const toBase64Url = /* @__PURE__ */ __name((obj) => {
+  const toBase64Url = /* @__PURE__ */ __name2((obj) => {
     const jsonStr = JSON.stringify(obj);
     const binStr = String.fromCharCode(...encoder.encode(jsonStr));
     return btoa(binStr).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -97,6 +128,7 @@ async function signJWT(payload, secret) {
   return `${tokenInput}.${signatureB64}`;
 }
 __name(signJWT, "signJWT");
+__name2(signJWT, "signJWT");
 async function verifyJWT(token, secret) {
   try {
     const parts = token.split(".");
@@ -111,7 +143,7 @@ async function verifyJWT(token, secret) {
       false,
       ["verify"]
     );
-    const fromBase64Url = /* @__PURE__ */ __name((str) => {
+    const fromBase64Url = /* @__PURE__ */ __name2((str) => {
       const pad = "=".repeat((4 - str.length % 4) % 4);
       const base64 = (str + pad).replace(/-/g, "+").replace(/_/g, "/");
       const binStr = atob(base64);
@@ -141,6 +173,7 @@ async function verifyJWT(token, secret) {
   }
 }
 __name(verifyJWT, "verifyJWT");
+__name2(verifyJWT, "verifyJWT");
 function apiResponse(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -151,8 +184,7 @@ function apiResponse(data, status = 200, headers = {}) {
   });
 }
 __name(apiResponse, "apiResponse");
-
-// api/auth/login.js
+__name2(apiResponse, "apiResponse");
 globalThis.__MOCK_USERS_DB = globalThis.__MOCK_USERS_DB || [];
 async function onRequestPost(context) {
   try {
@@ -211,8 +243,7 @@ async function onRequestPost(context) {
   }
 }
 __name(onRequestPost, "onRequestPost");
-
-// api/auth/me.js
+__name2(onRequestPost, "onRequestPost");
 function parseCookies(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
@@ -225,6 +256,7 @@ function parseCookies(cookieHeader) {
   return cookies;
 }
 __name(parseCookies, "parseCookies");
+__name2(parseCookies, "parseCookies");
 async function onRequestGet(context) {
   try {
     const { request, env } = context;
@@ -263,6 +295,7 @@ async function onRequestGet(context) {
   }
 }
 __name(onRequestGet, "onRequestGet");
+__name2(onRequestGet, "onRequestGet");
 async function onRequestPost2(context) {
   try {
     const { request } = context;
@@ -280,9 +313,8 @@ async function onRequestPost2(context) {
     return apiResponse({ error: `\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF: ${error.message}` }, 500);
   }
 }
-__name(onRequestPost2, "onRequestPost");
-
-// api/auth/register.js
+__name(onRequestPost2, "onRequestPost2");
+__name2(onRequestPost2, "onRequestPost");
 globalThis.__MOCK_USERS_DB = globalThis.__MOCK_USERS_DB || [];
 async function onRequestPost3(context) {
   try {
@@ -335,9 +367,8 @@ async function onRequestPost3(context) {
     return apiResponse({ error: `\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF: ${error.message}` }, 500);
   }
 }
-__name(onRequestPost3, "onRequestPost");
-
-// api/daily-profits.js
+__name(onRequestPost3, "onRequestPost3");
+__name2(onRequestPost3, "onRequestPost");
 function parseCookies2(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
@@ -349,7 +380,8 @@ function parseCookies2(cookieHeader) {
   });
   return cookies;
 }
-__name(parseCookies2, "parseCookies");
+__name(parseCookies2, "parseCookies2");
+__name2(parseCookies2, "parseCookies");
 async function getAuthenticatedUser(context) {
   const { request, env } = context;
   const cookieHeader = request.headers.get("Cookie");
@@ -360,6 +392,7 @@ async function getAuthenticatedUser(context) {
   return await verifyJWT(token, jwtSecret);
 }
 __name(getAuthenticatedUser, "getAuthenticatedUser");
+__name2(getAuthenticatedUser, "getAuthenticatedUser");
 async function onRequestGet2(context) {
   try {
     const user = await getAuthenticatedUser(context);
@@ -384,9 +417,8 @@ async function onRequestGet2(context) {
     return apiResponse({ error: `\u62C9\u53D6\u6BCF\u65E5\u6536\u76CA\u5386\u53F2\u5931\u8D25: ${error.message}` }, 500);
   }
 }
-__name(onRequestGet2, "onRequestGet");
-
-// api/fund-industry.js
+__name(onRequestGet2, "onRequestGet2");
+__name2(onRequestGet2, "onRequestGet");
 async function onRequestGet3(context) {
   try {
     const { request, env } = context;
@@ -473,9 +505,8 @@ async function onRequestGet3(context) {
     );
   }
 }
-__name(onRequestGet3, "onRequestGet");
-
-// api/funds.js
+__name(onRequestGet3, "onRequestGet3");
+__name2(onRequestGet3, "onRequestGet");
 function parseCookies3(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
@@ -487,7 +518,8 @@ function parseCookies3(cookieHeader) {
   });
   return cookies;
 }
-__name(parseCookies3, "parseCookies");
+__name(parseCookies3, "parseCookies3");
+__name2(parseCookies3, "parseCookies");
 async function getAuthenticatedUser2(context) {
   const { request, env } = context;
   const cookieHeader = request.headers.get("Cookie");
@@ -497,7 +529,8 @@ async function getAuthenticatedUser2(context) {
   const jwtSecret = env.JWT_SECRET || "free-auth-pc-super-secret-key-987654321";
   return await verifyJWT(token, jwtSecret);
 }
-__name(getAuthenticatedUser2, "getAuthenticatedUser");
+__name(getAuthenticatedUser2, "getAuthenticatedUser2");
+__name2(getAuthenticatedUser2, "getAuthenticatedUser");
 async function onRequestGet4(context) {
   try {
     const user = await getAuthenticatedUser2(context);
@@ -533,7 +566,8 @@ async function onRequestGet4(context) {
     return apiResponse({ error: `\u62C9\u53D6\u81EA\u9009\u57FA\u91D1\u5931\u8D25: ${error.message}` }, 500);
   }
 }
-__name(onRequestGet4, "onRequestGet");
+__name(onRequestGet4, "onRequestGet4");
+__name2(onRequestGet4, "onRequestGet");
 async function onRequestPost4(context) {
   try {
     const user = await getAuthenticatedUser2(context);
@@ -576,7 +610,8 @@ async function onRequestPost4(context) {
     return apiResponse({ error: `\u4FDD\u5B58\u81EA\u9009\u57FA\u91D1\u5931\u8D25: ${error.message}` }, 500);
   }
 }
-__name(onRequestPost4, "onRequestPost");
+__name(onRequestPost4, "onRequestPost4");
+__name2(onRequestPost4, "onRequestPost");
 async function onRequestDelete(context) {
   try {
     const user = await getAuthenticatedUser2(context);
@@ -608,8 +643,7 @@ async function onRequestDelete(context) {
   }
 }
 __name(onRequestDelete, "onRequestDelete");
-
-// api/market.js
+__name2(onRequestDelete, "onRequestDelete");
 var INDICES = [
   { symbol: "000001.SS", name: "\u4E0A\u8BC1\u7EFC\u5408\u6307\u6570", englishName: "Shanghai Composite", region: "CN", regionName: "\u4E2D\u56FD" },
   { symbol: "399001.SZ", name: "\u6DF1\u8BC1\u6210\u4EFD\u6307\u6570", englishName: "Shenzhen Component", region: "CN", regionName: "\u4E2D\u56FD" },
@@ -658,8 +692,203 @@ var BASE_CONFIGS = {
   "NQ=F": { base: 18800, drift: 4e-4, volatility: 7e-3 },
   "ES=F": { base: 5310, drift: 3e-4, volatility: 8e-3 },
   "^HXC": { base: 6200, drift: 2e-4, volatility: 0.011 },
-  "USDCNH=X": { base: 7.25, drift: -5e-5, volatility: 15e-4 }
+  "USDCNH=X": { base: 7.25, drift: -5e-5, volatility: 15e-4 },
+  "512480.SS": { base: 1.25, drift: 1e-4, volatility: 0.015 },
+  "512690.SS": { base: 0.85, drift: 1e-4, volatility: 0.01 },
+  "512170.SS": { base: 0.38, drift: 1e-4, volatility: 0.012 },
+  "515790.SS": { base: 0.98, drift: 1e-4, volatility: 0.016 },
+  "512880.SS": { base: 0.92, drift: 1e-4, volatility: 0.018 },
+  "512660.SS": { base: 1.35, drift: 1e-4, volatility: 0.013 },
+  "512800.SS": { base: 1.15, drift: 1e-4, volatility: 8e-3 },
+  "515060.SS": { base: 0.65, drift: 1e-4, volatility: 0.0195 },
+  "515980.SS": { base: 0.82, drift: 1e-4, volatility: 0.0165 },
+  "515220.SS": { base: 1.45, drift: 1e-4, volatility: 0.011 }
 };
+function getMarketSchedule(symbol) {
+  if (["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"].includes(symbol) || symbol.endsWith(".SS") || symbol.endsWith(".SZ")) {
+    return {
+      timeZone: "Asia/Shanghai",
+      sessions: [
+        { start: "09:30", end: "11:31" },
+        { start: "13:00", end: "15:02" }
+      ]
+    };
+  }
+  if (["^HSI", "^HSTECH"].includes(symbol)) {
+    return {
+      timeZone: "Asia/Hong_Kong",
+      sessions: [
+        { start: "09:30", end: "12:02" },
+        { start: "13:00", end: "16:10" }
+      ]
+    };
+  }
+  if (["^GSPC", "^IXIC", "^DJI", "^HXC"].includes(symbol)) {
+    return {
+      timeZone: "America/New_York",
+      sessions: [
+        { start: "09:30", end: "16:05" }
+      ]
+    };
+  }
+  if (symbol === "^N225") {
+    return {
+      timeZone: "Asia/Tokyo",
+      sessions: [
+        { start: "09:00", end: "11:32" },
+        { start: "12:30", end: "15:05" }
+      ]
+    };
+  }
+  if (symbol === "^FTSE") {
+    return {
+      timeZone: "Europe/London",
+      sessions: [
+        { start: "08:00", end: "16:35" }
+      ]
+    };
+  }
+  if (symbol === "^GDAXI") {
+    return {
+      timeZone: "Europe/Berlin",
+      sessions: [
+        { start: "09:00", end: "17:35" }
+      ]
+    };
+  }
+  return {
+    timeZone: "UTC",
+    sessions: [
+      { start: "00:00", end: "24:00" }
+    ]
+  };
+}
+__name(getMarketSchedule, "getMarketSchedule");
+__name2(getMarketSchedule, "getMarketSchedule");
+function isWithinTradingSessions(timestampMs, schedule) {
+  if (schedule.timeZone === "UTC" && schedule.sessions[0].start === "00:00" && schedule.sessions[0].end === "24:00") {
+    return true;
+  }
+  const date = new Date(timestampMs);
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: schedule.timeZone,
+    hour12: false,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  const parts = formatter.formatToParts(date);
+  let weekday = "";
+  let hour = "";
+  let minute = "";
+  for (const part of parts) {
+    if (part.type === "weekday") weekday = part.value;
+    if (part.type === "hour") hour = part.value;
+    if (part.type === "minute") minute = part.value;
+  }
+  const timeStr = `${hour}:${minute}`;
+  if (weekday === "Sat" || weekday === "Sun") {
+    return false;
+  }
+  for (const session of schedule.sessions) {
+    if (timeStr >= session.start && timeStr <= session.end) {
+      return true;
+    }
+  }
+  return false;
+}
+__name(isWithinTradingSessions, "isWithinTradingSessions");
+__name2(isWithinTradingSessions, "isWithinTradingSessions");
+function generateIntradayTimestamps(symbol, count = 78, intervalMinutes = 5) {
+  const schedule = getMarketSchedule(symbol);
+  const timestamps = [];
+  let curr = Date.now();
+  let safetyLoop = 0;
+  while (!isWithinTradingSessions(curr, schedule) && safetyLoop < 1e4) {
+    curr -= 60 * 1e3;
+    safetyLoop++;
+  }
+  curr = Math.floor(curr / (intervalMinutes * 60 * 1e3)) * (intervalMinutes * 60 * 1e3);
+  safetyLoop = 0;
+  while (timestamps.length < count && safetyLoop < 2e4) {
+    if (isWithinTradingSessions(curr, schedule)) {
+      timestamps.push(Math.floor(curr / 1e3));
+    }
+    curr -= intervalMinutes * 60 * 1e3;
+    safetyLoop++;
+  }
+  return timestamps.reverse();
+}
+__name(generateIntradayTimestamps, "generateIntradayTimestamps");
+__name2(generateIntradayTimestamps, "generateIntradayTimestamps");
+var TENCENT_SYMBOL_MAP = {
+  "000001.SS": "sh000001",
+  "399001.SZ": "sz399001",
+  "000300.SS": "sh000300",
+  "399006.SZ": "sz399006",
+  "000688.SS": "sh000688",
+  "000905.SS": "sh000905",
+  "000016.SS": "sh000016",
+  "^HSI": "hkHSI",
+  "515790.SS": "sh515790",
+  "512880.SS": "sh512880",
+  "512660.SS": "sh512660",
+  "512800.SS": "sh512800",
+  "515060.SS": "sh515060",
+  "515980.SS": "sh515980",
+  "515220.SS": "sh515220"
+};
+function parseTencentMinuteData(json, symbolCode, matchName) {
+  const codeData = json?.data?.[symbolCode];
+  if (!codeData || !codeData.data || !Array.isArray(codeData.data.data)) {
+    throw new Error("Invalid Tencent minute response");
+  }
+  const dateStr = codeData.data.date;
+  const points = codeData.data.data;
+  const history = [];
+  const closes = [];
+  const year = dateStr.slice(0, 4);
+  const month = dateStr.slice(4, 6);
+  const day = dateStr.slice(6, 8);
+  const baseDateStr = `${year}-${month}-${day}`;
+  for (const pt of points) {
+    const parts = pt.split(" ");
+    if (parts.length < 2) continue;
+    const timeHHMM = parts[0];
+    const price = parseFloat(parts[1]);
+    if (isNaN(price)) continue;
+    const hour = timeHHMM.slice(0, 2);
+    const minute = timeHHMM.slice(2, 4);
+    const localDate = /* @__PURE__ */ new Date(`${baseDateStr}T${hour}:${minute}:00+08:00`);
+    history.push({
+      date: localDate.toISOString(),
+      time: `${hour}:${minute}`,
+      value: price
+    });
+    closes.push(price);
+  }
+  const qtInfo = codeData.qt?.[symbolCode] || [];
+  const currentPrice = parseFloat(qtInfo[3]) || closes[closes.length - 1] || 0;
+  const change = parseFloat(qtInfo[31]) || currentPrice - (closes[0] || currentPrice) || 0;
+  const changePercent = parseFloat(qtInfo[32]) || 0;
+  const prevClose = currentPrice - change;
+  return {
+    success: true,
+    symbol: symbolCode,
+    name: matchName,
+    currentPrice,
+    change: Number(change.toFixed(2)),
+    changePercent: Number(changePercent.toFixed(2)),
+    history,
+    meta: {
+      symbol: symbolCode,
+      regularMarketPrice: currentPrice,
+      chartPreviousClose: prevClose
+    }
+  };
+}
+__name(parseTencentMinuteData, "parseTencentMinuteData");
+__name2(parseTencentMinuteData, "parseTencentMinuteData");
 function boxMullerRandom() {
   let u = 0, v = 0;
   while (u === 0) u = Math.random();
@@ -667,6 +896,7 @@ function boxMullerRandom() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 __name(boxMullerRandom, "boxMullerRandom");
+__name2(boxMullerRandom, "boxMullerRandom");
 function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realTimePrevClose = null) {
   const config = BASE_CONFIGS[symbol] || { base: 2e3, drift: 2e-4, volatility: 0.01 };
   let days = 250;
@@ -683,13 +913,19 @@ function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realT
   } else if (range === "1y") {
     days = 252;
   }
-  const timestamps = [];
+  let timestamps = [];
   const closePrices = [];
-  const now = range === "1d" ? Date.now() - 30 * 60 * 1e3 : Date.now();
   let currentPrice = config.base;
-  for (let i = days - 1; i >= 0; i--) {
-    const time = now - i * intervalMs;
-    timestamps.push(Math.floor(time / 1e3));
+  if (range === "1d") {
+    timestamps = generateIntradayTimestamps(symbol, days, 5);
+  } else {
+    const now = Date.now();
+    for (let i = days - 1; i >= 0; i--) {
+      const time = now - i * intervalMs;
+      timestamps.push(Math.floor(time / 1e3));
+    }
+  }
+  for (let i = 0; i < days; i++) {
     const rand = boxMullerRandom();
     const vol = range === "1d" ? config.volatility * 0.15 : config.volatility;
     const drift = range === "1d" ? config.drift * 0.15 : config.drift;
@@ -728,6 +964,7 @@ function generateSimulatedData(symbol, range = "1y", realTimePrice = null, realT
   };
 }
 __name(generateSimulatedData, "generateSimulatedData");
+__name2(generateSimulatedData, "generateSimulatedData");
 function cleanYahooData(result) {
   const timestamps = result.timestamp || [];
   const closes = result.indicators?.quote?.[0]?.close || [];
@@ -759,6 +996,7 @@ function cleanYahooData(result) {
   };
 }
 __name(cleanYahooData, "cleanYahooData");
+__name2(cleanYahooData, "cleanYahooData");
 var SINA_INDEX_MAP = {
   "000001.SS": "s_sh000001",
   "399001.SZ": "s_sz399001",
@@ -856,6 +1094,7 @@ async function fetchSinaRealtimeForSymbol(symbol) {
   }
 }
 __name(fetchSinaRealtimeForSymbol, "fetchSinaRealtimeForSymbol");
+__name2(fetchSinaRealtimeForSymbol, "fetchSinaRealtimeForSymbol");
 async function getIndexData(symbol, range = "1y", interval = "1d") {
   let indexResult;
   try {
@@ -910,6 +1149,132 @@ async function getIndexData(symbol, range = "1y", interval = "1d") {
   return indexResult;
 }
 __name(getIndexData, "getIndexData");
+__name2(getIndexData, "getIndexData");
+async function fetchEastmoneySectors() {
+  try {
+    const fetchPage = /* @__PURE__ */ __name2(async (page, type = 2) => {
+      const url = `https://push2.eastmoney.com/api/qt/clist/get?pn=${page}&pz=100&po=1&np=1&ut=bd1d9ddb040893a3cf4fc3d054b7fc6b&flg=1&fid=f3&fs=m:90+t:${type}&fields=f12,f14,f2,f3,f4,f62`;
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": "https://quote.eastmoney.com/"
+        }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      return json?.data?.diff || [];
+    }, "fetchPage");
+    const pages = await Promise.all([
+      fetchPage(1, 2),
+      fetchPage(2, 2),
+      fetchPage(1, 3),
+      fetchPage(2, 3)
+    ]);
+    const list = [];
+    const seen = /* @__PURE__ */ new Set();
+    pages.flat().forEach((item) => {
+      if (item && item.f12 && item.f14 && !seen.has(item.f12)) {
+        seen.add(item.f12);
+        list.push(item);
+      }
+    });
+    if (list.length === 0) {
+      throw new Error("Fetched list is empty");
+    }
+    const now = Date.now();
+    return list.map((item) => {
+      const rawPrice = parseFloat(item.f2);
+      const price = isNaN(rawPrice) ? 0 : rawPrice / 100;
+      const changePercent = (parseFloat(item.f3) || 0) / 100;
+      const change = parseFloat(item.f4) / 100 || 0;
+      const netInflow = parseFloat(item.f62) || 0;
+      const sparkline = [];
+      const points = 30;
+      const baseChangePerDay = changePercent / points;
+      for (let i = points - 1; i >= 0; i--) {
+        const dateStr = new Date(now - i * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
+        const noise = (Math.random() - 0.5) * (price * 8e-3);
+        const reconstructedPrice = price * (1 - baseChangePerDay * i / 100) + noise;
+        sparkline.push({
+          date: dateStr,
+          value: Number(reconstructedPrice.toFixed(2))
+        });
+      }
+      return {
+        symbol: item.f12,
+        name: item.f14,
+        englishName: item.f12,
+        region: "SEC",
+        regionName: "\u884C\u4E1A\u677F\u5757",
+        currentPrice: Number(price.toFixed(2)),
+        change: Number(change.toFixed(2)),
+        changePercent: Number(changePercent.toFixed(2)),
+        sparkline,
+        netInflow
+      };
+    });
+  } catch (err) {
+    console.error("Failed to fetch Eastmoney sectors:", err.message);
+    const fallbackSectors = [
+      { code: "BK1128", name: "CPO\u6982\u5FF5", baseChange: -4.5 },
+      { code: "BK1130", name: "\u7B97\u529B\u6982\u5FF5", baseChange: -5.2 },
+      { code: "BK1340", name: "\u5370\u5236\u7535\u8DEF\u677F", baseChange: -1.89 },
+      { code: "BK0448", name: "\u901A\u4FE1\u8BBE\u5907", baseChange: -3.18 },
+      { code: "BK1036", name: "\u534A\u5BFC\u4F53", baseChange: -6.4 },
+      { code: "BK1201", name: "\u7535\u5B50\u5143\u4EF6", baseChange: -2.39 },
+      { code: "BK0996", name: "\u8BA1\u7B97\u673A\u8BBE\u5907", baseChange: -1.85 },
+      { code: "BK0447", name: "\u8F6F\u4EF6\u5F00\u53D1", baseChange: -1.56 },
+      { code: "BK0896", name: "\u8BC1\u5238", baseChange: 0.69 },
+      { code: "BK0424", name: "\u917F\u9152\u884C\u4E1A", baseChange: 1.25 },
+      { code: "BK0450", name: "\u7535\u529B\u8BBE\u5907", baseChange: 0.88 },
+      { code: "BK0465", name: "\u5316\u5B66\u5236\u836F", baseChange: -1.2 },
+      { code: "BK0422", name: "\u6C7D\u8F66\u6574\u8F66", baseChange: 0.45 },
+      { code: "BK0425", name: "\u822A\u5929\u822A\u7A7A", baseChange: -2.1 },
+      { code: "BK0437", name: "\u7164\u70AD\u884C\u4E1A", baseChange: 1.85 },
+      { code: "BK0478", name: "\u94F6\u884C", baseChange: 0.22 },
+      { code: "BK0451", name: "\u623F\u5730\u4EA7\u5F00\u53D1", baseChange: 0.68 },
+      { code: "BK0475", name: "\u6709\u8272\u91D1\u5C5E", baseChange: -0.95 },
+      { code: "BK0480", name: "\u751F\u7269\u5236\u54C1", baseChange: -1.5 },
+      { code: "BK0427", name: "\u5546\u4E1A\u767E\u8D27", baseChange: 4.13 },
+      { code: "BK0479", name: "\u533B\u836F\u5546\u4E1A", baseChange: -0.85 },
+      { code: "BK0433", name: "\u5149\u4F0F\u8BBE\u5907", baseChange: 0.92 }
+    ];
+    const now = Date.now();
+    return fallbackSectors.map((item) => {
+      const dailyNoise = (Math.random() - 0.5) * 0.4;
+      const changePercent = Number((item.baseChange + dailyNoise).toFixed(2));
+      const price = 800 + Math.random() * 2e3;
+      const inflowNoise = Math.random() * 15e7;
+      const netInflow = Math.round((changePercent >= 0 ? 1 : -1) * (2e7 + Math.abs(changePercent) * 4e7) + (Math.random() - 0.5) * inflowNoise);
+      const sparkline = [];
+      const points = 30;
+      const baseChangePerDay = changePercent / points;
+      for (let i = points - 1; i >= 0; i--) {
+        const dateStr = new Date(now - i * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
+        const noise = (Math.random() - 0.5) * (price * 8e-3);
+        const reconstructedPrice = price * (1 - baseChangePerDay * i / 100) + noise;
+        sparkline.push({
+          date: dateStr,
+          value: Number(reconstructedPrice.toFixed(2))
+        });
+      }
+      return {
+        symbol: item.code,
+        name: item.name,
+        englishName: item.code,
+        region: "SEC",
+        regionName: "\u884C\u4E1A\u677F\u5757",
+        currentPrice: Number(price.toFixed(2)),
+        change: Number((price * changePercent / 100).toFixed(2)),
+        changePercent,
+        sparkline,
+        netInflow
+      };
+    });
+  }
+}
+__name(fetchEastmoneySectors, "fetchEastmoneySectors");
+__name2(fetchEastmoneySectors, "fetchEastmoneySectors");
 async function onRequestGet5(context) {
   try {
     const { request } = context;
@@ -917,30 +1282,212 @@ async function onRequestGet5(context) {
     const symbol = url.searchParams.get("symbol");
     const range = url.searchParams.get("range") || "1y";
     if (symbol) {
-      const match2 = INDICES.find((idx) => idx.symbol === symbol);
-      if (!match2) {
+      const isEastmoneySector = symbol.startsWith("BK");
+      let match2 = INDICES.find((idx) => idx.symbol === symbol);
+      if (!match2 && !isEastmoneySector) {
         return new Response(
           JSON.stringify({ error: "Unsupported stock index symbol" }),
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
+      if (isEastmoneySector) {
+        try {
+          const namePromise = fetch(`https://push2.eastmoney.com/api/qt/stock/get?secid=90.${symbol}&fields=f58,f43,f60`, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Referer": "https://quote.eastmoney.com/"
+            }
+          }).then((r) => r.json()).catch(() => null);
+          let detailPromise;
+          if (range === "1d") {
+            detailPromise = fetch(`https://push2his.eastmoney.com/api/qt/stock/trends/get?secid=90.${symbol}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58`, {
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://quote.eastmoney.com/"
+              }
+            }).then((r) => r.json()).catch(() => null);
+          } else {
+            detailPromise = fetch(`https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=90.${symbol}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=120`, {
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://quote.eastmoney.com/"
+              }
+            }).then((r) => r.json()).catch(() => null);
+          }
+          const [nameRes, detailRes] = await Promise.all([namePromise, detailPromise]);
+          const sectorName = nameRes?.data?.f58 || symbol;
+          const currentPrice2 = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1e3 : 0;
+          const prevClose2 = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1e3 : currentPrice2;
+          const history2 = [];
+          if (range === "1d") {
+            const trends = detailRes?.data || [];
+            for (const pt of trends) {
+              const timeHHMMStr = pt.f2.toString();
+              const price = parseFloat(pt.f3) / 1e3;
+              if (isNaN(price)) continue;
+              const year = "20" + timeHHMMStr.slice(0, 2);
+              const month = timeHHMMStr.slice(2, 4);
+              const day = timeHHMMStr.slice(4, 6);
+              const hour = timeHHMMStr.slice(6, 8);
+              const minute = timeHHMMStr.slice(8, 10);
+              const localDate = /* @__PURE__ */ new Date(`${year}-${month}-${day}T${hour}:${minute}:00+08:00`);
+              history2.push({
+                date: localDate.toISOString(),
+                time: `${hour}:${minute}`,
+                value: price
+              });
+            }
+          } else {
+            const klines = detailRes?.data?.klines || [];
+            for (const kl of klines) {
+              const parts = kl.split(",");
+              if (parts.length < 5) continue;
+              const date = parts[0];
+              const value = parseFloat(parts[2]) / 10;
+              if (isNaN(value)) continue;
+              history2.push({
+                date,
+                value: Number(value.toFixed(2))
+              });
+            }
+          }
+          const change2 = Number((currentPrice2 - prevClose2).toFixed(2));
+          const changePercent2 = prevClose2 > 0 ? Number((change2 / prevClose2 * 100).toFixed(2)) : 0;
+          return new Response(
+            JSON.stringify({
+              success: true,
+              symbol,
+              name: sectorName,
+              englishName: symbol,
+              regionName: "\u884C\u4E1A\u677F\u5757",
+              currentPrice: Number(currentPrice2.toFixed(2)),
+              change: change2,
+              changePercent: changePercent2,
+              history: history2
+            }),
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "public, max-age=60"
+              }
+            }
+          );
+        } catch (err) {
+          console.error(`Eastmoney dynamic detail load failed for ${symbol}:`, err.message);
+          return new Response(
+            JSON.stringify({ error: "Failed to load sector detailed quotes" }),
+            { status: 500, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      }
       let interval = "1d";
       if (range === "1d") interval = "5m";
+      const schedule = getMarketSchedule(symbol);
+      if (range === "1d" && TENCENT_SYMBOL_MAP[symbol]) {
+        const tenCode = TENCENT_SYMBOL_MAP[symbol];
+        try {
+          const res = await fetch(`https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=${tenCode}`, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Referer": "https://finance.sina.com.cn/"
+            }
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const parsed = parseTencentMinuteData(json, tenCode, match2.name);
+            if (parsed.history.length > 0) {
+              const now = Date.now();
+              if (isWithinTradingSessions(now, schedule)) {
+                const nowDate = new Date(now);
+                parsed.history[parsed.history.length - 1].date = nowDate.toISOString();
+                const localFormatter = new Intl.DateTimeFormat("en-US", {
+                  timeZone: schedule.timeZone || "Asia/Shanghai",
+                  hour12: false,
+                  hour: "2-digit",
+                  minute: "2-digit"
+                });
+                const parts = localFormatter.formatToParts(nowDate);
+                let hour = "00";
+                let minute = "00";
+                for (const part of parts) {
+                  if (part.type === "hour") hour = part.value;
+                  if (part.type === "minute") minute = part.value;
+                }
+                parsed.history[parsed.history.length - 1].time = `${hour}:${minute}`;
+              }
+            }
+            return new Response(
+              JSON.stringify(parsed),
+              {
+                status: 200,
+                headers: {
+                  "Content-Type": "application/json",
+                  "Cache-Control": "public, max-age=30"
+                  // Cache for 30 seconds
+                }
+              }
+            );
+          }
+        } catch (err) {
+          console.error(`Failed to fetch from Tencent for ${symbol}: ${err.message}. Falling back to Yahoo Finance.`);
+        }
+      }
       const indexResult = await getIndexData(symbol, range, interval);
       const timestamps = indexResult.timestamp || [];
       const closes = indexResult.indicators?.quote?.[0]?.close || [];
-      const history = [];
+      let history = [];
       const shiftSeconds = range === "1d" ? 30 * 60 : 0;
       for (let i = 0; i < timestamps.length; i++) {
-        const d = new Date((timestamps[i] + shiftSeconds) * 1e3);
+        const timestampMs = (timestamps[i] + shiftSeconds) * 1e3;
+        if (range === "1d" && !isWithinTradingSessions(timestampMs, schedule)) {
+          continue;
+        }
+        const d = new Date(timestampMs);
         const dateStr = range === "1d" ? d.toISOString() : d.toISOString().split("T")[0];
+        let timeStr = null;
+        if (range === "1d") {
+          const localFormatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: schedule.timeZone,
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+          const parts = localFormatter.formatToParts(d);
+          let hour = "00";
+          let minute = "00";
+          for (const part of parts) {
+            if (part.type === "hour") hour = part.value;
+            if (part.type === "minute") minute = part.value;
+          }
+          timeStr = `${hour}:${minute}`;
+        }
         history.push({
           date: dateStr,
+          time: timeStr,
           value: closes[i]
         });
       }
       if (range === "1d" && history.length > 0) {
-        history[history.length - 1].date = (/* @__PURE__ */ new Date()).toISOString();
+        const now = Date.now();
+        if (isWithinTradingSessions(now, schedule)) {
+          const nowDate = new Date(now);
+          history[history.length - 1].date = nowDate.toISOString();
+          const localFormatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: schedule.timeZone,
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+          const parts = localFormatter.formatToParts(nowDate);
+          let hour = "00";
+          let minute = "00";
+          for (const part of parts) {
+            if (part.type === "hour") hour = part.value;
+            if (part.type === "minute") minute = part.value;
+          }
+          history[history.length - 1].time = `${hour}:${minute}`;
+        }
       }
       const currentPrice = indexResult.meta?.regularMarketPrice || closes[closes.length - 1] || 0;
       const prevClose = range === "1d" || interval === "5m" ? indexResult.meta?.chartPreviousClose || closes[0] || currentPrice : closes.length > 1 ? closes[closes.length - 2] : indexResult.meta?.chartPreviousClose || currentPrice;
@@ -999,10 +1546,12 @@ async function onRequestGet5(context) {
         };
       })
     );
+    const emSectors = await fetchEastmoneySectors();
+    const finalIndices = [...results, ...emSectors];
     return new Response(
       JSON.stringify({
         success: true,
-        indices: results,
+        indices: finalIndices,
         timestamp: Date.now()
       }),
       {
@@ -1024,9 +1573,8 @@ async function onRequestGet5(context) {
     );
   }
 }
-__name(onRequestGet5, "onRequestGet");
-
-// api/ocr.js
+__name(onRequestGet5, "onRequestGet5");
+__name2(onRequestGet5, "onRequestGet");
 async function onRequestPost5(context) {
   try {
     const { request, env } = context;
@@ -1211,9 +1759,8 @@ async function onRequestPost5(context) {
     );
   }
 }
-__name(onRequestPost5, "onRequestPost");
-
-// api/search.js
+__name(onRequestPost5, "onRequestPost5");
+__name2(onRequestPost5, "onRequestPost");
 async function onRequestGet6(context) {
   try {
     const { request } = context;
@@ -1265,9 +1812,8 @@ async function onRequestGet6(context) {
     );
   }
 }
-__name(onRequestGet6, "onRequestGet");
-
-// api/stock-quotes.js
+__name(onRequestGet6, "onRequestGet6");
+__name2(onRequestGet6, "onRequestGet");
 async function onRequestGet7(context) {
   try {
     const { request } = context;
@@ -1286,7 +1832,8 @@ async function onRequestGet7(context) {
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
-    const qList = symbols.map((sym) => `s_${sym}`).join(",");
+    const isFull = url.searchParams.get("full") === "true";
+    const qList = symbols.map((sym) => isFull ? sym : `s_${sym}`).join(",");
     const targetUrl = `https://qt.gtimg.cn/q=${qList}`;
     const res = await fetch(targetUrl, {
       headers: {
@@ -1301,21 +1848,73 @@ async function onRequestGet7(context) {
     const quotes = {};
     const lines = text.split(";").map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
-      const match2 = line.match(/var\s+v_(s_[a-zA-Z0-9_\.]+)\s*=\s*"([^"]*)"/);
+      const match2 = line.match(/(?:var\s+)?v_([a-zA-Z0-9_\.]+)\s*=\s*"([^"]*)"/);
       if (!match2) continue;
       const fullKey = match2[1];
       const symbolKey = fullKey.replace(/^s_/, "").toLowerCase();
       const dataStr = match2[2];
       const parts = dataStr.split("~");
       if (parts.length < 6) continue;
+      const isFullQuote = parts.length > 20;
       const price = parseFloat(parts[3]);
-      const change = parseFloat(parts[4]);
-      const changePercent = parseFloat(parts[5]);
+      let change = 0;
+      let changePercent = 0;
+      let name = parts[1];
+      let code = parts[2];
+      let open = 0;
+      let yesterdayClose = 0;
+      let high = 0;
+      let low = 0;
+      let turnover = 0;
+      let turnoverRate = 0;
+      let pe = 0;
+      let pb = 0;
+      let floatMarketCap = 0;
+      let totalMarketCap = 0;
+      let amplitude = 0;
+      let limitUp = 0;
+      let limitDown = 0;
+      if (isFullQuote) {
+        yesterdayClose = parseFloat(parts[4]) || 0;
+        open = parseFloat(parts[5]) || 0;
+        change = parseFloat(parts[31]) || 0;
+        changePercent = parseFloat(parts[32]) || 0;
+        high = parseFloat(parts[33]) || 0;
+        low = parseFloat(parts[34]) || 0;
+        turnover = parseFloat(parts[37]) || 0;
+        turnoverRate = parseFloat(parts[38]) || 0;
+        pe = parseFloat(parts[39]) || 0;
+        amplitude = parseFloat(parts[41]) || 0;
+        floatMarketCap = parseFloat(parts[42]) || 0;
+        totalMarketCap = parseFloat(parts[43]) || 0;
+        pb = parseFloat(parts[44]) || 0;
+        limitUp = parseFloat(parts[45]) || 0;
+        limitDown = parseFloat(parts[46]) || 0;
+      } else {
+        change = parseFloat(parts[4]) || 0;
+        changePercent = parseFloat(parts[5]) || 0;
+      }
       if (!isNaN(price)) {
         quotes[symbolKey] = {
+          name,
+          code,
           price,
           change: isNaN(change) ? 0 : change,
-          changePercent: isNaN(changePercent) ? 0 : changePercent
+          changePercent: isNaN(changePercent) ? 0 : changePercent,
+          open,
+          yesterdayClose,
+          high,
+          low,
+          turnover,
+          turnoverRate,
+          pe,
+          pb,
+          floatMarketCap,
+          totalMarketCap,
+          amplitude,
+          limitUp,
+          limitDown,
+          isFull: isFullQuote
         };
       }
     }
@@ -1340,9 +1939,8 @@ async function onRequestGet7(context) {
     );
   }
 }
-__name(onRequestGet7, "onRequestGet");
-
-// api/sync.js
+__name(onRequestGet7, "onRequestGet7");
+__name2(onRequestGet7, "onRequestGet");
 function parseCookies4(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
@@ -1354,7 +1952,8 @@ function parseCookies4(cookieHeader) {
   });
   return cookies;
 }
-__name(parseCookies4, "parseCookies");
+__name(parseCookies4, "parseCookies4");
+__name2(parseCookies4, "parseCookies");
 async function getAuthenticatedUser3(context) {
   const { request, env } = context;
   const cookieHeader = request.headers.get("Cookie");
@@ -1364,7 +1963,8 @@ async function getAuthenticatedUser3(context) {
   const jwtSecret = env.JWT_SECRET || "free-auth-pc-super-secret-key-987654321";
   return await verifyJWT(token, jwtSecret);
 }
-__name(getAuthenticatedUser3, "getAuthenticatedUser");
+__name(getAuthenticatedUser3, "getAuthenticatedUser3");
+__name2(getAuthenticatedUser3, "getAuthenticatedUser");
 async function onRequestPost6(context) {
   try {
     const user = await getAuthenticatedUser3(context);
@@ -1484,9 +2084,8 @@ async function onRequestPost6(context) {
     return apiResponse({ error: `\u6279\u91CF\u540C\u6B65\u6570\u636E\u5931\u8D25: ${error.message}` }, 500);
   }
 }
-__name(onRequestPost6, "onRequestPost");
-
-// api/transactions.js
+__name(onRequestPost6, "onRequestPost6");
+__name2(onRequestPost6, "onRequestPost");
 function parseCookies5(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
@@ -1498,7 +2097,8 @@ function parseCookies5(cookieHeader) {
   });
   return cookies;
 }
-__name(parseCookies5, "parseCookies");
+__name(parseCookies5, "parseCookies5");
+__name2(parseCookies5, "parseCookies");
 async function getAuthenticatedUser4(context) {
   const { request, env } = context;
   const cookieHeader = request.headers.get("Cookie");
@@ -1508,7 +2108,8 @@ async function getAuthenticatedUser4(context) {
   const jwtSecret = env.JWT_SECRET || "free-auth-pc-super-secret-key-987654321";
   return await verifyJWT(token, jwtSecret);
 }
-__name(getAuthenticatedUser4, "getAuthenticatedUser");
+__name(getAuthenticatedUser4, "getAuthenticatedUser4");
+__name2(getAuthenticatedUser4, "getAuthenticatedUser");
 async function onRequestGet8(context) {
   try {
     const user = await getAuthenticatedUser4(context);
@@ -1542,7 +2143,8 @@ async function onRequestGet8(context) {
     return apiResponse({ error: `\u62C9\u53D6\u4EA4\u6613\u660E\u7EC6\u5931\u8D25: ${error.message}` }, 500);
   }
 }
-__name(onRequestGet8, "onRequestGet");
+__name(onRequestGet8, "onRequestGet8");
+__name2(onRequestGet8, "onRequestGet");
 async function onRequestPost7(context) {
   try {
     const user = await getAuthenticatedUser4(context);
@@ -1606,7 +2208,8 @@ async function onRequestPost7(context) {
     return apiResponse({ error: `\u4FDD\u5B58\u4EA4\u6613\u6D41\u6C34\u5931\u8D25: ${error.message}` }, 500);
   }
 }
-__name(onRequestPost7, "onRequestPost");
+__name(onRequestPost7, "onRequestPost7");
+__name2(onRequestPost7, "onRequestPost");
 async function onRequestDelete2(context) {
   try {
     const user = await getAuthenticatedUser4(context);
@@ -1630,9 +2233,8 @@ async function onRequestDelete2(context) {
     return apiResponse({ error: `\u5220\u9664\u4EA4\u6613\u6D41\u6C34\u5931\u8D25: ${error.message}` }, 500);
   }
 }
-__name(onRequestDelete2, "onRequestDelete");
-
-// ../.wrangler/tmp/pages-uFl7Et/functionsRoutes-0.533487647537308.mjs
+__name(onRequestDelete2, "onRequestDelete2");
+__name2(onRequestDelete2, "onRequestDelete");
 var routes = [
   {
     routePath: "/api/auth/login",
@@ -1754,8 +2356,6 @@ var routes = [
     modules: [onRequestPost7]
   }
 ];
-
-// C:/Users/LeDon/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/path-to-regexp/dist.es2015/index.js
 function lexer(str) {
   var tokens = [];
   var i = 0;
@@ -1840,6 +2440,7 @@ function lexer(str) {
   return tokens;
 }
 __name(lexer, "lexer");
+__name2(lexer, "lexer");
 function parse(str, options) {
   if (options === void 0) {
     options = {};
@@ -1850,18 +2451,18 @@ function parse(str, options) {
   var key = 0;
   var i = 0;
   var path = "";
-  var tryConsume = /* @__PURE__ */ __name(function(type) {
+  var tryConsume = /* @__PURE__ */ __name2(function(type) {
     if (i < tokens.length && tokens[i].type === type)
       return tokens[i++].value;
   }, "tryConsume");
-  var mustConsume = /* @__PURE__ */ __name(function(type) {
+  var mustConsume = /* @__PURE__ */ __name2(function(type) {
     var value2 = tryConsume(type);
     if (value2 !== void 0)
       return value2;
     var _a2 = tokens[i], nextType = _a2.type, index = _a2.index;
     throw new TypeError("Unexpected ".concat(nextType, " at ").concat(index, ", expected ").concat(type));
   }, "mustConsume");
-  var consumeText = /* @__PURE__ */ __name(function() {
+  var consumeText = /* @__PURE__ */ __name2(function() {
     var result2 = "";
     var value2;
     while (value2 = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR")) {
@@ -1869,7 +2470,7 @@ function parse(str, options) {
     }
     return result2;
   }, "consumeText");
-  var isSafe = /* @__PURE__ */ __name(function(value2) {
+  var isSafe = /* @__PURE__ */ __name2(function(value2) {
     for (var _i = 0, delimiter_1 = delimiter; _i < delimiter_1.length; _i++) {
       var char2 = delimiter_1[_i];
       if (value2.indexOf(char2) > -1)
@@ -1877,7 +2478,7 @@ function parse(str, options) {
     }
     return false;
   }, "isSafe");
-  var safePattern = /* @__PURE__ */ __name(function(prefix2) {
+  var safePattern = /* @__PURE__ */ __name2(function(prefix2) {
     var prev = result[result.length - 1];
     var prevText = prefix2 || (prev && typeof prev === "string" ? prev : "");
     if (prev && !prevText) {
@@ -1940,12 +2541,14 @@ function parse(str, options) {
   return result;
 }
 __name(parse, "parse");
+__name2(parse, "parse");
 function match(str, options) {
   var keys = [];
   var re = pathToRegexp(str, keys, options);
   return regexpToFunction(re, keys, options);
 }
 __name(match, "match");
+__name2(match, "match");
 function regexpToFunction(re, keys, options) {
   if (options === void 0) {
     options = {};
@@ -1959,7 +2562,7 @@ function regexpToFunction(re, keys, options) {
       return false;
     var path = m[0], index = m.index;
     var params = /* @__PURE__ */ Object.create(null);
-    var _loop_1 = /* @__PURE__ */ __name(function(i2) {
+    var _loop_1 = /* @__PURE__ */ __name2(function(i2) {
       if (m[i2] === void 0)
         return "continue";
       var key = keys[i2 - 1];
@@ -1978,14 +2581,17 @@ function regexpToFunction(re, keys, options) {
   };
 }
 __name(regexpToFunction, "regexpToFunction");
+__name2(regexpToFunction, "regexpToFunction");
 function escapeString(str) {
   return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
 }
 __name(escapeString, "escapeString");
+__name2(escapeString, "escapeString");
 function flags(options) {
   return options && options.sensitive ? "" : "i";
 }
 __name(flags, "flags");
+__name2(flags, "flags");
 function regexpToRegexp(path, keys) {
   if (!keys)
     return path;
@@ -2006,6 +2612,7 @@ function regexpToRegexp(path, keys) {
   return path;
 }
 __name(regexpToRegexp, "regexpToRegexp");
+__name2(regexpToRegexp, "regexpToRegexp");
 function arrayToRegexp(paths, keys, options) {
   var parts = paths.map(function(path) {
     return pathToRegexp(path, keys, options).source;
@@ -2013,10 +2620,12 @@ function arrayToRegexp(paths, keys, options) {
   return new RegExp("(?:".concat(parts.join("|"), ")"), flags(options));
 }
 __name(arrayToRegexp, "arrayToRegexp");
+__name2(arrayToRegexp, "arrayToRegexp");
 function stringToRegexp(path, keys, options) {
   return tokensToRegexp(parse(path, options), keys, options);
 }
 __name(stringToRegexp, "stringToRegexp");
+__name2(stringToRegexp, "stringToRegexp");
 function tokensToRegexp(tokens, keys, options) {
   if (options === void 0) {
     options = {};
@@ -2072,6 +2681,7 @@ function tokensToRegexp(tokens, keys, options) {
   return new RegExp(route, flags(options));
 }
 __name(tokensToRegexp, "tokensToRegexp");
+__name2(tokensToRegexp, "tokensToRegexp");
 function pathToRegexp(path, keys, options) {
   if (path instanceof RegExp)
     return regexpToRegexp(path, keys);
@@ -2080,8 +2690,7 @@ function pathToRegexp(path, keys, options) {
   return stringToRegexp(path, keys, options);
 }
 __name(pathToRegexp, "pathToRegexp");
-
-// C:/Users/LeDon/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/pages-template-worker.ts
+__name2(pathToRegexp, "pathToRegexp");
 var escapeRegex = /[.+?^${}()|[\]\\]/g;
 function* executeRequest(request) {
   const requestPath = new URL(request.url).pathname;
@@ -2132,13 +2741,14 @@ function* executeRequest(request) {
   }
 }
 __name(executeRequest, "executeRequest");
+__name2(executeRequest, "executeRequest");
 var pages_template_worker_default = {
   async fetch(originalRequest, env, workerContext) {
     let request = originalRequest;
     const handlerIterator = executeRequest(request);
     let data = {};
     let isFailOpen = false;
-    const next = /* @__PURE__ */ __name(async (input, init) => {
+    const next = /* @__PURE__ */ __name2(async (input, init) => {
       if (input !== void 0) {
         let url = input;
         if (typeof input === "string") {
@@ -2165,7 +2775,7 @@ var pages_template_worker_default = {
           },
           env,
           waitUntil: workerContext.waitUntil.bind(workerContext),
-          passThroughOnException: /* @__PURE__ */ __name(() => {
+          passThroughOnException: /* @__PURE__ */ __name2(() => {
             isFailOpen = true;
           }, "passThroughOnException")
         };
@@ -2193,16 +2803,14 @@ var pages_template_worker_default = {
     }
   }
 };
-var cloneResponse = /* @__PURE__ */ __name((response) => (
+var cloneResponse = /* @__PURE__ */ __name2((response) => (
   // https://fetch.spec.whatwg.org/#null-body-status
   new Response(
     [101, 204, 205, 304].includes(response.status) ? null : response.body,
     response
   )
 ), "cloneResponse");
-
-// C:/Users/LeDon/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
-var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+var drainBody = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } finally {
@@ -2218,8 +2826,6 @@ var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
   }
 }, "drainBody");
 var middleware_ensure_req_body_drained_default = drainBody;
-
-// C:/Users/LeDon/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
 function reduceError(e) {
   return {
     name: e?.name,
@@ -2229,7 +2835,8 @@ function reduceError(e) {
   };
 }
 __name(reduceError, "reduceError");
-var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+__name2(reduceError, "reduceError");
+var jsonError = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } catch (e) {
@@ -2241,20 +2848,17 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
   }
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
-
-// ../.wrangler/tmp/bundle-I1WJqb/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
 ];
 var middleware_insertion_facade_default = pages_template_worker_default;
-
-// C:/Users/LeDon/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/common.ts
 var __facade_middleware__ = [];
 function __facade_register__(...args) {
   __facade_middleware__.push(...args.flat());
 }
 __name(__facade_register__, "__facade_register__");
+__name2(__facade_register__, "__facade_register__");
 function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   const [head, ...tail] = middlewareChain;
   const middlewareCtx = {
@@ -2266,6 +2870,7 @@ function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   return head(request, env, ctx, middlewareCtx);
 }
 __name(__facade_invokeChain__, "__facade_invokeChain__");
+__name2(__facade_invokeChain__, "__facade_invokeChain__");
 function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   return __facade_invokeChain__(request, env, ctx, dispatch, [
     ...__facade_middleware__,
@@ -2273,16 +2878,18 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   ]);
 }
 __name(__facade_invoke__, "__facade_invoke__");
-
-// ../.wrangler/tmp/bundle-I1WJqb/middleware-loader.entry.ts
+__name2(__facade_invoke__, "__facade_invoke__");
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
+  static {
+    __name(this, "___Facade_ScheduledController__");
+  }
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
     this.cron = cron;
     this.#noRetry = noRetry;
   }
   static {
-    __name(this, "__Facade_ScheduledController__");
+    __name2(this, "__Facade_ScheduledController__");
   }
   #noRetry;
   noRetry() {
@@ -2299,7 +2906,7 @@ function wrapExportedHandler(worker) {
   for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
     __facade_register__(middleware);
   }
-  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
+  const fetchDispatcher = /* @__PURE__ */ __name2(function(request, env, ctx) {
     if (worker.fetch === void 0) {
       throw new Error("Handler does not export a fetch() function.");
     }
@@ -2308,7 +2915,7 @@ function wrapExportedHandler(worker) {
   return {
     ...worker,
     fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
+      const dispatcher = /* @__PURE__ */ __name2(function(type, init) {
         if (type === "scheduled" && worker.scheduled !== void 0) {
           const controller = new __Facade_ScheduledController__(
             Date.now(),
@@ -2324,6 +2931,7 @@ function wrapExportedHandler(worker) {
   };
 }
 __name(wrapExportedHandler, "wrapExportedHandler");
+__name2(wrapExportedHandler, "wrapExportedHandler");
 function wrapWorkerEntrypoint(klass) {
   if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
     return klass;
@@ -2332,7 +2940,7 @@ function wrapWorkerEntrypoint(klass) {
     __facade_register__(middleware);
   }
   return class extends klass {
-    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
+    #fetchDispatcher = /* @__PURE__ */ __name2((request, env, ctx) => {
       this.env = env;
       this.ctx = ctx;
       if (super.fetch === void 0) {
@@ -2340,7 +2948,7 @@ function wrapWorkerEntrypoint(klass) {
       }
       return super.fetch(request);
     }, "#fetchDispatcher");
-    #dispatcher = /* @__PURE__ */ __name((type, init) => {
+    #dispatcher = /* @__PURE__ */ __name2((type, init) => {
       if (type === "scheduled" && super.scheduled !== void 0) {
         const controller = new __Facade_ScheduledController__(
           Date.now(),
@@ -2363,6 +2971,7 @@ function wrapWorkerEntrypoint(klass) {
   };
 }
 __name(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
+__name2(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
 var WRAPPED_ENTRY;
 if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapExportedHandler(middleware_insertion_facade_default);
@@ -2370,8 +2979,178 @@ if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapWorkerEntrypoint(middleware_insertion_facade_default);
 }
 var middleware_loader_entry_default = WRAPPED_ENTRY;
-export {
-  __INTERNAL_WRANGLER_MIDDLEWARE__,
-  middleware_loader_entry_default as default
+
+// C:/Users/LeDon/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
+var drainBody2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+  try {
+    return await middlewareCtx.next(request, env);
+  } finally {
+    try {
+      if (request.body !== null && !request.bodyUsed) {
+        const reader = request.body.getReader();
+        while (!(await reader.read()).done) {
+        }
+      }
+    } catch (e) {
+      console.error("Failed to drain the unused request body.", e);
+    }
+  }
+}, "drainBody");
+var middleware_ensure_req_body_drained_default2 = drainBody2;
+
+// C:/Users/LeDon/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
+function reduceError2(e) {
+  return {
+    name: e?.name,
+    message: e?.message ?? String(e),
+    stack: e?.stack,
+    cause: e?.cause === void 0 ? void 0 : reduceError2(e.cause)
+  };
+}
+__name(reduceError2, "reduceError");
+var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+  try {
+    return await middlewareCtx.next(request, env);
+  } catch (e) {
+    const error = reduceError2(e);
+    return Response.json(error, {
+      status: 500,
+      headers: { "MF-Experimental-Error-Stack": "true" }
+    });
+  }
+}, "jsonError");
+var middleware_miniflare3_json_error_default2 = jsonError2;
+
+// .wrangler/tmp/bundle-s4Apr0/middleware-insertion-facade.js
+var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
+  middleware_ensure_req_body_drained_default2,
+  middleware_miniflare3_json_error_default2
+];
+var middleware_insertion_facade_default2 = middleware_loader_entry_default;
+
+// C:/Users/LeDon/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/common.ts
+var __facade_middleware__2 = [];
+function __facade_register__2(...args) {
+  __facade_middleware__2.push(...args.flat());
+}
+__name(__facade_register__2, "__facade_register__");
+function __facade_invokeChain__2(request, env, ctx, dispatch, middlewareChain) {
+  const [head, ...tail] = middlewareChain;
+  const middlewareCtx = {
+    dispatch,
+    next(newRequest, newEnv) {
+      return __facade_invokeChain__2(newRequest, newEnv, ctx, dispatch, tail);
+    }
+  };
+  return head(request, env, ctx, middlewareCtx);
+}
+__name(__facade_invokeChain__2, "__facade_invokeChain__");
+function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
+  return __facade_invokeChain__2(request, env, ctx, dispatch, [
+    ...__facade_middleware__2,
+    finalMiddleware
+  ]);
+}
+__name(__facade_invoke__2, "__facade_invoke__");
+
+// .wrangler/tmp/bundle-s4Apr0/middleware-loader.entry.ts
+var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
+  constructor(scheduledTime, cron, noRetry) {
+    this.scheduledTime = scheduledTime;
+    this.cron = cron;
+    this.#noRetry = noRetry;
+  }
+  static {
+    __name(this, "__Facade_ScheduledController__");
+  }
+  #noRetry;
+  noRetry() {
+    if (!(this instanceof ___Facade_ScheduledController__2)) {
+      throw new TypeError("Illegal invocation");
+    }
+    this.#noRetry();
+  }
 };
-//# sourceMappingURL=functionsWorker-0.5707930502688849.mjs.map
+function wrapExportedHandler2(worker) {
+  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
+    return worker;
+  }
+  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
+    __facade_register__2(middleware);
+  }
+  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
+    if (worker.fetch === void 0) {
+      throw new Error("Handler does not export a fetch() function.");
+    }
+    return worker.fetch(request, env, ctx);
+  }, "fetchDispatcher");
+  return {
+    ...worker,
+    fetch(request, env, ctx) {
+      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
+        if (type === "scheduled" && worker.scheduled !== void 0) {
+          const controller = new __Facade_ScheduledController__2(
+            Date.now(),
+            init.cron ?? "",
+            () => {
+            }
+          );
+          return worker.scheduled(controller, env, ctx);
+        }
+      }, "dispatcher");
+      return __facade_invoke__2(request, env, ctx, dispatcher, fetchDispatcher);
+    }
+  };
+}
+__name(wrapExportedHandler2, "wrapExportedHandler");
+function wrapWorkerEntrypoint2(klass) {
+  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
+    return klass;
+  }
+  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
+    __facade_register__2(middleware);
+  }
+  return class extends klass {
+    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
+      this.env = env;
+      this.ctx = ctx;
+      if (super.fetch === void 0) {
+        throw new Error("Entrypoint class does not define a fetch() function.");
+      }
+      return super.fetch(request);
+    }, "#fetchDispatcher");
+    #dispatcher = /* @__PURE__ */ __name((type, init) => {
+      if (type === "scheduled" && super.scheduled !== void 0) {
+        const controller = new __Facade_ScheduledController__2(
+          Date.now(),
+          init.cron ?? "",
+          () => {
+          }
+        );
+        return super.scheduled(controller);
+      }
+    }, "#dispatcher");
+    fetch(request) {
+      return __facade_invoke__2(
+        request,
+        this.env,
+        this.ctx,
+        this.#dispatcher,
+        this.#fetchDispatcher
+      );
+    }
+  };
+}
+__name(wrapWorkerEntrypoint2, "wrapWorkerEntrypoint");
+var WRAPPED_ENTRY2;
+if (typeof middleware_insertion_facade_default2 === "object") {
+  WRAPPED_ENTRY2 = wrapExportedHandler2(middleware_insertion_facade_default2);
+} else if (typeof middleware_insertion_facade_default2 === "function") {
+  WRAPPED_ENTRY2 = wrapWorkerEntrypoint2(middleware_insertion_facade_default2);
+}
+var middleware_loader_entry_default2 = WRAPPED_ENTRY2;
+export {
+  __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
+  middleware_loader_entry_default2 as default
+};
+//# sourceMappingURL=functionsWorker-0.3077027244375776.js.map
