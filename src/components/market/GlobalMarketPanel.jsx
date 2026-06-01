@@ -563,6 +563,25 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
   const [period, setPeriod] = useState('1D'); // 1D, 1M, 3M, 6M, 1Y
+
+  // Dynamic displayIndices memo that injects live detail updates into indices
+  const displayIndices = useMemo(() => {
+    if (!indices || indices.length === 0) return [];
+    return indices.map(item => {
+      const isSelected = item.symbol === selectedSymbol;
+      if (isSelected) {
+        const hasLivePrice = liveDetail && liveDetail.symbol === item.symbol;
+        return {
+          ...item,
+          currentPrice: hasLivePrice ? liveDetail.currentPrice : item.currentPrice,
+          change: hasLivePrice ? liveDetail.change : item.change,
+          changePercent: hasLivePrice ? liveDetail.changePercent : item.changePercent,
+          sparkline: (period === '1D' && detailHistory && detailHistory.length > 0) ? detailHistory : item.sparkline
+        };
+      }
+      return item;
+    });
+  }, [indices, selectedSymbol, liveDetail, detailHistory, period]);
   const [marketTab, setMarketTab] = useState(activeTab); // 'overview' | 'sectors' | 'predictor' | 'advisor'
 
   useEffect(() => {
@@ -1412,25 +1431,6 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
     
     return { nqWeather, nqBg, nqEmoji, nqColor, esWeather, esBg, esEmoji, esColor };
   }, [usNasdaqInput, usSp505Input]);
-
-  // Dynamic displayIndices memo that injects live detail updates into indices
-  const displayIndices = useMemo(() => {
-    if (!indices || indices.length === 0) return [];
-    return indices.map(item => {
-      const isSelected = item.symbol === selectedSymbol;
-      if (isSelected) {
-        const hasLivePrice = liveDetail && liveDetail.symbol === item.symbol;
-        return {
-          ...item,
-          currentPrice: hasLivePrice ? liveDetail.currentPrice : item.currentPrice,
-          change: hasLivePrice ? liveDetail.change : item.change,
-          changePercent: hasLivePrice ? liveDetail.changePercent : item.changePercent,
-          sparkline: (period === '1D' && detailHistory && detailHistory.length > 0) ? detailHistory : item.sparkline
-        };
-      }
-      return item;
-    });
-  }, [indices, selectedSymbol, liveDetail, detailHistory, period]);
 
   // Filter indices into main stock indices and leading wind vane indicators
   const mainIndices = useMemo(() => {
