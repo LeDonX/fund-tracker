@@ -4832,7 +4832,7 @@ export default function FundTrackerApp() {
   return (
     <div className="h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800 overflow-hidden">
       {/* 1. 左侧悬浮玻璃侧边栏 (Desktop Only) */}
-      <aside className="hidden md:flex w-72 flex-col bg-white/80 backdrop-blur-md border-r border-slate-200/50 p-5 z-30 shrink-0 gap-5 select-none relative overflow-hidden">
+      <aside className="hidden md:flex w-72 flex-col bg-white/80 backdrop-blur-md border-r border-slate-200/50 p-4 z-30 shrink-0 gap-3.5 select-none relative overflow-hidden">
         {/* Brand/Logo */}
         <div className="flex items-center gap-2 shrink-0">
           {totalDailyProfit > 0 ? (
@@ -4879,7 +4879,7 @@ export default function FundTrackerApp() {
         </div>
 
         {/* 中间可滚动区域：导航菜单 Tabs + 侧边栏实时大盘走势图 */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-5 pr-1.5 -mr-1.5">
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-3.5 pr-1.5 -mr-1.5">
           {/* 导航菜单 Tabs */}
           <div className="flex flex-col gap-1 select-none shrink-0">
             <button
@@ -4957,13 +4957,13 @@ export default function FundTrackerApp() {
           </div>
 
           {/* 侧边栏三个实时大盘分时走势图 */}
-          <div className="flex flex-col gap-3.5 border-t border-slate-200/50 pt-4 select-none shrink-0">
+          <div className="flex flex-col gap-3 border-t border-slate-200/50 pt-3 select-none shrink-0">
             <SidebarMarketTrends setActiveTab={setActiveTab} />
           </div>
         </div>
 
         {/* 侧边栏底部区域 (固定在底部，只包含账号与参数配置) */}
-        <div className="mt-auto flex flex-col gap-3.5 border-t border-slate-200/50 pt-4 select-none shrink-0">
+        <div className="mt-auto flex flex-col gap-3 border-t border-slate-200/50 pt-3 select-none shrink-0">
           {/* 登录与同步状态 + 系统参数按钮 (常驻侧边栏并排为一行 - 极致空间利用) */}
           <div className="flex items-center gap-2">
             {/* 登录与账号状态 */}
