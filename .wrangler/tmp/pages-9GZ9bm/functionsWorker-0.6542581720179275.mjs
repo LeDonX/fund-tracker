@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-NtCzqX/checked-fetch.js
+// ../.wrangler/tmp/bundle-rU5f6D/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -1271,9 +1271,6 @@ async function onRequestGet5(context) {
             }).then((r) => r.json()).catch(() => null);
           }
           const [nameRes, detailRes] = await Promise.all([namePromise, detailPromise]);
-          const sectorName = nameRes?.data?.f58 || symbol;
-          const currentPrice2 = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1e3 : 0;
-          const prevClose2 = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1e3 : currentPrice2;
           const history2 = [];
           if (range === "1d") {
             const trends = detailRes?.data || [];
@@ -1307,6 +1304,9 @@ async function onRequestGet5(context) {
               });
             }
           }
+          const sectorName = nameRes?.data?.f58 || symbol;
+          const currentPrice2 = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1e3 : history2.length > 0 ? history2[history2.length - 1].value : 0;
+          const prevClose2 = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1e3 : history2.length > 0 ? history2[0].value : currentPrice2;
           const change2 = Number((currentPrice2 - prevClose2).toFixed(2));
           const changePercent2 = prevClose2 > 0 ? Number((change2 / prevClose2 * 100).toFixed(2)) : 0;
           return new Response(
@@ -2190,7 +2190,7 @@ async function onRequestDelete2(context) {
 }
 __name(onRequestDelete2, "onRequestDelete");
 
-// ../.wrangler/tmp/pages-gTRAfP/functionsRoutes-0.9737547112654584.mjs
+// ../.wrangler/tmp/pages-9GZ9bm/functionsRoutes-0.3370944970738513.mjs
 var routes = [
   {
     routePath: "/api/auth/login",
@@ -2800,7 +2800,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-NtCzqX/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-rU5f6D/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -2832,7 +2832,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-NtCzqX/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-rU5f6D/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -2932,4 +2932,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.3077027244375776.mjs.map
+//# sourceMappingURL=functionsWorker-0.6542581720179275.mjs.map

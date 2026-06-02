@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-bw0R8Y/checked-fetch.js
+// .wrangler/tmp/bundle-yUWH8z/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,7 +27,7 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// .wrangler/tmp/pages-11hZui/functionsWorker-0.14590900533490359.mjs
+// .wrangler/tmp/pages-9GZ9bm/functionsWorker-0.6542581720179275.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 var urls2 = /* @__PURE__ */ new Set();
@@ -1315,9 +1315,6 @@ async function onRequestGet5(context) {
             }).then((r) => r.json()).catch(() => null);
           }
           const [nameRes, detailRes] = await Promise.all([namePromise, detailPromise]);
-          const sectorName = nameRes?.data?.f58 || symbol;
-          const currentPrice2 = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1e3 : 0;
-          const prevClose2 = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1e3 : currentPrice2;
           const history2 = [];
           if (range === "1d") {
             const trends = detailRes?.data || [];
@@ -1351,6 +1348,9 @@ async function onRequestGet5(context) {
               });
             }
           }
+          const sectorName = nameRes?.data?.f58 || symbol;
+          const currentPrice2 = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1e3 : history2.length > 0 ? history2[history2.length - 1].value : 0;
+          const prevClose2 = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1e3 : history2.length > 0 ? history2[0].value : currentPrice2;
           const change2 = Number((currentPrice2 - prevClose2).toFixed(2));
           const changePercent2 = prevClose2 > 0 ? Number((change2 / prevClose2 * 100).toFixed(2)) : 0;
           return new Response(
@@ -1848,7 +1848,7 @@ async function onRequestGet7(context) {
     const quotes = {};
     const lines = text.split(";").map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
-      const match2 = line.match(/var\s+v_([a-zA-Z0-9_\.]+)\s*=\s*"([^"]*)"/);
+      const match2 = line.match(/(?:var\s+)?v_([a-zA-Z0-9_\.]+)\s*=\s*"([^"]*)"/);
       if (!match2) continue;
       const fullKey = match2[1];
       const symbolKey = fullKey.replace(/^s_/, "").toLowerCase();
@@ -3021,7 +3021,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-bw0R8Y/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-yUWH8z/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -3053,7 +3053,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-bw0R8Y/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-yUWH8z/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -3153,4 +3153,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.14590900533490359.js.map
+//# sourceMappingURL=functionsWorker-0.6542581720179275.js.map

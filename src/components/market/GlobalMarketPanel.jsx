@@ -25,6 +25,75 @@ function getMarketTime(timeZone) {
   }
 }
 
+// Get market timezone based on symbol
+function getMarketTimeZone(symbol) {
+  const symbolStr = String(symbol || '');
+  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
+  const hkIndices = ["^HSI", "^HSTECH"];
+  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
+  
+  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK') || symbolStr.includes('CN=F') || symbolStr === 'USDCNH=X') {
+    return 'Asia/Shanghai';
+  } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
+    return 'Asia/Hong_Kong';
+  } else if (usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US')) {
+    return 'America/New_York';
+  } else if (symbolStr === "^N225") {
+    return 'Asia/Tokyo';
+  } else if (symbolStr === "^FTSE") {
+    return 'Europe/London';
+  } else if (symbolStr === "^GDAXI") {
+    return 'Europe/Berlin';
+  }
+  return 'Asia/Shanghai';
+}
+
+// Get timezone-specific Date components deterministically without string parsing
+function getMarketTimeParts(symbol) {
+  const timeZone = getMarketTimeZone(symbol);
+  const now = new Date();
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour12: false,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      weekday: 'short'
+    });
+    const parts = formatter.formatToParts(now);
+    const partValues = {};
+    for (const p of parts) {
+      partValues[p.type] = p.value;
+    }
+    
+    const weekdays = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    
+    return {
+      year: parseInt(partValues.year, 10),
+      month: parseInt(partValues.month, 10),
+      day: parseInt(partValues.day, 10),
+      hour: parseInt(partValues.hour, 10),
+      minute: parseInt(partValues.minute, 10),
+      second: parseInt(partValues.second, 10),
+      dayOfWeek: weekdays[partValues.weekday] !== undefined ? weekdays[partValues.weekday] : now.getDay()
+    };
+  } catch (e) {
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate(),
+      hour: now.getHours(),
+      minute: now.getMinutes(),
+      second: now.getSeconds(),
+      dayOfWeek: now.getDay()
+    };
+  }
+}
+
 // Frontend deterministic reconstruction of high-fidelity 1D real-time intraday history
 function reconstructIntradayHistory(item) {
   if (!item || !item.symbol) return [];
@@ -38,36 +107,10 @@ function reconstructIntradayHistory(item) {
   const marketToday = getMarketCurrentDateStr(symbol);
   const fullTimeline = getFullDayTimeline(symbol);
   
-  // Find current time in target timezone
-  let timeZone = 'Asia/Shanghai';
-  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
-  const hkIndices = ["^HSI", "^HSTECH"];
-  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
-  
-  const symbolStr = String(symbol || '');
-  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK') || symbolStr.includes('CN=F') || symbolStr === 'USDCNH=X') {
-    timeZone = 'Asia/Shanghai';
-  } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
-    timeZone = 'Asia/Hong_Kong';
-  } else if (usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US')) {
-    timeZone = 'America/New_York';
-  } else if (symbolStr === "^N225") {
-    timeZone = 'Asia/Tokyo';
-  } else if (symbolStr === "^FTSE") {
-    timeZone = 'Europe/London';
-  } else if (symbolStr === "^GDAXI") {
-    timeZone = 'Europe/Berlin';
-  }
-
-  let nowHour = 15;
-  let nowMinute = 0;
-  let nowDayOfWeek = 1; // Mon
-  try {
-    const marketTime = getMarketTime(timeZone);
-    nowHour = marketTime.getHours();
-    nowMinute = marketTime.getMinutes();
-    nowDayOfWeek = marketTime.getDay(); // 0 is Sunday, 1 is Monday, etc.
-  } catch (e) {}
+  const parts = getMarketTimeParts(symbol);
+  const nowHour = parts.hour;
+  const nowMinute = parts.minute;
+  const nowDayOfWeek = parts.dayOfWeek;
 
   const isWeekend = nowDayOfWeek === 0 || nowDayOfWeek === 6;
   
@@ -95,14 +138,20 @@ function reconstructIntradayHistory(item) {
   const rand = getSeededRandom(symbol);
   
   for (let i = 0; i <= currentIndex; i += step) {
-    const t = currentIndex > 0 ? i / currentIndex : 0;
-    let val = prevClose + t * (currentPrice - prevClose);
+    const progress = currentIndex > 0 ? i / currentIndex : 0;
+    let val = prevClose + progress * (currentPrice - prevClose);
     
     if (currentIndex > 0) {
-      const wave1 = Math.sin(t * Math.PI * 2) * (currentPrice * 0.003) * (rand() - 0.5);
-      const wave2 = Math.sin(t * Math.PI * 5) * (currentPrice * 0.0015) * (rand() - 0.5);
-      const wave3 = Math.sin(t * Math.PI * 10) * (currentPrice * 0.0008) * (rand() - 0.5);
-      val += wave1 + wave2 + wave3;
+      // Stable wave offsets using index relative to the FULL timeline length
+      const tStable = i / (fullTimeline.length - 1);
+      
+      const wave1 = Math.sin(tStable * Math.PI * 8) * (currentPrice * 0.003) * (rand() - 0.5);
+      const wave2 = Math.sin(tStable * Math.PI * 15) * (currentPrice * 0.0015) * (rand() - 0.5);
+      const wave3 = Math.sin(tStable * Math.PI * 30) * (currentPrice * 0.0008) * (rand() - 0.5);
+      
+      // Envelope function to damp waves to 0 at start (prevClose) and end (currentPrice)
+      const envelope = Math.sin(progress * Math.PI);
+      val += envelope * (wave1 + wave2 + wave3);
     }
     
     history.push({
@@ -269,65 +318,32 @@ function formatTargetDate(date) {
 
 // Timezone-aware date helpers to check if market has opened today
 function getMarketCurrentDateStr(symbol) {
-  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
-  const hkIndices = ["^HSI", "^HSTECH"];
-  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
-  
-  let timeZone = 'Asia/Shanghai';
-  const symbolStr = String(symbol || '');
-  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK')) {
-    timeZone = 'Asia/Shanghai';
-  } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
-    timeZone = 'Asia/Hong_Kong';
-  } else if (usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US')) {
-    timeZone = 'America/New_York';
-  } else if (symbolStr === "^N225") {
-    timeZone = 'Asia/Tokyo';
-  } else if (symbolStr === "^FTSE") {
-    timeZone = 'Europe/London';
-  } else if (symbolStr === "^GDAXI") {
-    timeZone = 'Europe/Berlin';
-  }
-  
-  try {
-    const marketTime = getMarketTime(timeZone);
-    const y = marketTime.getFullYear();
-    const m = String(marketTime.getMonth() + 1).padStart(2, '0');
-    const d = String(marketTime.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  } catch (e) {
-    return new Date().toISOString().split('T')[0];
-  }
+  const parts = getMarketTimeParts(symbol);
+  const y = parts.year;
+  const m = String(parts.month).padStart(2, '0');
+  const d = String(parts.day).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function getMarketDateStrFromISO(isoStr, symbol) {
-  const cnIndices = ["000001.SS", "399001.SZ", "000300.SS", "399006.SZ", "000688.SS", "000905.SS", "000016.SS"];
-  const hkIndices = ["^HSI", "^HSTECH"];
-  const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
-  
-  let timeZone = 'Asia/Shanghai';
-  const symbolStr = String(symbol || '');
-  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK')) {
-    timeZone = 'Asia/Shanghai';
-  } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
-    timeZone = 'Asia/Hong_Kong';
-  } else if (usIndices.includes(symbolStr) || symbolStr.endsWith('=F') || symbolStr.endsWith('.US')) {
-    timeZone = 'America/New_York';
-  } else if (symbolStr === "^N225") {
-    timeZone = 'Asia/Tokyo';
-  } else if (symbolStr === "^FTSE") {
-    timeZone = 'Europe/London';
-  } else if (symbolStr === "^GDAXI") {
-    timeZone = 'Europe/Berlin';
-  }
-  
+  const timeZone = getMarketTimeZone(symbol);
   try {
     const dObj = new Date(isoStr);
-    const tzString = dObj.toLocaleString('en-US', { timeZone });
-    const marketTime = new Date(tzString);
-    const y = marketTime.getFullYear();
-    const m = String(marketTime.getMonth() + 1).padStart(2, '0');
-    const d = String(marketTime.getDate()).padStart(2, '0');
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour12: false,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric'
+    });
+    const parts = formatter.formatToParts(dObj);
+    const partValues = {};
+    for (const p of parts) {
+      partValues[p.type] = p.value;
+    }
+    const y = partValues.year;
+    const m = String(partValues.month).padStart(2, '0');
+    const d = String(partValues.day).padStart(2, '0');
     return `${y}-${m}-${d}`;
   } catch (e) {
     return isoStr.split('T')[0];
