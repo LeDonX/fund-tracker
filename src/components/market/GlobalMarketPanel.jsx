@@ -14,6 +14,17 @@ function getSeededRandom(seedStr) {
   };
 }
 
+// Reliable helper to get timezone-specific Date object
+function getMarketTime(timeZone) {
+  const date = new Date();
+  try {
+    const tzString = date.toLocaleString('en-US', { timeZone });
+    return new Date(tzString);
+  } catch (e) {
+    return date;
+  }
+}
+
 // Frontend deterministic reconstruction of high-fidelity 1D real-time intraday history
 function reconstructIntradayHistory(item) {
   if (!item || !item.symbol) return [];
@@ -34,7 +45,7 @@ function reconstructIntradayHistory(item) {
   const usIndices = ["^GSPC", "^IXIC", "^DJI", "^HXC"];
   
   const symbolStr = String(symbol || '');
-  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK')) {
+  if (cnIndices.includes(symbolStr) || symbolStr.endsWith('.SS') || symbolStr.endsWith('.SZ') || symbolStr.startsWith('BK') || symbolStr.includes('CN=F') || symbolStr === 'USDCNH=X') {
     timeZone = 'Asia/Shanghai';
   } else if (hkIndices.includes(symbolStr) || symbolStr.endsWith('.HK')) {
     timeZone = 'Asia/Hong_Kong';
@@ -52,20 +63,10 @@ function reconstructIntradayHistory(item) {
   let nowMinute = 0;
   let nowDayOfWeek = 1; // Mon
   try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      weekday: 'numeric'
-    });
-    const parts = formatter.formatToParts(new Date());
-    for (const part of parts) {
-      if (part.type === 'hour') nowHour = parseInt(part.value, 10);
-      if (part.type === 'minute') nowMinute = parseInt(part.value, 10);
-    }
-    const dayFormatter = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'numeric' });
-    nowDayOfWeek = parseInt(dayFormatter.format(new Date()), 10);
+    const marketTime = getMarketTime(timeZone);
+    nowHour = marketTime.getHours();
+    nowMinute = marketTime.getMinutes();
+    nowDayOfWeek = marketTime.getDay(); // 0 is Sunday, 1 is Monday, etc.
   } catch (e) {}
 
   const isWeekend = nowDayOfWeek === 0 || nowDayOfWeek === 6;
@@ -289,8 +290,11 @@ function getMarketCurrentDateStr(symbol) {
   }
   
   try {
-    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
-    return formatter.format(new Date());
+    const marketTime = getMarketTime(timeZone);
+    const y = marketTime.getFullYear();
+    const m = String(marketTime.getMonth() + 1).padStart(2, '0');
+    const d = String(marketTime.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   } catch (e) {
     return new Date().toISOString().split('T')[0];
   }
@@ -318,8 +322,13 @@ function getMarketDateStrFromISO(isoStr, symbol) {
   }
   
   try {
-    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
-    return formatter.format(new Date(isoStr));
+    const dObj = new Date(isoStr);
+    const tzString = dObj.toLocaleString('en-US', { timeZone });
+    const marketTime = new Date(tzString);
+    const y = marketTime.getFullYear();
+    const m = String(marketTime.getMonth() + 1).padStart(2, '0');
+    const d = String(marketTime.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   } catch (e) {
     return isoStr.split('T')[0];
   }
@@ -1576,32 +1585,63 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   const sectorIndices = useMemo(() => {
     const list = displayIndices.filter(idx => idx.region === 'SEC');
     if (sectorSort === 'gain') {
-      return [...list].sort((a, b) => b.changePercent - a.changePercent);
+      return [...list].sort((a, b) => {
+        const origA = indices.find(x => x.symbol === a.symbol) || a;
+        const origB = indices.find(x => x.symbol === b.symbol) || b;
+        return origB.changePercent - origA.changePercent;
+      });
     } else if (sectorSort === 'loss') {
-      return [...list].sort((a, b) => a.changePercent - b.changePercent);
+      return [...list].sort((a, b) => {
+        const origA = indices.find(x => x.symbol === a.symbol) || a;
+        const origB = indices.find(x => x.symbol === b.symbol) || b;
+        return origA.changePercent - origB.changePercent;
+      });
     } else if (sectorSort === 'hot') {
       return [...list].sort((a, b) => (b.netInflow || 0) - (a.netInflow || 0));
     } else if (sectorSort === 'holding') {
       return [...list].sort((a, b) => (sectorHoldings[b.symbol] || 0) - (sectorHoldings[a.symbol] || 0));
     }
     return list;
-  }, [displayIndices, sectorSort, sectorHoldings]);
+  }, [displayIndices, indices, sectorSort, sectorHoldings]);
 
   // Group main indices by region/country, sorting China (CN & HK) first
   const groupedIndices = useMemo(() => {
     const groups = {};
+    
+    const getRegionTimeSuffix = (region) => {
+      let tz = 'Asia/Shanghai';
+      let tzLabel = '北京时间';
+      if (region === 'CN') { tz = 'Asia/Shanghai'; tzLabel = '北京时间'; }
+      else if (region === 'HK') { tz = 'Asia/Hong_Kong'; tzLabel = '香港时间'; }
+      else if (region === 'US') { tz = 'America/New_York'; tzLabel = '纽约时间'; }
+      else if (region === 'JP') { tz = 'Asia/Tokyo'; tzLabel = '东京时间'; }
+      else if (region === 'UK') { tz = 'Europe/London'; tzLabel = '伦敦时间'; }
+      else if (region === 'DE') { tz = 'Europe/Berlin'; tzLabel = '柏林时间'; }
+      else { return ''; }
+      
+      try {
+        const mTime = getMarketTime(tz);
+        const hh = String(mTime.getHours()).padStart(2, '0');
+        const mm = String(mTime.getMinutes()).padStart(2, '0');
+        return ` (${tzLabel} ${hh}:${mm})`;
+      } catch (e) {
+        return '';
+      }
+    };
+
     mainIndices.forEach(idx => {
       const region = idx.region;
       if (!groups[region]) {
+        const suffix = getRegionTimeSuffix(region);
         groups[region] = {
           region: region,
-          regionName: region === 'CN' ? '🇨🇳 中国 A 股' :
-                      region === 'HK' ? '🇭🇰 中国香港港股' :
-                      region === 'US' ? '🇺🇸 美国股市' :
-                      region === 'JP' ? '🇯🇵 日本股市' :
-                      region === 'UK' ? '🇬🇧 英国股市' :
-                      region === 'DE' ? '🇩🇪 德国股市' :
-                      idx.regionName,
+          regionName: region === 'CN' ? `🇨🇳 中国 A 股${suffix}` :
+                      region === 'HK' ? `🇭🇰 中国香港港股${suffix}` :
+                      region === 'US' ? `🇺🇸 美国股市${suffix}` :
+                      region === 'JP' ? `🇯🇵 日本股市${suffix}` :
+                      region === 'UK' ? `🇬🇧 英国股市${suffix}` :
+                      region === 'DE' ? `🇩🇪 德国股市${suffix}` :
+                      `${idx.regionName}${suffix}`,
           items: []
         };
       }
@@ -1840,7 +1880,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   }, [leadingIndices]);
 
   // Fetch all indices overview
-  const fetchOverview = async (showRefreshIndicator = false) => {
+  const fetchOverview = async (showRefreshIndicator = false, showToastIndicator = false) => {
     if (showRefreshIndicator) {
       setIsRefreshing(true);
     } else {
@@ -1863,7 +1903,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
           setSelectedSymbol(data.indices[0].symbol);
         }
 
-        if (showRefreshIndicator) {
+        if (showToastIndicator) {
           showToast('全球大盘行情已刷新成功！', 'success');
         }
       } else {
@@ -1871,7 +1911,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
       }
     } catch (err) {
       setError(err.message);
-      if (showRefreshIndicator) {
+      if (showToastIndicator) {
         showToast('行情数据刷新失败，请稍后重试', 'error');
       }
     } finally {
@@ -1927,6 +1967,18 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
       setLiveDetail(null);
       fetchDetail(selectedSymbol, period);
     }
+  }, [selectedSymbol, period]);
+
+  // Set up auto-refresh poll for the whole dashboard every 30 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchOverview(true, false); // pass true for rotating indicator, but false for toast popup
+      if (selectedSymbol) {
+        fetchDetail(selectedSymbol, period);
+      }
+    }, 30000);
+
+    return () => clearInterval(intervalId);
   }, [selectedSymbol, period]);
 
   // Find active index information
@@ -4441,7 +4493,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
               </span>
             )}
             <button
-              onClick={() => fetchOverview(true)}
+              onClick={() => fetchOverview(true, true)}
               disabled={loading || isRefreshing}
               className="flex items-center justify-center p-2 sm:p-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 transition-all text-slate-500 cursor-pointer disabled:opacity-50"
               title="一键刷新行情"
