@@ -157,10 +157,10 @@ function SidebarSparkline({ data, isPositive, symbol }) {
 
   if (!data || data.length <= 1) return null;
 
-  const marketToday = getMarketCurrentDateStr(symbol);
-  
-  // Filter data to only contain today's points in target timezone to avoid drawing yesterday's chart
-  const todayData = data.filter(d => getMarketDateStrFromISO(d.date, symbol) === marketToday);
+  // Filter data to only contain the latest session's points to handle weekends and closed markets gracefully
+  const dates = data.map(d => getMarketDateStrFromISO(d.date, symbol));
+  const latestDate = dates.reduce((latest, current) => current > latest ? current : latest, "");
+  const todayData = data.filter(d => getMarketDateStrFromISO(d.date, symbol) === latestDate);
   const isHistoryFromToday = todayData.length > 0;
 
   // Chinese stock standard: Rose for up, Emerald for down

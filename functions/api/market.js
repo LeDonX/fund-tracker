@@ -775,22 +775,21 @@ export async function onRequestGet(context) {
           
           const history = [];
           if (range === "1d") {
-            const trends = detailRes?.data || [];
+            const trends = detailRes?.data?.trends || [];
             for (const pt of trends) {
-              const timeHHMMStr = pt.f2.toString();
-              const price = parseFloat(pt.f3) / 1000;
+              const parts = pt.split(",");
+              if (parts.length < 2) continue;
+              const dateTimeStr = parts[0];
+              const price = parseFloat(parts[1]);
               if (isNaN(price)) continue;
               
-              const year = "20" + timeHHMMStr.slice(0, 2);
-              const month = timeHHMMStr.slice(2, 4);
-              const day = timeHHMMStr.slice(4, 6);
-              const hour = timeHHMMStr.slice(6, 8);
-              const minute = timeHHMMStr.slice(8, 10);
-              const localDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:00+08:00`);
+              const [dateStr, timeStr] = dateTimeStr.split(" ");
+              if (!dateStr || !timeStr) continue;
+              const localDate = new Date(`${dateStr}T${timeStr}:00+08:00`);
               
               history.push({
                 date: localDate.toISOString(),
-                time: `${hour}:${minute}`,
+                time: timeStr,
                 value: price
               });
             }
@@ -811,8 +810,46 @@ export async function onRequestGet(context) {
           }
           
           const sectorName = nameRes?.data?.f58 || symbol;
-          const currentPrice = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) / 1000 : (history.length > 0 ? history[history.length - 1].value : 0);
-          const prevClose = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) / 1000 : (history.length > 0 ? history[0].value : currentPrice);
+          
+          let currentPrice = nameRes?.data?.f43 ? parseFloat(nameRes.data.f43) : 0;
+          let prevClose = nameRes?.data?.f60 ? parseFloat(nameRes.data.f60) : 0;
+          
+          if (currentPrice > 50000) {
+            currentPrice = currentPrice / 1000;
+          }
+          if (prevClose > 50000) {
+            prevClose = prevClose / 1000;
+          }
+          
+          // Fallbacks if nameRes fields are missing
+          if (!currentPrice) {
+            currentPrice = history.length > 0 ? history[history.length - 1].value : 0;
+          }
+          if (!prevClose) {
+            prevClose = history.length > 0 ? history[0].value : currentPrice;
+          }
+          
+          // Self-correcting scale alignment for history values
+          if (history.length > 0 && currentPrice > 0) {
+            const firstVal = history[0].value;
+            if (firstVal > 0) {
+              const ratio = currentPrice / firstVal;
+              let multiplier = 1;
+              
+              if (ratio > 8 && ratio < 12) multiplier = 10;
+              else if (ratio > 80 && ratio < 120) multiplier = 100;
+              else if (ratio > 800 && ratio < 1200) multiplier = 1000;
+              else if (ratio > 0.08 && ratio < 0.12) multiplier = 0.1;
+              else if (ratio > 0.008 && ratio < 0.012) multiplier = 0.01;
+              else if (ratio > 0.0008 && ratio < 0.0012) multiplier = 0.001;
+              
+              if (multiplier !== 1) {
+                for (const pt of history) {
+                  pt.value = Number((pt.value * multiplier).toFixed(2));
+                }
+              }
+            }
+          }
           
           const change = Number((currentPrice - prevClose).toFixed(2));
           const changePercent = prevClose > 0 ? Number(((change / prevClose) * 100).toFixed(2)) : 0;

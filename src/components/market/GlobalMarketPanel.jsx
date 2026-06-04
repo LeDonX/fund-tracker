@@ -94,83 +94,7 @@ function getMarketTimeParts(symbol) {
   }
 }
 
-// Frontend deterministic reconstruction of high-fidelity 1D real-time intraday history
-function reconstructIntradayHistory(item) {
-  if (!item || !item.symbol) return [];
-  
-  const symbol = item.symbol;
-  const currentPrice = item.currentPrice || 0;
-  const changePercent = item.changePercent || 0;
-  const change = item.change || 0;
-  const prevClose = currentPrice - change;
-  
-  const marketToday = getMarketCurrentDateStr(symbol);
-  const fullTimeline = getFullDayTimeline(symbol);
-  
-  const parts = getMarketTimeParts(symbol);
-  const nowHour = parts.hour;
-  const nowMinute = parts.minute;
-  const nowDayOfWeek = parts.dayOfWeek;
-
-  const isWeekend = nowDayOfWeek === 0 || nowDayOfWeek === 6;
-  
-  // Find the index in fullTimeline up to which the market has traded today
-  let currentIndex = -1;
-  
-  if (isWeekend) {
-    currentIndex = fullTimeline.length - 1;
-  } else {
-    const currentTimeStr = `${String(nowHour).padStart(2, '0')}:${String(nowMinute).padStart(2, '0')}`;
-    for (let i = fullTimeline.length - 1; i >= 0; i--) {
-      if (fullTimeline[i] <= currentTimeStr) {
-        currentIndex = i;
-        break;
-      }
-    }
-  }
-  
-  if (currentIndex < 0) {
-    return [];
-  }
-  
-  const history = [];
-  const step = 5;
-  const rand = getSeededRandom(symbol);
-  
-  for (let i = 0; i <= currentIndex; i += step) {
-    const progress = currentIndex > 0 ? i / currentIndex : 0;
-    let val = prevClose + progress * (currentPrice - prevClose);
-    
-    if (currentIndex > 0) {
-      // Stable wave offsets using index relative to the FULL timeline length
-      const tStable = i / (fullTimeline.length - 1);
-      
-      const wave1 = Math.sin(tStable * Math.PI * 8) * (currentPrice * 0.003) * (rand() - 0.5);
-      const wave2 = Math.sin(tStable * Math.PI * 15) * (currentPrice * 0.0015) * (rand() - 0.5);
-      const wave3 = Math.sin(tStable * Math.PI * 30) * (currentPrice * 0.0008) * (rand() - 0.5);
-      
-      // Envelope function to damp waves to 0 at start (prevClose) and end (currentPrice)
-      const envelope = Math.sin(progress * Math.PI);
-      val += envelope * (wave1 + wave2 + wave3);
-    }
-    
-    history.push({
-      date: `${marketToday}T${fullTimeline[i]}:00.000Z`,
-      time: fullTimeline[i],
-      value: Number(val.toFixed(2))
-    });
-  }
-  
-  if (currentIndex % step !== 0) {
-    history.push({
-      date: `${marketToday}T${fullTimeline[currentIndex]}:00.000Z`,
-      time: fullTimeline[currentIndex],
-      value: currentPrice
-    });
-  }
-  
-  return history;
-}
+// reconstructIntradayHistory removed as we use actual item.sparkline data
 
 // Light-weight pure SVG sparkline component for grid cards
 function Sparkline({ data, isPositive, symbol }) {
@@ -180,57 +104,26 @@ function Sparkline({ data, isPositive, symbol }) {
 
   if (!data || data.length <= 1) return null;
 
-  const marketToday = getMarketCurrentDateStr(symbol);
-  
-  // Filter data to only contain today's points in target timezone to avoid drawing yesterday's chart
-  const todayData = data.filter(d => getMarketDateStrFromISO(d.date, symbol) === marketToday);
-  const isHistoryFromToday = todayData.length > 0;
-
   // Chinese stock standard: Rose for up, Emerald for down
   const strokeColor = isPositive ? '#f43f5e' : '#10b981';
   const gradId = `sparkline-grad-${isPositive ? 'up' : 'down'}-${symbol ? symbol.replace(/[^a-zA-Z0-9]/g, '') : Math.random().toString(36).substr(2, 5)}`;
 
-  // If unopened or no points from today, render a beautiful flat dashed line representing previous close
-  if (!isHistoryFromToday) {
-    return (
-      <svg className="w-full h-8 overflow-visible pointer-events-none opacity-30 mt-2" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#94a3b8" strokeWidth="1" strokeDasharray="3,3" />
-      </svg>
-    );
-  }
-
-  const values = todayData.map(d => d.value);
+  const values = data.map(d => d.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
 
-  const fullTimeline = getFullDayTimeline(symbol);
-
-  const mappedPoints = todayData.map((d, index) => {
-    const timeIndex = d.time ? fullTimeline.indexOf(d.time) : -1;
+  const mappedPoints = data.map((d, index) => {
     const y = height - ((d.value - min) / range) * (height - padding * 2) - padding;
-    return { d, timeIndex, y, index };
+    return { d, y, index };
   });
 
-  const hasAnyValidTime = mappedPoints.some(p => p.timeIndex !== -1);
-
-  let sortedPoints;
-  if (hasAnyValidTime) {
-    sortedPoints = mappedPoints
-      .filter(p => p.timeIndex !== -1)
-      .map(p => ({
-        x: (p.timeIndex / (fullTimeline.length - 1)) * (width - padding * 2) + padding,
-        y: p.y
-      }))
-      .sort((a, b) => a.x - b.x);
-  } else {
-    sortedPoints = mappedPoints
-      .map(p => ({
-        x: (p.index / (todayData.length - 1)) * (width - padding * 2) + padding,
-        y: p.y
-      }))
-      .sort((a, b) => a.x - b.x);
-  }
+  const sortedPoints = mappedPoints
+    .map(p => ({
+      x: (p.index / (data.length - 1)) * (width - padding * 2) + padding,
+      y: p.y
+    }))
+    .sort((a, b) => a.x - b.x);
 
   if (!sortedPoints || sortedPoints.length <= 1) {
     return (
@@ -586,7 +479,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
   const [detailHistory, setDetailHistory] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
-  const [period, setPeriod] = useState('1D'); // 1D, 1M, 3M, 6M, 1Y
+  const [period, setPeriod] = useState('1M'); // 1D, 1M, 3M, 6M, 1Y
   const [marketTab, setMarketTab] = useState(activeTab); // 'overview' | 'sectors' | 'predictor' | 'advisor'
 
   useEffect(() => {
@@ -4597,7 +4490,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
 
                             {/* Pure SVG Sparkline */}
                             <div className="h-8 mt-2.5 flex items-end">
-                              <Sparkline data={reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
+                              <Sparkline data={item.sparkline} isPositive={isPositive} symbol={item.symbol} />
                             </div>
                           </div>
                         </div>
@@ -4736,7 +4629,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
 
                           {/* Pure SVG Sparkline */}
                           <div className="h-8 mt-2.5 flex items-end">
-                            <Sparkline data={reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
+                            <Sparkline data={item.sparkline} isPositive={isPositive} symbol={item.symbol} />
                           </div>
                         </div>
                       </div>
@@ -4917,7 +4810,7 @@ export default function GlobalMarketPanel({ funds = [], activeTab = 'overview' }
                           
                           {/* Sparkline & custom instruction */}
                           <div className="h-8 mt-2.5 flex items-end">
-                            <Sparkline data={reconstructIntradayHistory(item)} isPositive={isPositive} symbol={item.symbol} />
+                            <Sparkline data={item.sparkline} isPositive={isPositive} symbol={item.symbol} />
                           </div>
                           
                           {/* Meaning instruction */}
